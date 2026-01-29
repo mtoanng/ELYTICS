@@ -5,7 +5,7 @@ from services.changelog_service import get_latest_released_version
 
 # TODO: implement use of dash_auth.list_groups to conditionally show/hide sidebar items
 
-def get_sidebar():
+def sidebar_layout():
     latest_version = get_latest_released_version() or "Unknown"
     return html.Div(
         [
@@ -130,3 +130,5 @@ def get_sidebar():
         ],
         className="sidebar-container"
     )
+
+layout = sidebar_layout

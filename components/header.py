@@ -6,7 +6,7 @@ import dash_bootstrap_components as dbc
 # TODO: use dash_auth.list_groups to conditionally show available spaces in dropdown
 # nice to have: show unavailable spaces wiht a tooltip saying they need _x oneidm role?
 
-def get_header():
+def header_layout():
     return html.Header([
         html.Div([
             # Left: Sherlock logo and text
@@ -56,6 +56,8 @@ def get_header():
             ),
         ], style={"width": "100%", "display": "flex", "alignItems": "center", "justifyContent": "space-between"}),
     ], className="header-bar")
+
+layout = header_layout
 
 @callback(
     Output("bosch-logo-div", "children"),
