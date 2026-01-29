@@ -1,0 +1,21 @@
+.github/copilot-instructions.md
+.env
+
+# Python bytecode files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment
+venv/
+.venv/
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# VS Code specific files (optional, but often useful)
+.vscode/
+tokens.env
+components/__pycache__/header.cpython-313.pyc
+components/__pycache__/footer.cpython-313.pyc

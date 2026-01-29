@@ -1,0 +1,44 @@
+# databricks.yml
+# test
+bundle:
+
+  name: sherlock # Replace with a unique name for your application
+ 
+resources:
+
+  jobs:
+
+    minimal_app_runner:
+
+      tasks:
+
+        - task_key: run_app
+
+          new_cluster:
+
+            spark_version: 13.3.x-scala2.12 # Specify a Databricks Runtime version
+
+            node_type_id: Standard_DS3_v2 # A basic node type
+
+            num_workers: 0 # Single node for a simple Dash app
+
+          libraries:
+
+            - pip:
+
+                requirements: requirements.txt # Assumes requirements.txt is in the root or src folder
+
+          spark_python_task:
+
+            python_file: file://app.py # Path to your main Dash app file
+
+            parameters:
+
+              - "--port"
+
+              - "8080"
+
+              - "--host"
+
+              - "0.0.0.0"
+ 

@@ -1,0 +1,17 @@
+# Requirements for PEMELY Sherlock platform
+# Requires Python >=3.8
+
+###### Requirements without Version Specifiers ######
+dash
+dash-bootstrap-components
+dash-table
+
+pandas
+pyodbc
+dotenv
+databricks
+databricks.sql
+databricks-sql-connector
+
+authlib
+flask-session

@@ -1,0 +1,500 @@
+/* Sherlock quote blockquote styling */
+.sherlock-quote {
+    background: #ffffff;
+    border-left: 5px solid #2d98da;
+    border-right: 5px solid #2d98da;
+    padding: 1.1em 1.5em 1.1em 1.2em;
+    margin: 18px auto;
+    color: #222a35;
+    font-size: 1.02rem;
+    font-style: italic;
+    border-radius: 8px;
+    box-shadow: 0 5px 12px rgba(44,62,80,0.07);
+    transition: background 0.2s, color 0.2s;
+}
+.dark-mode .sherlock-quote {
+    background: #3b3e42;
+    color: #e6e6e6;
+    border-left: 5px solid #8ee8f8;
+    border-right: 5px solid #8ee8f8;
+    box-shadow: 0 5px 12px rgba(44,62,80,0.18);
+}
+.invert-logo {
+    filter: invert(1);
+}
+/* Holmes application suite logos */
+.holmes-logo {
+    height: 100px;
+    width: auto;
+    margin: 0 0.2rem;
+    filter: drop-shadow(0 2px 6px rgba(0,0,0,0.10));
+    transition: transform 0.2s;
+}
+.holmes-logo:hover {
+    transform: scale(1.08) rotate(-2deg);
+    filter: drop-shadow(0 4px 12px rgba(0,0,0,0.18));
+}
+/* Selection display area styling for both themes */
+.selection-display-area {
+    padding: 10px;
+    border-radius: 6px;
+    margin-bottom: 5px;
+    font-size: 14px;
+    border: 1px solid #c7d4f3;
+    background: #eef4ff;
+    color: #222a35;
+}
+.dark-mode .selection-display-area {
+    background-color: #181a1b !important;
+    color: #e6e6e6 !important;
+    border: 1px solid #333 !important;
+}
+/* Reset selection button: match download button style */
+#reset-selection-btn {
+    background-color: #ecf4ff !important;
+    color: #111 !important;
+    border: 1px solid #c7d4f3 !important;
+}
+#reset-selection-btn:hover, #reset-selection-btn:focus {
+    background-color: #d1e2fc !important;
+    color: #111 !important;
+}
+.dark-mode #reset-selection-btn {
+    background-color: #343a40 !important;
+    color: #f1f1f1 !important;
+    border: 1px solid #444 !important;
+}
+.dark-mode #reset-selection-btn:hover, .dark-mode #reset-selection-btn:focus {
+    background-color: #495057 !important;
+    color: #fff !important;
+}
+
+/* Download button dark mode for sample/order pages */
+/* Download button: match reset selection button style */
+.download-btn {
+    background-color: #ecf4ff !important;
+    color: #111 !important;
+    border: 1px solid #c7d4f3 !important;
+}
+.download-btn:hover, .download-btn:focus {
+    background-color: #d1e2fc !important;
+    color: #111 !important;
+}
+.dark-mode .download-btn {
+    background-color: #343a40 !important;
+    color: #f1f1f1 !important;
+    border: 1px solid #444 !important;
+}
+.dark-mode .download-btn:hover, .dark-mode .download-btn:focus {
+    background-color: #495057 !important;
+    color: #fff !important;
+}
+/* Dark mode: dim dropdown menu text in filters (order/sample pages) */
+.dark-mode .dash-dropdown, .dark-mode .Select-control, .dark-mode .Select-menu-outer, .dark-mode .Select-menu, .dark-mode .Select-option {
+    color: #cfcfcf !important;
+    background-color: #23272b !important;
+}
+.dark-mode .Select-option.is-focused {
+    background-color: #343a40 !important;
+    color: #f1f1f1 !important;
+}
+/* Theme switch icon spacing and alignment */
+.theme-switch-custom + .bi {
+    vertical-align: middle;
+}
+.theme-switch-custom .bi {
+    vertical-align: middle;
+}
+/* Theme label color for Light/Dark text */
+.theme-label-light {
+    color: #222;
+    transition: color 0.2s;
+}
+.theme-label-dark {
+    color: #222;
+    transition: color 0.2s;
+}
+.dark-mode .theme-label-light {
+    color: #f1f1f1;
+}
+.dark-mode .theme-label-dark {
+    color: #f7c948;
+}
+/* Custom theme switch with sun/moon icons that toggle visibility */
+.theme-switch-custom {
+    position: relative;
+    min-width: 10px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+}
+
+/* Force dark table header background, override all */
+.dark-mode .dash-table-container .dash-header th,
+.dark-mode .dash-table-container th {
+    background-color: #111215 !important;
+    color: #f8f9fa !important;
+    border-bottom: 2px solid #333 !important;
+    font-weight: bold !important;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+}
+/* Sidebar selection color for light and dark mode (paired) */
+.nav-link.active {
+    background-color: #d1e2fc !important;
+    color: #000 !important;
+}
+.nav-link.active:hover {
+    background-color: #afcfff !important;
+    color: #000 !important;
+}
+.sidebar-group-btn {
+    background-color: #e7ebed !important;
+    color: #222 !important;
+}
+.sidebar-group-btn:hover, .sidebar-group-btn:focus {
+    background-color: #b4c2d3 !important;
+    color: #111 !important;
+}
+.dark-mode .nav-link.active {
+    background-color: #343a40 !important;
+    color: #f1f1f1 !important;
+}
+.dark-mode .nav-link.active:hover {
+    background-color: #495057 !important;
+    color: #f1f1f1 !important;
+}
+.dark-mode .sidebar-group-btn {
+    background-color: #23272b !important;
+    color: #f1f1f1 !important;
+}
+.dark-mode .sidebar-group-btn:hover, .dark-mode .sidebar-group-btn:focus {
+    background-color: #343a40 !important;
+    color: #fff !important;
+}
+/* Full-page background theme (paired) */
+.light-mode, .light-mode body, .light-mode html {
+    --main-bg: #fff;
+    --main-color: #222;
+    background-color: #f8f9fa !important;
+    color: #222 !important;
+}
+.dark-mode, .dark-mode body, .dark-mode html {
+    --main-bg: #23272b;
+    --main-color: #f1f1f1;
+    background-color: #181a1b !important;
+    color: #f1f1f1 !important;
+}
+/* Sidebar background (paired) */
+.sidebar {
+    background-color: #f8f9fa;
+    color: #222;
+}
+.dark-mode .sidebar {
+    background-color: #23272b !important;
+    color: #f1f1f1 !important;
+}
+.dark-mode .sidebar a, .dark-mode .sidebar .sidebar-group-btn {
+    color: #f1f1f1 !important;
+}
+.dark-mode .sidebar-group-btn {
+    background-color: #343a40 !important;
+}
+
+/* Dash DataTable dark mode */
+.dark-mode .dash-table-container {
+    background-color: #23272b !important;
+    color: #f1f1f1 !important;
+}
+.dark-mode .dash-table-container .dash-spreadsheet-container {
+    background-color: #23272b !important;
+}
+/* Improved table header visibility in dark mode */
+/* Make table headers in dark mode even darker for contrast */
+.dark-mode .dash-table-container .dash-header th {
+    background-color: #111215 !important;
+    color: #f8f9fa !important;
+    border-bottom: 2px solid #333 !important;
+    font-weight: bold !important;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+}
+.dark-mode .dash-table-container .dash-cell {
+    background-color: #23272b !important;
+    color: #f1f1f1 !important;
+    border-color: #333 !important;
+}
+.dark-mode .dash-table-container .dash-cell.focused {
+    background-color: #343a40 !important;
+}
+.dark-mode .dash-table-container .dash-header {
+    border-bottom: 1px solid #333 !important;
+}
+.dark-mode .dash-table-container .dash-row:hover .dash-cell {
+    background-color: #343a40 !important;
+}
+.dark-mode .dash-table-container .dash-filter {
+    background-color: #23272b !important;
+    color: #f1f1f1 !important;
+}
+/* Light/Dark mode support */
+.light-mode {
+    background-color: #f8f9fa !important;
+    color: #222 !important;
+}
+.dark-mode {
+    background-color: #181a1b !important;
+    color: #f1f1f1 !important;
+}
+
+/* Header and Footer for dark mode */
+.dark-mode .header-bar {
+    background: #23272b !important;
+    color: #f1f1f1 !important;
+    border-bottom: 1px solid #333 !important;
+}
+
+.light-mode .header-bar {
+    background: #fff !important;
+    color: #222 !important;
+    border-bottom: 1px solid #eaeaea !important;
+}
+/* Footer should always look the same regardless of theme */
+    .footer-img {
+        filter: none !important;
+    }
+/* Horizontal bar for home page links section */
+.horizontal-bar {
+    width: 100%;
+    height: 3px;
+    background: #d1e2fc;
+    margin: 18px 0;
+    border-radius: 2px;
+}
+/* Move Dash DataTable sort icon to the bottom center of each header cell */
+.dash-table-container .dash-header th {
+    position: relative;
+}
+/* Remove height and overflow restrictions for Dash DataTable to prevent vertical scrollbars */
+.dash-table-container, .dash-table-container .dash-spreadsheet-container, .dash-table-container .dash-spreadsheet-inner {
+    max-height: none !important;
+    height: auto !important;
+    overflow-y: visible !important;
+}
+/* Header */
+.header-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 30px;
+    background: #fff;
+    border-bottom: 1px solid #eaeaea;
+    height: 70px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1050;
+}
+.header-logo-left {
+    float: left;
+}
+.header-logo-right {
+    float: right;
+}
+
+/* Sidebar container */
+.sidebar-container {
+    position: fixed;
+    top: 70px;
+    left: 0;
+    bottom: 15px;
+    height: calc(100vh - 70px - 15px);
+    z-index: 1000;
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+}
+
+/* Sidebar */
+.sidebar {
+    top: 0;
+    bottom: 0;
+    width: 220px;
+    padding: 1rem;
+    background-color: #f8f9fa;
+    transition: all 0.2s;
+    overflow-x: hidden;
+    z-index: 1000;
+    height: 100%;
+}
+.sidebar-collapsed {
+    width: 0 !important;
+    padding: 0 !important;
+}
+
+/* Sidebar toggle button */
+.sidebar-toggle-btn {
+    position: absolute;
+    top: 0;
+    left: 220px;
+    z-index: 1101;
+    transition: left 0.2s;
+    padding: 0.25rem 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #eff0f0;
+    border: 1px solid #f3f3f6;
+    width: 25px;
+    height: 30px;
+    border-radius: 5%;
+    font-size: 1.5rem;
+}
+.sidebar.sidebar-collapsed + .sidebar-toggle-btn {
+    left: 0 !important;
+}
+
+/* Page content */
+.page-content, .page-content-expanded {
+    position: absolute;
+    top: 70px;
+    left: 0;
+    right: 0;
+    bottom: 15px;
+    box-sizing: border-box;
+    padding: 0.0rem 1rem;
+    background: var(--main-bg) !important;
+    color: var(--main-color) !important;
+    transition: all 0.2s;
+    width: 100vw;
+    overflow-y: auto;
+}
+.page-content {
+    left: 220px;
+    width: calc(100vw - 220px);
+}
+.page-content-expanded {
+    left: 0;
+    width: 100vw;
+}
+
+/* Footer */
+.footer-img {
+    width: 100vw;
+    height: 10px;
+    object-fit: cover;
+    display: block;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    z-index: 1050;
+}
+
+/* Sidebar group buttons */
+.sidebar-group-btn {
+    /* background-color: #d1d5db !important; darker gray */
+    background-color: #e7ebed !important; /* darker gray */
+    border-radius: 12px !important;
+    margin: 0.25rem 0;
+    color: #222 !important;
+    font-weight: 600;
+    text-decoration: none !important; /* remove underline */
+    box-shadow: none !important;
+    border: none !important;
+    outline: none !important;
+    transition: background 0.2s;
+}
+.sidebar-group-btn:hover, .sidebar-group-btn:focus {
+    /* background-color: #b0b4b9 !important; */
+    /* color: #111 !important; */
+    background-color: #b4c2d3 !important;
+    color: #111 !important;
+    text-decoration: none !important;
+}
+
+
+/* Override Bootstrap active nav item color */
+.nav-link.active {
+    background-color: #d1e2fc !important;   /* light grey background */
+    color: #000 !important;                 /* black text */
+    border-radius: 8px !important;
+}
+
+/* Optional: hover state for active item */
+.nav-link.active:hover {
+    background-color: #afcfff !important;
+    color: #000 !important;
+}
+
+
+/* Hover behavior for all NON-active nav links */
+.nav-link:hover:not(.active) {
+    background-color: #ecf4ff !important;
+    color: #000 !important;
+    border-radius: 8px !important;
+    }
+
+/* Platform logo sizing for home page */
+.platform-logo {
+    width: 150px;
+    height: 60px;
+    object-fit: contain;
+    display: block;
+}
+/* Invert logo in dark mode */
+.dark-mode .platform-logo {
+    filter: invert(1) hue-rotate(180deg);
+}
+/* Restrict anchor clickable area to logo size */
+.logo-link {
+    display: inline-block;
+    width: 150px;
+    height: 60px;
+    line-height: 0;
+    padding: 0;
+}
+
+/* --- polcurve count buttons --- */
+/* Light mode styles */
+.polcurve-count-box {
+    background-color: #f1f2f6;
+    border-radius: 10px;
+    padding: 8px 32px 4px 32px;
+    box-shadow: 0 2px 8px rgba(44,62,80,0.07);
+    min-width: 160px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    border: 1px solid #dfe4ea;
+}
+
+.polcurve-count-label {
+    font-size: 13px;
+    color: #636e72;
+    font-weight: 500;
+    margin-bottom: 2px;
+    letter-spacing: 0.5px;
+}
+
+.polcurve-count-number {
+    font-size: 2.2em;
+    font-weight: 700;
+    color: #2d98da;
+    margin-top: 2px;
+}
+
+/* Dark mode styles */
+body.dark-mode .polcurve-count-box {
+    background-color: #181a1d !important;
+    border: 1px solid #353b48 !important;
+}
+
+body.dark-mode .polcurve-count-label {
+    color: #dfe6e9 !important;
+}
+
+body.dark-mode .polcurve-count-number {
+    color: #8ee8f8 !important;
+}

@@ -1,0 +1,4 @@
+SELECT *
+
+FROM
+  ps_xplatform_dev.pemely_ops.dia2tb_timeseries_gold_testrig_management_dashboard_incl_locations_jan2026
