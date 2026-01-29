@@ -71,7 +71,6 @@ from dash_auth import protected_callback
 from dash import Output, Input
 
 @protected_callback(
-    html.Div("Access denied", style={"color": "red", "padding": "2rem"}),
     Output("some-output", "children"),
     Input("some-input", "value"),
     groups=["IdM2BCD_holmes_pemely_management"]
@@ -99,11 +98,20 @@ This returns a list of all groups associated with the current user session, incl
 ## Group Access Policy
 
 - **IdM2BCD_holmes_pemely_user**  
-  Grants access to: `sherlock`, `watson`, `mycroft`
+  Should grant access to: `sherlock`, `watson`, `mycroft`
 
 - **IdM2BCD_holmes_pemely_management**  
-  Grants access to: `enola`
+  Should grant access to: `enola`
 
 Additional OneIDM roles can be created and customized as needed.
+
+---
+
+## Automated Enforcement
+
+**These group access policies are automatically enforced via Pytest.**
+
+A test in `tests/test_authorization.py` statically analyzes all page files in the `spaces/` directory to ensure that each page is protected with the correct group(s) according to the policy above.  
+If a page is missing the required authorization decorator or group, the test will fail, helping maintain security and consistency across the app.
 
 ---
