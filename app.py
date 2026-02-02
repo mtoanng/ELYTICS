@@ -2,11 +2,14 @@ import os
 import dash
 from dash import html, dcc, Output, Input, State
 from dash import callback_context
-
 import dash_bootstrap_components as dbc
 from dash_auth import OIDCAuth
 
 from components import header, sidebar, footer
+
+from dotenv import load_dotenv
+from waitress import serve
+load_dotenv()
 
 external_stylesheets = [dbc.themes.BOOTSTRAP]
 
@@ -173,4 +176,8 @@ def toggle_ai_group(n, is_open):
     return is_open, "bi bi-chevron-right me-2"
 
 if __name__ == "__main__":
-    app.run(debug=True, port=8501)
+    debug_mode = os.getenv("ENVIRONMENT", "development") == "development"
+    if debug_mode:
+        app.run(debug=True, port=8501, use_reloader=True)
+    else:
+        serve(app.server, host="0.0.0.0", port=8501)
