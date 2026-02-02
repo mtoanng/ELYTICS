@@ -56,7 +56,7 @@ stages:
                 - task: Docker@2
                   displayName: 'Build and Push Docker Image'
                   inputs:
-                    containerRegistry: '$(DOCKER_REGISTRY_SERVICE_CONNECTION)'
+                    containerRegistry: 'holmes_docker_registry'
                     repository: '$(DOCKER_REPOSITORY)'
                     command: 'buildAndPush'
                     Dockerfile: '**/Dockerfile'
@@ -66,7 +66,7 @@ stages:
                 - task: AzureWebAppContainer@1
                   displayName: 'Deploy to Azure Web App (Dev)'
                   inputs:
-                    azureSubscription: '$(AZURE_SUBSCRIPTION)'
+                    azureSubscription: 'holmes_deployment'
                     appName: '$(DEV_APP_SERVICE_NAME)'
                     containers: '$(CONTAINER_REGISTRY)/$(DOCKER_REPOSITORY):$(BUILD_BUILDID)'
 
@@ -98,7 +98,7 @@ stages:
                 - task: Docker@2
                   displayName: 'Build and Push Docker Image'
                   inputs:
-                    containerRegistry: '$(DOCKER_REGISTRY_SERVICE_CONNECTION)'
+                    containerRegistry: 'holmes_docker_registry'
                     repository: '$(DOCKER_REPOSITORY)'
                     command: 'buildAndPush'
                     Dockerfile: '**/Dockerfile'
@@ -108,6 +108,6 @@ stages:
                 - task: AzureWebAppContainer@1
                   displayName: 'Deploy to Azure Web App (Prod)'
                   inputs:
-                    azureSubscription: '$(AZURE_SUBSCRIPTION)'
+                    azureSubscription: 'holmes_deployment'
                     appName: '$(PROD_APP_SERVICE_NAME)'
                     containers: '$(CONTAINER_REGISTRY)/$(DOCKER_REPOSITORY):$(BUILD_BUILDID)'
