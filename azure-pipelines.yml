@@ -20,7 +20,7 @@ stages:
             displayName: 'Upgrade pip'
           - script: pip install -r requirements.txt
             displayName: 'Install dependencies'
-          - script: pytest --junitxml=test-results.xml
+          - script: python -m pytest --junitxml=test-results.xml
             displayName: 'Run pytest'
           - task: PublishTestResults@2
             inputs:
