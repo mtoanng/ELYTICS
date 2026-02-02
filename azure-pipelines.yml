@@ -4,6 +4,10 @@ trigger:
       - develop-test
       - main
 
+variables:
+  - name: TagName
+    value: $[eq(variables['Build.SourceBranch'], 'refs/heads/main') ? 'latest' : 'develop']
+
 stages:
   - stage: Test
     displayName: "Run Tests"
@@ -113,7 +117,3 @@ stages:
                     azureSubscription: 'holmes_deployment'
                     appName: '$(PROD_APP_SERVICE_NAME)'
                     containers: '$(CONTAINER_REGISTRY)/$(DOCKER_REPOSITORY):$(TagName)'
-
-variables:
-  - name: TagName
-    value: $[eq(variables['Build.SourceBranch'], 'refs/heads/main') ? 'latest' : 'develop']
