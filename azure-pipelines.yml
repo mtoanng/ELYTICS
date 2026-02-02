@@ -4,10 +4,6 @@ trigger:
       - develop-test
       - main
 
-variables:
-  - name: TagName
-    value: $[eq(variables['Build.SourceBranch'], 'refs/heads/main') ? 'latest' : 'develop']
-
 stages:
   - stage: Test
     displayName: "Run Tests"
@@ -67,14 +63,14 @@ stages:
                     command: 'buildAndPush'
                     Dockerfile: '**/Dockerfile'
                     tags: |
-                      $(TagName)
+                      $(TAG_NAME)
                 # Deploy to Azure Web App for Containers
                 - task: AzureWebAppContainer@1
                   displayName: 'Deploy to Azure Web App (Dev)'
                   inputs:
                     azureSubscription: 'holmes_deployment'
                     appName: '$(DEV_APP_SERVICE_NAME)'
-                    containers: '$(CONTAINER_REGISTRY)/$(DOCKER_REPOSITORY):$(TagName)'
+                    containers: '$(CONTAINER_REGISTRY)/$(DOCKER_REPOSITORY):$(TAG_NAME)'
 
   - stage: Deploy_Prod
     displayName: "Deploy to Prod"
@@ -109,11 +105,11 @@ stages:
                     command: 'buildAndPush'
                     Dockerfile: '**/Dockerfile'
                     tags: |
-                      $(TagName)
+                      $(TAG_NAME)
                 # Deploy to Azure Web App for Containers
                 - task: AzureWebAppContainer@1
                   displayName: 'Deploy to Azure Web App (Prod)'
                   inputs:
                     azureSubscription: 'holmes_deployment'
                     appName: '$(PROD_APP_SERVICE_NAME)'
-                    containers: '$(CONTAINER_REGISTRY)/$(DOCKER_REPOSITORY):$(TagName)'
+                    containers: '$(CONTAINER_REGISTRY)/$(DOCKER_REPOSITORY):$(TAG_NAME)'
