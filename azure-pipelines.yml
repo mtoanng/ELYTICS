@@ -1,7 +1,7 @@
 trigger:
   branches:
     include:
-      - develop-test
+      - develop
       - main
 
 stages:
@@ -33,7 +33,7 @@ stages:
   - stage: Deploy_Dev
     displayName: "Deploy to Dev"
     dependsOn: Test
-    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/develop-test'))
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/develop'))
     variables:
       - group: HOLMES_SUITE_DEV
     jobs:
