@@ -63,14 +63,14 @@ stages:
                     command: 'buildAndPush'
                     Dockerfile: '**/Dockerfile'
                     tags: |
-                      $(BUILD_BUILDID)
+                      $(TagName)
                 # Deploy to Azure Web App for Containers
                 - task: AzureWebAppContainer@1
                   displayName: 'Deploy to Azure Web App (Dev)'
                   inputs:
                     azureSubscription: 'holmes_deployment'
                     appName: '$(DEV_APP_SERVICE_NAME)'
-                    containers: '$(CONTAINER_REGISTRY)/$(DOCKER_REPOSITORY):$(BUILD_BUILDID)'
+                    containers: '$(CONTAINER_REGISTRY)/$(DOCKER_REPOSITORY):$(TagName)'
 
   - stage: Deploy_Prod
     displayName: "Deploy to Prod"
@@ -105,11 +105,15 @@ stages:
                     command: 'buildAndPush'
                     Dockerfile: '**/Dockerfile'
                     tags: |
-                      $(BUILD_BUILDID)
+                      $(TagName)
                 # Deploy to Azure Web App for Containers
                 - task: AzureWebAppContainer@1
                   displayName: 'Deploy to Azure Web App (Prod)'
                   inputs:
                     azureSubscription: 'holmes_deployment'
                     appName: '$(PROD_APP_SERVICE_NAME)'
-                    containers: '$(CONTAINER_REGISTRY)/$(DOCKER_REPOSITORY):$(BUILD_BUILDID)'
+                    containers: '$(CONTAINER_REGISTRY)/$(DOCKER_REPOSITORY):$(TagName)'
+
+variables:
+  - name: TagName
+    value: $[eq(variables['Build.SourceBranch'], 'refs/heads/main') ? 'latest' : 'develop']
