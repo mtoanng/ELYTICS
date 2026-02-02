@@ -176,8 +176,8 @@ def toggle_ai_group(n, is_open):
     return is_open, "bi bi-chevron-right me-2"
 
 if __name__ == "__main__":
-    debug_mode = os.getenv("ENVIRONMENT", "development") == "development"
+    debug_mode = os.getenv("ENV", "development") == "development"
     if debug_mode:
-        app.run(debug=True, port=8501, use_reloader=True)
+        app.run(debug=True, host="0.0.0.0", port=8501, use_reloader=True)
     else:
         serve(app.server, host="0.0.0.0", port=8501)

@@ -1,0 +1,113 @@
+trigger:
+  branches:
+    include:
+      - develop
+      - main
+
+stages:
+  - stage: Test
+    displayName: "Run Tests"
+    jobs:
+      - job: RunPytest
+        displayName: "Run pytest"
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: '3.10'
+          - script: python -m pip install --upgrade pip
+            displayName: 'Upgrade pip'
+          - script: pip install -r requirements.txt
+            displayName: 'Install dependencies'
+          - script: pytest --junitxml=test-results.xml
+            displayName: 'Run pytest'
+          - task: PublishTestResults@2
+            inputs:
+              testResultsFiles: 'test-results.xml'
+              testRunTitle: 'Pytest Results'
+              failTaskOnFailedTests: true
+
+  - stage: Deploy_Dev
+    displayName: "Deploy to Dev"
+    dependsOn: Test
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/develop'))
+    variables:
+      - group: HOLMES_SUITE_DEV
+    jobs:
+      - deployment: DeployDev
+        displayName: "Deploy to Azure App Service (Dev)"
+        environment: 'dev'
+        pool:
+          vmImage: 'ubuntu-latest'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                - task: UsePythonVersion@0
+                  inputs:
+                    versionSpec: '3.10'
+                - script: python -m pip install --upgrade pip
+                  displayName: 'Upgrade pip'
+                - script: pip install -r requirements.txt
+                  displayName: 'Install dependencies'
+                # Build Docker image and push to Azure Container Registry
+                - task: Docker@2
+                  displayName: 'Build and Push Docker Image'
+                  inputs:
+                    containerRegistry: '$(DOCKER_REGISTRY_SERVICE_CONNECTION)'
+                    repository: '$(DOCKER_REPOSITORY)'
+                    command: 'buildAndPush'
+                    Dockerfile: '**/Dockerfile'
+                    tags: |
+                      $(BUILD_BUILDID)
+                # Deploy to Azure Web App for Containers
+                - task: AzureWebAppContainer@1
+                  displayName: 'Deploy to Azure Web App (Dev)'
+                  inputs:
+                    azureSubscription: '$(AZURE_SUBSCRIPTION)'
+                    appName: '$(DEV_APP_SERVICE_NAME)'
+                    containers: '$(CONTAINER_REGISTRY)/$(DOCKER_REPOSITORY):$(BUILD_BUILDID)'
+
+  - stage: Deploy_Prod
+    displayName: "Deploy to Prod"
+    dependsOn: Test
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    variables:
+      - group: HOLMES_SUITE_PROD
+    jobs:
+      - deployment: DeployProd
+        displayName: "Deploy to Azure App Service (Prod)"
+        environment: 'prod'
+        pool:
+          vmImage: 'ubuntu-latest'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                - task: UsePythonVersion@0
+                  inputs:
+                    versionSpec: '3.10'
+                - script: python -m pip install --upgrade pip
+                  displayName: 'Upgrade pip'
+                - script: pip install -r requirements.txt
+                  displayName: 'Install dependencies'
+                # Build Docker image and push to Azure Container Registry
+                - task: Docker@2
+                  displayName: 'Build and Push Docker Image'
+                  inputs:
+                    containerRegistry: '$(DOCKER_REGISTRY_SERVICE_CONNECTION)'
+                    repository: '$(DOCKER_REPOSITORY)'
+                    command: 'buildAndPush'
+                    Dockerfile: '**/Dockerfile'
+                    tags: |
+                      $(BUILD_BUILDID)
+                # Deploy to Azure Web App for Containers
+                - task: AzureWebAppContainer@1
+                  displayName: 'Deploy to Azure Web App (Prod)'
+                  inputs:
+                    azureSubscription: '$(AZURE_SUBSCRIPTION)'
+                    appName: '$(PROD_APP_SERVICE_NAME)'
+                    containers: '$(CONTAINER_REGISTRY)/$(DOCKER_REPOSITORY):$(BUILD_BUILDID)'
