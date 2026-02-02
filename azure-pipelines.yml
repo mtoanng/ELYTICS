@@ -58,7 +58,7 @@ stages:
                 - task: Docker@2
                   displayName: 'Build and Push Docker Image'
                   inputs:
-                    containerRegistry: 'holmes_docker_registry'
+                    containerRegistry: 'holmes_docker_registry_managed'
                     repository: '$(DOCKER_REPOSITORY)'
                     command: 'buildAndPush'
                     Dockerfile: '**/Dockerfile'
@@ -100,7 +100,7 @@ stages:
                 - task: Docker@2
                   displayName: 'Build and Push Docker Image'
                   inputs:
-                    containerRegistry: 'holmes_docker_registry'
+                    containerRegistry: 'holmes_docker_registry_managed'
                     repository: '$(DOCKER_REPOSITORY)'
                     command: 'buildAndPush'
                     Dockerfile: '**/Dockerfile'
