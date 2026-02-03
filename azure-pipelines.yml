@@ -11,6 +11,7 @@ stages:
       - job: RunPytest
         displayName: "Run pytest"
         pool:
+          name: TbP
           vmImage: 'ubuntu-latest'
         steps:
           - task: UsePythonVersion@0
@@ -41,6 +42,7 @@ stages:
         displayName: "Deploy to Azure App Service (Dev)"
         environment: 'dev'
         pool:
+          name: TbP
           vmImage: 'ubuntu-latest'
         strategy:
           runOnce:
@@ -83,6 +85,7 @@ stages:
         displayName: "Deploy to Azure App Service (Prod)"
         environment: 'prod'
         pool:
+          name: TbP
           vmImage: 'ubuntu-latest'
         strategy:
           runOnce:
