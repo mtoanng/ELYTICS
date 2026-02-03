@@ -1,40 +1,63 @@
-# Introduction 
-PEMELY SHERLOCK application to view ELY asTested data.
+# TBP-HOLMES Developer Guide
 
-# Databricks Connection Setup
+## Getting Started (Recommended: Dev Container)
 
-To connect to Databricks DEV, create a file named `tokens.env` in the project root with the following content:
+**We strongly recommend all developers use Docker and the provided Dev Container for a consistent, hassle-free development environment.**
 
+### Prerequisites
+
+Docker and Visual Studio Code can be ordered [here](https://service-management.bosch.tech/sp?id=sc_cat_item&sys_id=b08ed16c1b83c91078087403dd4bcbb1)
+
+- [Docker - Docupedia](https://inside-docupedia.bosch.com/confluence/spaces/AABDO/pages/6400935502/Docker+Desktop) (required)
+- [Visual Studio Code](https://code.visualstudio.com/) (recommended)
+- [Dev Containers extension for VS Code](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) (recommended)
+
+### Quick Start with Dev Container
+
+1. **Clone the repository:**
+	```sh
+	git clone https://BoschTransmissionTechnology@dev.azure.com/BoschTransmissionTechnology/ELY%20Analytics%20Solution/_git/TBP-HOLMES
+	cd TBP-HOLMES
+	```
+2. **Open in VS Code.**
+3. **Reopen in Container:**
+	- When prompted, click "Reopen in Container". If not prompted, open the Command Palette (`Ctrl+Shift+P`), search for `Dev Containers: Reopen in Container` and select it.
+4. **Wait for the container to build and dependencies to install.**
+5. **Configure your environment variables:**
+	- Copy `.env.example` to `.env` and fill in the required values.
+	```sh
+	cp .env.example .env
+	# Edit .env as needed
+	```
+6. **Run the application:**
+	```sh
+	# Inside the dev container terminal
+	python app.py
+	```
+
+---
+
+## Alternative: Local Setup (Not Recommended)
+
+If you choose not to use Docker/dev containers, you must ensure you have Python 3.9+ and install all dependencies manually:
+
+```sh
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+# Edit .env as needed
+python app.py
 ```
-DATABRICKS_SERVER_HOSTNAME=adb-1032635496032522.2.azuredatabricks.net
-DATABRICKS_HTTP_PATH=/sql/1.0/warehouses/9990e8fa0759e833
-DATABRICKS_TOKEN=<your access token>
-```
 
-- **DATABRICKS_SERVER_HOSTNAME**: The hostname of your Databricks workspace.
-- **DATABRICKS_HTTP_PATH**: The HTTP path for your Databricks SQL endpoint.
-- **DATABRICKS_TOKEN**: Your Databricks personal access token (keep this secret, do not share or commit it).
+---
 
-> **Important:** Never commit your `tokens.env` file to version control. Only share a template or example file with your team.
+## Project Structure
 
-# Getting Started
-TODO: Guide users through getting your code up and running on their own system. In this section you can talk about:
-1.   Installation process
-2.   Software dependencies
-3.   Latest releases
-4.   API references
-
-
-# Version History
-See the [Version History](CHANGELOG.md) for release notes and changelog.
-
-# Build and Test
-TODO: Describe and show how to build your code and run the tests. 
-
-# Contribute
-TODO: Explain how other users and developers can contribute to make your code better. 
-
-If you want to learn more about creating good readme files then refer the following [guidelines](https://docs.microsoft.com/en-us/azure/devops/repos/git/create-a-readme?view=azure-devops). You can also seek inspiration from the below readme files:
-- [ASP.NET Core](https://github.com/aspnet/Home)
-- [Visual Studio Code](https://github.com/Microsoft/vscode)
-- [Chakra Core](https://github.com/Microsoft/ChakraCore)
+- `app.py` — Main application entry point
+- `components/` — UI components
+- `services/` — Service layer (e.g., Databricks integration)
+- `queries/` — SQL queries
+- `spaces/` — App spaces/pages (Additional documentation can be found in here)
+- `assets/` — Static assets (CSS, icons)
+- `tests/` — Test suite

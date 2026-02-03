@@ -20,7 +20,9 @@ stages:
             displayName: 'Upgrade pip'
           - script: pip install -r requirements.txt
             displayName: 'Install dependencies'
-          - script: pytest --junitxml=test-results.xml
+          - script: pip install pytest
+            displayName: 'Install pytest'
+          - script: python -m pytest --junitxml=test-results.xml
             displayName: 'Run pytest'
           - task: PublishTestResults@2
             inputs:
@@ -56,19 +58,19 @@ stages:
                 - task: Docker@2
                   displayName: 'Build and Push Docker Image'
                   inputs:
-                    containerRegistry: '$(DOCKER_REGISTRY_SERVICE_CONNECTION)'
+                    containerRegistry: 'holmes_docker_registry_managed'
                     repository: '$(DOCKER_REPOSITORY)'
                     command: 'buildAndPush'
                     Dockerfile: '**/Dockerfile'
                     tags: |
-                      $(BUILD_BUILDID)
+                      $(TAG_NAME)
                 # Deploy to Azure Web App for Containers
                 - task: AzureWebAppContainer@1
                   displayName: 'Deploy to Azure Web App (Dev)'
                   inputs:
-                    azureSubscription: '$(AZURE_SUBSCRIPTION)'
+                    azureSubscription: 'holmes_deployment'
                     appName: '$(DEV_APP_SERVICE_NAME)'
-                    containers: '$(CONTAINER_REGISTRY)/$(DOCKER_REPOSITORY):$(BUILD_BUILDID)'
+                    containers: '$(CONTAINER_REGISTRY)/$(DOCKER_REPOSITORY):$(TAG_NAME)'
 
   - stage: Deploy_Prod
     displayName: "Deploy to Prod"
@@ -89,7 +91,7 @@ stages:
                 - checkout: self
                 - task: UsePythonVersion@0
                   inputs:
-                    versionSpec: '3.10'
+                    versionSpec: '3.12'
                 - script: python -m pip install --upgrade pip
                   displayName: 'Upgrade pip'
                 - script: pip install -r requirements.txt
@@ -98,16 +100,16 @@ stages:
                 - task: Docker@2
                   displayName: 'Build and Push Docker Image'
                   inputs:
-                    containerRegistry: '$(DOCKER_REGISTRY_SERVICE_CONNECTION)'
+                    containerRegistry: 'holmes_docker_registry_managed'
                     repository: '$(DOCKER_REPOSITORY)'
                     command: 'buildAndPush'
                     Dockerfile: '**/Dockerfile'
                     tags: |
-                      $(BUILD_BUILDID)
+                      $(TAG_NAME)
                 # Deploy to Azure Web App for Containers
                 - task: AzureWebAppContainer@1
                   displayName: 'Deploy to Azure Web App (Prod)'
                   inputs:
-                    azureSubscription: '$(AZURE_SUBSCRIPTION)'
+                    azureSubscription: 'holmes_deployment'
                     appName: '$(PROD_APP_SERVICE_NAME)'
-                    containers: '$(CONTAINER_REGISTRY)/$(DOCKER_REPOSITORY):$(BUILD_BUILDID)'
+                    containers: '$(CONTAINER_REGISTRY)/$(DOCKER_REPOSITORY):$(TAG_NAME)'
