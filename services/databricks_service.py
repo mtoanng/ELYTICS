@@ -1,8 +1,12 @@
 import pandas as pd
 import os
 from dotenv import load_dotenv
+import time
+import glob
+import numpy as np
 import databricks.sql
 
+load_dotenv()
 # Load environment variables from tokens.env (or .env)
 # load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '../tookens.env'))
 
@@ -33,3 +37,33 @@ class DatabricksService:
 
 def get_databricks_service():
     return DatabricksService()
+
+if __name__ == "__main__":
+
+    queries_dir = os.path.join(os.path.dirname(__file__), "../queries")
+    query_files = glob.glob(os.path.join(queries_dir, "*.sql"))
+    service = get_databricks_service()
+
+    results = []
+
+    for query_file in query_files:
+        query_name = os.path.basename(query_file)
+        timings = []
+        sizes = []
+        query = DatabricksService.load_query(query_file)
+        print(f"Profiling query: {query_name}")
+        for i in range(5):
+            start = time.time()
+            df = service.execute_query(query)
+            elapsed = time.time() - start
+            mem_mb = df.memory_usage(deep=True).sum() / (1024 * 1024)
+            timings.append(elapsed)
+            sizes.append(mem_mb)
+            print(f"  Run {i+1}: {elapsed:.2f}s, {mem_mb:.2f} MB")
+        avg_time = np.mean(timings)
+        avg_size = np.mean(sizes)
+        results.append((query_name, avg_time, avg_size))
+
+    print("\nSummary:")
+    for query_name, avg_time, avg_size in results:
+        print(f"{query_name}: avg time = {avg_time:.2f}s, avg size = {avg_size:.2f} MB")

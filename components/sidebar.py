@@ -1,116 +1,164 @@
 import os
 from dash import html
-import dash_bootstrap_components as dbc
+import dash_mantine_components as dmc
 from services.changelog_service import get_latest_released_version
+from dash_iconify import DashIconify
 
-SPACES_DIR = os.path.join(os.path.dirname(__file__), "..", "spaces")
-
-def get_sidebar_structure():
-    """
-    Returns a dict of the form:
-    {
-        "mycroft": {
-            "ai": ["polarization", "predictions", "rate"],
-            "general": ["timeseries"],
-            None: ["home"]
+SIDEBAR_STRUCTURE = {
+    "mycroft": {
+        None: [{"path": "home", "label": "Home"}],
+    },
+    "sherlock": {
+        None: [{"path": "home", "label": "Home"}],
+        "Management": {
+            "path": "management",
+            "pages": [
+                {"path": "test-statistics", "label": "Test Statistics"},
+                {"path": "test-rig-activity", "label": "Test Rig Activity"},
+            ],
         },
-        ...
-    }
-    """
-    sidebar = {}
-    for section in os.listdir(SPACES_DIR):
-        section_path = os.path.join(SPACES_DIR, section)
-        if not os.path.isdir(section_path):
+        "Data Exploration": {
+            "path": "data-exploration",
+            "pages": [
+                {"path": "order-overview", "label": "Order Overview"},
+                {"path": "sample-overview", "label": "Sample Overview"},
+                {"path": "ccm-overview", "label": "CCM Overview"},
+                {"path": "polarization-curves", "label": "Polarization Curves"},
+                {"path": "timeseries-overview", "label": "Timeseries Overview"},
+            ],
+        },
+        "Data Analysis": {
+            "path": "data-analysis",
+            "pages": [
+                {"path": "summary-stats", "label": "Summary Stats"},
+                {"path": "charts", "label": "Charts"},
+            ],
+        },
+        "AI/ML": {
+            "path": "ai-ml",
+            "pages": [
+                {"path": "model-overview", "label": "Model Overview"},
+                {"path": "predictions", "label": "Predictions"},
+            ],
+        },
+    },
+    "enola": {
+        None: [{"path": "home", "label": "Home"}],
+    },
+    "watson": {
+        None: [{"path": "home", "label": "Home"}],
+    },
+}
+
+def get_space_from_path(pathname: str | None) -> str | None:
+    if not pathname:
+        return None
+    parts = [p for p in pathname.split("/") if p]
+    return parts[0] if parts else None
+
+def create_content(space: str, groups: dict, latest_version: str):
+    body = []
+
+    # Version + Home as main NavLink
+    if None in groups:
+        home_page = groups[None][0]  # Assume first item is Home
+        body.append(
+            dmc.NavLink(
+                label=home_page["label"],
+                description=f"Version {latest_version}",
+                href=f"/{space}/{home_page['path']}",
+                active="exact",
+                className="navbar-link",
+                h=50,
+                pl=8,
+            )
+        )
+        
+        # Add remaining ungrouped pages (if any)
+        for page in groups[None][1:]:
+            body.append(
+                dmc.NavLink(
+                    label=page["label"],
+                    href=f"/{space}/{page['path']}",
+                    active="exact",
+                    className="navbar-link",
+                    h=32,
+                    pl=8,
+                )
+            )
+
+    # Grouped pages
+    for group, group_data in groups.items():
+        if group is None or isinstance(group_data, list):
             continue
-        groups = {}
-        for root, _, files in os.walk(section_path):
-            rel_path = os.path.relpath(root, section_path)
-            for file in files:
-                if file.endswith(".py") and not file.startswith("__"):
-                    page_name = file[:-3]
-                    if rel_path == ".":
-                        group = None
-                    else:
-                        group = rel_path.replace("\\", "/")  # For Windows paths
-                    groups.setdefault(group, []).append(page_name)
-        sidebar[section] = groups
-    return sidebar
 
-def make_nav_links(section, group, pages):
-    links = []
-    for page in sorted(pages):
-        # Build the href
-        if group:
-            href = f"/{section}/{group}/{page}"
-        else:
-            href = f"/{section}/{page}"
-        # Capitalize nicely
-        label = page.replace("_", " ").title()
-        links.append(dbc.NavLink(label, href=href, active="exact", className="ps-4" if group else ""))
-    return links
+        # Group section header as a link
+        group_path = group_data.get("path", group.lower().replace(" ", "-"))
+        pages = group_data.get("pages", [])
 
-def sidebar_layout():
-    latest_version = get_latest_released_version() or "Unknown"
-    sidebar_structure = get_sidebar_structure()
-
-    nav_sections = []
-    for section, groups in sidebar_structure.items():
-        nav_sections.append(html.Hr())
-        nav_sections.append(html.H5(section.title(), className="ps-2", style={"marginTop": "1rem"}))
-        # Top-level pages (not in a group)
-        if None in groups:
-            nav_sections.extend(make_nav_links(section, None, groups[None]))
-        # Grouped pages
-        for group, pages in groups.items():
-            if group is None:
-                continue
-            group_id = f"{section}-{group}-group"
-            nav_sections.append(
-                dbc.Button(
-                    [html.I(className="bi bi-chevron-right me-2", id=f"{group_id}-icon"), group.title()],
-                    id=f"{group_id}-toggle",
-                    className="sidebar-group-btn",
-                    color="link",
-                    style={"textAlign": "left", "width": "100%"},
-                )
+        body.append(
+            dmc.Divider(
+                label=dmc.Anchor(
+                    dmc.Text(group, size="sm", fw=700),
+                    href=f"/{space}/{group_path}",
+                    underline=False,
+                ),
+                labelPosition="left",
+                mt=24,
+                mb=8,
             )
-            nav_sections.append(
-                dbc.Collapse(
-                    dbc.Nav(
-                        make_nav_links(section, group, pages),
-                        vertical=True,
-                        pills=True,
-                    ),
-                    id=f"{group_id}-collapse",
-                    is_open=False,
+        )
+
+        for page in pages:
+            body.append(
+                dmc.NavLink(
+                    label=page["label"],
+                    href=f"/{space}/{group_path}/{page['path']}",
+                    active="exact",
+                    className="navbar-link",
+                    h=32,
+                    pl=18,
                 )
             )
 
-    return html.Div(
-        [
-            html.Div(
-                [
-                    dbc.NavLink([
-                        html.Span(f"Version {latest_version}", style={"fontSize": "0.85em", "fontWeight": "normal"})
-                    ], href="/version_history", active="exact", className="ps-2", style={"marginBottom": "0.25rem", "marginTop": "0.5rem", "textAlign": "left"}),
-                    html.Hr(),
-                    *nav_sections,
-                ],
-                id="sidebar",
-                className="sidebar",
+    return dmc.Stack(
+        gap=0,
+        children=[
+            dmc.ScrollArea(
+                offsetScrollbars=True,
+                type="scroll",
+                style={"height": "100%", "flex": 1},
+                children=dmc.Stack(
+                    gap=0,
+                    children=[*body, dmc.Space(h=90)],
+                    pl="xs",
+                    pr="xs",
+                    pt="sm",
+                ),
             ),
-            dbc.Button(
-                id="sidebar-toggle",
-                color="secondary",
-                className="sidebar-toggle-btn",
-                n_clicks=0,
-                outline=True,
-                size="sm",
-                style={"marginTop": 0},
-                children=html.I(className="bi bi-arrow-left-short", id="sidebar-toggle-icon")
+            dmc.Divider(m=0),
+            dmc.NavLink(
+                label="Submit Feedback",
+                href="#",
+                active=False,
+                className="navbar-link",
+                h=50,
+                pl=8,
+                style={"borderRadius": 0, "textAlign": "center"},
             ),
         ],
-        className="sidebar-container"
+        style={"height": "100%"},
     )
+
+def sidebar_layout(pathname: str | None = None):
+    latest_version = get_latest_released_version() or "Unknown"
+    space = get_space_from_path(pathname)
+
+    if space and space in SIDEBAR_STRUCTURE:
+        groups = SIDEBAR_STRUCTURE[space]
+    else:
+        groups = {}
+
+    return create_content(space, groups, latest_version) if space else dmc.Text("")
 
 layout = sidebar_layout

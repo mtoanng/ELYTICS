@@ -3,6 +3,8 @@
 
 ###### Requirements without Version Specifiers ######
 dash
+dash-mantine-components
+dash-iconify
 dash-bootstrap-components
 dash-table
 dash-auth

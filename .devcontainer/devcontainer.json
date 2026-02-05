@@ -4,9 +4,9 @@
     "dockerfile": "Dockerfile",
     "context": ".."
   },
-  "forwardPorts": [8051],
+  "forwardPorts": [8501],
   "portsAttributes": {
-    "8051": {
+    "8501": {
       "label": "Dash App",
       "onAutoForward": "openBrowser"
     }
