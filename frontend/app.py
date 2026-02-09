@@ -1,8 +1,11 @@
 import os
 import dash
-from dash_auth import OIDCAuth
 
 from components.appshell import create_appshell
+from services.auth import OIDCAuthWithToken
+
+import redis
+from flask_session import Session
 
 from dotenv import load_dotenv
 from waitress import serve
@@ -17,13 +20,19 @@ app = dash.Dash(
     update_title=None
 )
 
-auth = OIDCAuth(app, secret_key=os.getenv("OIDC_SECRET_KEY", "dev"))
+app.server.config["SESSION_TYPE"] = "redis"
+app.server.config["SESSION_REDIS"] = redis.StrictRedis()
+app.server.config["SESSION_PERMANENT"] = False
+Session(app.server)
+
+auth = OIDCAuthWithToken(app, secret_key=os.getenv("OIDC_SECRET_KEY", "dev"))
 auth.register_provider(
     "azure",
     token_endpoint_auth_method="client_secret_post",
     client_id=os.getenv("AZURE_CLIENT_ID"),
     client_secret=os.getenv("AZURE_CLIENT_SECRET"),
-    server_metadata_url=f'https://login.microsoftonline.com/{os.getenv("AZURE_TENANT_ID")}/v2.0/.well-known-openid-configuration',
+    server_metadata_url=f'https://login.microsoftonline.com/{os.getenv("AZURE_TENANT_ID")}/v2.0/.well-known/openid-configuration',
+    scope=f"openid profile email api://{os.getenv('API_AZURE_CLIENT_ID')}/user_impersonation"
 )
 
 app.layout = create_appshell()

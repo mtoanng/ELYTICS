@@ -15,3 +15,5 @@ python-dotenv
 databricks
 databricks-sql-connector
 waitress
+flask-session
+redis

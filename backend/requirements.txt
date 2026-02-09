@@ -1,0 +1,6 @@
+uvicorn
+fastapi
+apscheduler
+pyjwt
+cachetools
+python-dotenv

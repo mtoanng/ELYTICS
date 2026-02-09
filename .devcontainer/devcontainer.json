@@ -4,14 +4,18 @@
     "dockerfile": "Dockerfile",
     "context": ".."
   },
-  "forwardPorts": [8501],
+  "forwardPorts": [8501, 8000],
   "portsAttributes": {
     "8501": {
-      "label": "Dash App",
+      "label": "Dash Frontend",
       "onAutoForward": "openBrowser"
+    },
+    "8000": {
+      "label": "FastAPI Backend",
+      "onAutoForward": "notify"
     }
   },
-
+  "postStartCommand": "bash /workspaces/TBP-HOLMES/.devcontainer/start-services.sh",
   "customizations": {
     "vscode": {
       "extensions": [

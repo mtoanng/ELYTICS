@@ -4,6 +4,8 @@ import dash_mantine_components as dmc
 
 register_page(__name__, path="/sherlock/home", title="Sherlock Space")
 
+# all example content in here, needs changing
+
 example_updates = [
     "🔹 New: AI/ML Predictions page now available for advanced forecasting.",
     "🔹 Improved: Timeseries Overview supports larger datasets.",
