@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 import redis
+import json
 
 from internal.auth import require_groups
 
@@ -15,7 +16,10 @@ def get_query_result(query_name):
     value = redis_client.get(key)
     if value is None:
         raise HTTPException(status_code=404, detail=f"No data found for {query_name}")
-    return value
+    try:
+        return json.loads(value)  # Parse JSON string to Python list
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to parse data from Redis")
 
 @router.get("/ccm_overview")
 async def ccm_overview(token=Depends(require_groups(["IdM2BCD_holmes_pemely_user"]))):

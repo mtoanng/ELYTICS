@@ -24,27 +24,32 @@ def verify_oidc_token(credentials: HTTPAuthorizationCredentials = Depends(securi
         )
         return decoded
     except jwt.ExpiredSignatureError:
+        print("Token has expired")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token has expired",
         )
     except jwt.InvalidAudienceError:
+        print("Token audience mismatch")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token audience mismatch",
         )
     except jwt.InvalidIssuerError:
+        print("Token issuer mismatch")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token issuer mismatch",
         )
     except jwt.InvalidTokenError as e:
+        print(f"Invalid token: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Invalid token: {str(e)}",
             headers={"WWW-Authenticate": "Bearer"},
         )
     except Exception as e:
+        print(f"Unexpected error during token verification: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Unexpected error: {str(e)}",

@@ -1,12 +1,13 @@
 import requests
 import os
+import json
+import pandas as pd
 from flask import session
 
 API_BASE = os.environ.get("API_URL", "http://localhost:8000")
 
 def get_api_headers():
     """Extract OIDC token from Flask session and return headers"""
-    # Get token from Flask session (set by dash_auth/OAuth)
     token = session.get("access_token")
     if not token:
         raise ValueError("No OIDC token available in session")
@@ -16,8 +17,18 @@ def get_api_headers():
         "Content-Type": "application/json",
     }
 
-def get_latest_data(path):
+def get_table_as_df(table_name):
+    """
+    Request a table from the backend and return as a pandas DataFrame.
+    """
     headers = get_api_headers()
-    response = requests.get(f"{API_BASE}/{path}", headers=headers)
+    url = f"{API_BASE}/tables/{table_name}"
+    response = requests.get(url, headers=headers)
     response.raise_for_status()
-    return response.json()
+    data = response.json().get("data", [])
+    if isinstance(data, str):
+        try:
+            data = json.loads(data)
+        except Exception:
+            data = []
+    return pd.DataFrame(data)

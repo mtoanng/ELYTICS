@@ -1,8 +1,5 @@
-import os
-from dash import html
 import dash_mantine_components as dmc
 from services.changelog_service import get_latest_released_version
-from dash_iconify import DashIconify
 
 SIDEBAR_STRUCTURE = {
     "mycroft": {
