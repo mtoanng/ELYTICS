@@ -1,7 +1,7 @@
 import jwt
 import time
 from dash_auth.oidc_auth import OIDCAuth
-from flask import session, redirect
+from flask import session, redirect, request
 
 # Custom OIDCAuth class to store tokens in session
 class OIDCAuthWithToken(OIDCAuth):
@@ -54,7 +54,8 @@ def protected(denied_component, groups=None):
             if _is_access_token_expired():
                 # Optionally clear session or redirect
                 session.clear()
-                return redirect("/login")
+                next_url = request.path
+                return redirect(f"/login?next={next_url}")
             user = session.get("user")
             if not user or (groups and not any(g in user.get("groups", []) for g in groups)):
                 return denied_component

@@ -4,6 +4,11 @@ SELECT
   o.number_of_cells,
   o.testrig_id,
   o.short_description,
+  t.time_total,
+  t.timeFacTest,
+  t.timeFacRun,
+  t.startCnt,
+  e.polcurve_count,
   s.jStack_max,
   s.uCell_max,
   s.tAndeIn_max,
@@ -11,12 +16,7 @@ SELECT
   s.pCtdeOut_max,
   s.pAndeIn_max,
   s.vfAndeIn_max,
-  t.timeFacTest,
-  t.timeFacRun,
-  t.startCnt,
-  t.maxh2out,
-  t.time_total,
-  e.polcurve_count
+  t.maxh2out
 FROM
   ps_xplatform_dev.pemely_ops.gold_genericstack_order o
 INNER JOIN (

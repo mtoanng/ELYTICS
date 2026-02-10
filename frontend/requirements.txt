@@ -1,11 +1,7 @@
-# Requirements for PEMELY Sherlock platform
-# Requires Python >=3.8
-
-###### Requirements without Version Specifiers ######
 dash
 dash-mantine-components
+dash-ag-grid
 dash-iconify
-dash-bootstrap-components
 dash-table
 dash-auth
 authlib

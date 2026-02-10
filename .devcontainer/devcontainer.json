@@ -15,7 +15,6 @@
       "onAutoForward": "notify"
     }
   },
-  "postStartCommand": "bash /workspaces/TBP-HOLMES/.devcontainer/start-services.sh",
   "customizations": {
     "vscode": {
       "extensions": [

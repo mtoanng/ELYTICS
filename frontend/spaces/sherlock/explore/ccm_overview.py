@@ -1,7 +1,7 @@
 from dash_auth import protected
 from dash import html, dcc, callback, Output, Input, State, register_page, no_update
 from dash import dash_table
-from dash.dcc import send_data_frame
+from dash.dcc.express import send_data_frame
 
 import pandas as pd
 import plotly.express as px
