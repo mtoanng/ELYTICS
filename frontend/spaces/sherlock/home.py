@@ -1,4 +1,3 @@
-from dash_auth import protected
 from dash import register_page
 import dash_mantine_components as dmc
 
@@ -18,14 +17,6 @@ def get_latest_updates():
         icon=None,
     )
 
-@protected(
-    dmc.Alert(
-        title="Access Denied",
-        color="red",
-        children="You do not have permission to access this space.",
-    ),
-    groups=["IdM2BCD_holmes_pemely_user"]
-)
 def sherlock_layout():
     return dmc.Container(
         size="md",

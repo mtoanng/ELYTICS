@@ -48,17 +48,13 @@ def _is_access_token_expired():
     except Exception:
         return True
     
-def protected(denied_component, groups=None):
-    def decorator(layout_func):
-        def wrapper(*args, **kwargs):
-            if _is_access_token_expired():
-                # Optionally clear session or redirect
-                session.clear()
-                next_url = request.path
-                return redirect(f"/login?next={next_url}")
-            user = session.get("user")
-            if not user or (groups and not any(g in user.get("groups", []) for g in groups)):
-                return denied_component
-            return layout_func(*args, **kwargs)
-        return wrapper
-    return decorator
+def check_access(groups=None):
+    """Check if user has access based on groups. Returns (has_access, user)"""
+    if _is_access_token_expired():
+        return False, None
+    user = session.get("user")
+    if not user:
+        return False, None
+    if groups and not any(g in user.get("groups", []) for g in groups):
+        return False, user
+    return True, user

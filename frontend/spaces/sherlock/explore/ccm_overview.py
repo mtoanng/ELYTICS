@@ -1,4 +1,3 @@
-from dash_auth import protected
 from dash import html, dcc, callback, Output, Input, State, register_page, no_update
 from dash import dash_table
 from dash.dcc.express import send_data_frame
@@ -7,7 +6,6 @@ import pandas as pd
 import plotly.express as px
 
 from services.backend_service import get_table_as_df
-from services.auth import protected
 
 register_page(
     __name__,
@@ -15,10 +13,6 @@ register_page(
     title="CCM Overview Space"
 )
 
-@protected(
-    html.Div("Access denied", style={"color": "red", "padding": "2rem"}),
-    groups=["IdM2BCD_holmes_pemely_user"]
-)
 def ccm_overview_layout():
     return html.Div([
         html.H2("CCM Runtime Overview", style={"marginTop": "1rem"}),

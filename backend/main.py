@@ -5,7 +5,7 @@ import os
 
 from internal.poller import start_scheduler
 from internal.auth import verify_oidc_token
-from routers.tables import router as tables_router
+from routers.sherlock.tables import router as tables_router
 
 load_dotenv()
 

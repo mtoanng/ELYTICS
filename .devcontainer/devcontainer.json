@@ -4,7 +4,11 @@
     "dockerfile": "Dockerfile",
     "context": ".."
   },
-  "forwardPorts": [8501, 8000],
+  "forwardPorts": [
+    8501,
+    8000
+  ],
+  "postCreateCommand": "redis-server --daemonize yes",
   "portsAttributes": {
     "8501": {
       "label": "Dash Frontend",

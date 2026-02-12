@@ -30,7 +30,7 @@ spaces/sherlock/ai/polarization.py
 With the following content:
 
 ```python
-from dash_auth import protected
+from services.auth import protected
 from dash import html, register_page
 
 register_page(__name__, path="/sherlock/ai/polarization")
@@ -54,7 +54,7 @@ layout = polarization_layout
 ### Protected Layout Example
 
 ```python
-from dash_auth import protected
+from services.auth import protected
 
 @protected(
     html.Div("Access denied", style={"color": "red", "padding": "2rem"}),
@@ -65,6 +65,8 @@ def management_layout():
 ```
 
 ### Protected Callback Example
+
+*Unsupported by our custom protected decorator in auth service*
 
 ```python
 from dash_auth import protected_callback

@@ -4,8 +4,8 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jwt import PyJWKClient
 
-AZURE_TENANT_ID = os.getenv("AZURE_TENANT_ID")
-AZURE_CLIENT_ID = os.getenv("AZURE_CLIENT_ID")
+AZURE_TENANT_ID = os.getenv("BACKEND_AZURE_TENANT_ID")
+AZURE_CLIENT_ID = os.getenv("BACKEND_AZURE_CLIENT_ID")
 JWKS_URL = f"https://login.microsoftonline.com/{AZURE_TENANT_ID}/discovery/v2.0/keys"
 
 security = HTTPBearer()

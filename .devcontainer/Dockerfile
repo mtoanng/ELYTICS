@@ -18,10 +18,8 @@ RUN pip install --upgrade pip && pip install -r backend-requirements.txt
 COPY frontend/requirements.txt ./frontend-requirements.txt
 RUN pip install -r frontend-requirements.txt
 
-# Copy startup script and make it executable
-COPY .devcontainer/start-services.sh /workspaces/TBP-HOLMES/.devcontainer/start-services.sh
-RUN chmod +x /workspaces/TBP-HOLMES/.devcontainer/start-services.sh
-
 COPY . .
+
+RUN chmod +x /app/manual_deployment.sh
 
 EXPOSE 8501 8000

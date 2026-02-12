@@ -3,7 +3,6 @@ import dash_ag_grid as dag
 import pandas as pd
 
 from services.backend_service import get_table_as_df
-from services.auth import protected
 
 register_page(
     __name__,
@@ -21,10 +20,6 @@ USAGE_TOOLTIP_TEXT = (
     "• Download the table as CSV using the Download CSV button below the filters."
 )
 
-@protected(
-    html.Div("Access denied", style={"color": "red", "padding": "2rem"}),
-    groups=["IdM2BCD_holmes_pemely_user"]
-)
 def order_overview_layout():
     return html.Div([
         html.Div([

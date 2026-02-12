@@ -43,9 +43,6 @@ WITH filtered_ts AS (
             END
         ) AS testrig_label,
 
-        -- Dynamically injected raw signals
-        {{raw_signal_select}}
-
     FROM ps_xplatform_dev.pemely_ops.gold_genericstack_timeseries_1s ts
     INNER JOIN ps_xplatform_dev.pemely_ops.gold_genericstack_order o
         ON ts.order_id = o.order_id
@@ -53,7 +50,6 @@ WITH filtered_ts AS (
         ON o.testrig_id = tr.testrig_id
 
     WHERE 1 = 1
-    {{extra_filters}}
 )
 
 SELECT

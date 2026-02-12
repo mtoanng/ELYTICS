@@ -4,3 +4,7 @@ apscheduler
 pyjwt
 cachetools
 python-dotenv
+redis
+pandas
+databricks
+databricks-sql-connector

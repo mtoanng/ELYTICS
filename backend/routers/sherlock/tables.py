@@ -29,18 +29,30 @@ async def ccm_overview(token=Depends(require_groups(["IdM2BCD_holmes_pemely_user
 async def order_overview(token=Depends(require_groups(["IdM2BCD_holmes_pemely_user"]))):
     return {"data": get_query_result("order_overview")}
 
-@router.get("/polcurve_view")
-async def polcurve_view(token=Depends(require_groups(["IdM2BCD_holmes_pemely_user"]))):
-    return {"data": get_query_result("polcurve_view")}
+@router.get("/polcurve_view_data")
+async def polcurve_view_data(token=Depends(require_groups(["IdM2BCD_holmes_pemely_user"]))):
+    return {"data": get_query_result("polcurve_view_data")}
+
+@router.get("/polcurve_view_meta")
+async def polcurve_view_meta(token=Depends(require_groups(["IdM2BCD_holmes_pemely_user"]))):
+    return {"data": get_query_result("polcurve_view_meta")}
 
 @router.get("/sample_overview")
 async def sample_overview(token=Depends(require_groups(["IdM2BCD_holmes_pemely_user"]))):
     return {"data": get_query_result("sample_overview")}
 
-@router.get("/testrig_overview")
-async def testrig_overview(token=Depends(require_groups(["IdM2BCD_holmes_pemely_user"]))):
-    return {"data": get_query_result("testrig_overview")}
+@router.get("/testrig_activity_overview")
+async def testrig_activity_overview(token=Depends(require_groups(["IdM2BCD_holmes_pemely_user"]))):
+    return {"data": get_query_result("testrig_activity_overview")}
 
-@router.get("/timeseries_overview")
-async def timeseries_overview(token=Depends(require_groups(["IdM2BCD_holmes_pemely_user"]))):
-    return {"data": get_query_result("timeseries_overview")}
+@router.get("/testrig_statistics_overview")
+async def testrig_statistics_overview(token=Depends(require_groups(["IdM2BCD_holmes_pemely_user"]))):
+    return {"data": get_query_result("testrig_statistics_overview")}
+
+@router.get("/timeseries_exp_overview")
+async def timeseries_exp_overview(token=Depends(require_groups(["IdM2BCD_holmes_pemely_user"]))):
+    return {"data": get_query_result("timeseries_exp_overview")}
+
+@router.get("/timeseries_exp_raw_1s")
+async def timeseries_exp_raw_1s(token=Depends(require_groups(["IdM2BCD_holmes_pemely_user"]))):
+    return {"data": get_query_result("timeseries_exp_raw_1s")}

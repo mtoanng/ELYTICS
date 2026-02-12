@@ -4,7 +4,7 @@ import json
 import pandas as pd
 from flask import session
 
-API_BASE = os.environ.get("API_URL", "http://localhost:8000")
+API_BASE = os.environ.get("BACKEND_API_URL", "http://localhost:8000")
 
 def get_api_headers():
     """Extract OIDC token from Flask session and return headers"""
