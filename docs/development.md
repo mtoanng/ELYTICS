@@ -1,8 +1,3 @@
-# TODO:
-- add most popular forms of contribution to the repo
-    - new page -> add page, add query to backend, create backend route, create filters if needed etc
-    - new component -> find n occurances where component can be used, create and update all code, more modular 
-    
 # TBP-HOLMES Developer Guide
 
 ## Getting Started (Recommended: Dev Container)
@@ -28,12 +23,12 @@ Docker and Visual Studio Code can be ordered [here](https://service-management.b
 3. **Reopen in Container:**
 	- When prompted, click "Reopen in Container". If not prompted, open the Command Palette (`Ctrl+Shift+P`), search for `Dev Containers: Reopen in Container` and select it.
 4. **Wait for the container to build and dependencies to install.**
-5. **Configure your environment variables:**
-	- Copy `.env.example` to `.env` and fill in the required values.
-	```sh
-	cp .env.example .env
-	# Edit .env as needed
-	```
+5. **Setup your environment:**
+    - Please use the setup script to generate the necessary environment files
+    ```sh
+    az login
+    generate-env.sh
+    ```
 6. **Run the application:**
 	```sh
 	# Inside the dev container terminal
@@ -42,15 +37,7 @@ Docker and Visual Studio Code can be ordered [here](https://service-management.b
 
 ---
 
-## Alternative: Local Setup (Not Recommended)
-
-If you choose not to use Docker/dev containers, you must ensure you have Python 3.9+ and install all dependencies manually:
-
-```sh
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-# Edit .env as needed
-python app.py
-```
+# TODO:
+- add most popular forms of contribution to the repo
+    - new page -> add page, add query to backend, create backend route, create filters if needed etc
+    - new component -> find n occurances where component can be used, create and update all code, more modular 
