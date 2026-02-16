@@ -1,3 +1,5 @@
+# TODO: update changelog parsing to accept generated log from changeset
+
 import dash_mantine_components as dmc
 from dash import register_page, Output, Input, clientside_callback, html, callback
 from dash_iconify import DashIconify
@@ -41,11 +43,13 @@ SPACE_INFO = {
 }
 
 def _load_changelog(space_name: str):
+    base_path = Path(__file__).resolve().parents[1]
+
     changelog_path = (
-        Path(__file__).resolve().parents[1]
-        / "content"
-        / "changelogs"
-        / f"{space_name}.md"
+        base_path
+        / "spaces"
+        / space_name
+        / "CHANGELOG.md"
     )
     if not changelog_path.exists():
         return []

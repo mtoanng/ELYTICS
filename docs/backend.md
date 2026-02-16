@@ -18,13 +18,7 @@ The primary driver for creating this dedicated backend was to **mitigate slow an
 
 ## Architecture
 
-```
-User Request → FastAPI → Redis Cache → Fast Response
-                    ↓
-            Background Poller
-                    ↓
-              Databricks (periodic refresh)
-```
+![Backend Architecture](assets/image.png)
 
 ## Project Structure
 

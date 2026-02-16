@@ -4,6 +4,8 @@ import json
 
 from internal.auth import require_groups
 
+SPACE = "sherlock"
+
 redis_client = redis.StrictRedis(host="localhost", port=6379, db=0, decode_responses=True)
 
 router = APIRouter(
@@ -23,36 +25,32 @@ def get_query_result(query_name):
 
 @router.get("/ccm_overview")
 async def ccm_overview(token=Depends(require_groups(["IdM2BCD_holmes_pemely_user"]))):
-    return {"data": get_query_result("ccm_overview")}
+    return {"data": get_query_result(f"{SPACE}/ccm_overview")}
 
 @router.get("/order_overview")
 async def order_overview(token=Depends(require_groups(["IdM2BCD_holmes_pemely_user"]))):
-    return {"data": get_query_result("order_overview")}
-
+    return {"data": get_query_result(f"{SPACE}/order_overview")}
 @router.get("/polcurve_view_data")
 async def polcurve_view_data(token=Depends(require_groups(["IdM2BCD_holmes_pemely_user"]))):
-    return {"data": get_query_result("polcurve_view_data")}
+    return {"data": get_query_result(f"{SPACE}/polcurve_view_data")}
 
 @router.get("/polcurve_view_meta")
 async def polcurve_view_meta(token=Depends(require_groups(["IdM2BCD_holmes_pemely_user"]))):
-    return {"data": get_query_result("polcurve_view_meta")}
-
+    return {"data": get_query_result(f"{SPACE}/polcurve_view_meta")}
 @router.get("/sample_overview")
 async def sample_overview(token=Depends(require_groups(["IdM2BCD_holmes_pemely_user"]))):
-    return {"data": get_query_result("sample_overview")}
+    return {"data": get_query_result(f"{SPACE}/sample_overview")}
 
 @router.get("/testrig_activity_overview")
 async def testrig_activity_overview(token=Depends(require_groups(["IdM2BCD_holmes_pemely_user"]))):
-    return {"data": get_query_result("testrig_activity_overview")}
-
+    return {"data": get_query_result(f"{SPACE}/testrig_activity_overview")}
 @router.get("/testrig_statistics_overview")
 async def testrig_statistics_overview(token=Depends(require_groups(["IdM2BCD_holmes_pemely_user"]))):
-    return {"data": get_query_result("testrig_statistics_overview")}
+    return {"data": get_query_result(f"{SPACE}/testrig_statistics_overview")}
 
 @router.get("/timeseries_exp_overview")
 async def timeseries_exp_overview(token=Depends(require_groups(["IdM2BCD_holmes_pemely_user"]))):
-    return {"data": get_query_result("timeseries_exp_overview")}
-
+    return {"data": get_query_result(f"{SPACE}/timeseries_exp_overview")}
 @router.get("/timeseries_exp_raw_1s")
 async def timeseries_exp_raw_1s(token=Depends(require_groups(["IdM2BCD_holmes_pemely_user"]))):
-    return {"data": get_query_result("timeseries_exp_raw_1s")}
+    return {"data": get_query_result(f"{SPACE}/timeseries_exp_raw_1s")}

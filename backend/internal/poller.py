@@ -13,8 +13,9 @@ QUERIES_DIR = os.path.join(os.path.dirname(__file__), "../queries")
 
 def poll_and_update():
     db_service = DatabricksService()
-    for sql_file in glob.glob(os.path.join(QUERIES_DIR, "*.sql")):
-        query_name = os.path.splitext(os.path.basename(sql_file))[0]
+    for sql_file in glob.glob(os.path.join(QUERIES_DIR, "**", "*.sql"), recursive=True):
+        rel_path = os.path.relpath(sql_file, QUERIES_DIR)
+        query_name = os.path.splitext(rel_path)[0].replace(os.sep, "/")
         try:
             query = db_service.load_query(sql_file)
             df = db_service.execute_query(query)

@@ -50,5 +50,4 @@ INNER JOIN event_temp_set ets
   ON e.event_id = ets.event_id -- join to get per-event temp_set
 WHERE e.is_rising IS NOT NULL
   AND s.is_static = true
-{extra_conditions}
 ORDER BY s.start
