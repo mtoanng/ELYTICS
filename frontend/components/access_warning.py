@@ -1,6 +1,6 @@
 import dash_mantine_components as dmc
 from dash import html
-from config.access_config import PAGE_ACCESS_MAP
+from config.access_config import SPACE_ACCESS_MAP
 
 def create_access_warning(space_name: str = None):
     """
@@ -14,7 +14,7 @@ def create_access_warning(space_name: str = None):
     # Get the required role from the space mapping
     required_role = None
     if space_name:
-        required_groups = PAGE_ACCESS_MAP.get(f"/{space_name}")
+        required_groups = SPACE_ACCESS_MAP.get(f"/{space_name}")
         required_role = required_groups[0] if required_groups else "appropriate OneIDM role"
     else:
         required_role = "appropriate OneIDM role"

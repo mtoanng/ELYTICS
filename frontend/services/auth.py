@@ -1,7 +1,7 @@
 import jwt
 import time
 from dash_auth.oidc_auth import OIDCAuth
-from flask import session, redirect, request
+from flask import session, redirect
 
 # Custom OIDCAuth class to store tokens in session
 class OIDCAuthWithToken(OIDCAuth):
@@ -49,12 +49,22 @@ def _is_access_token_expired():
         return True
     
 def check_access(groups=None):
-    """Check if user has access based on groups. Returns (has_access, user)"""
+    """
+    Check if user has access based on groups. 
+    Returns (has_access, user, needs_login)
+    - has_access: True if user has required access
+    - user: User dict or None
+    - needs_login: True if token expired and needs re-authentication
+    """
     if _is_access_token_expired():
-        return False, None
+        session.clear()
+        return False, None, True
+    
     user = session.get("user")
     if not user:
-        return False, None
+        return False, None, True
+    
     if groups and not any(g in user.get("groups", []) for g in groups):
-        return False, user
-    return True, user
+        return False, user, False
+    
+    return True, user, False

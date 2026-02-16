@@ -8,3 +8,4 @@ redis
 pandas
 databricks
 databricks-sql-connector
+cryptography

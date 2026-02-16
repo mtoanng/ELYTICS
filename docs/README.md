@@ -1,0 +1,1 @@
+TODO: create a docs, this should include backend/frontend/hosting/developments etc

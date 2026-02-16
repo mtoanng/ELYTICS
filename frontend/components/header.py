@@ -1,11 +1,11 @@
 from dash.dependencies import Input, Output, State
-from dash import callback, clientside_callback
-from dash import html, dcc
+from dash import callback, clientside_callback, html
 import dash_mantine_components as dmc
 from dash_iconify import DashIconify
 
 from components.sidebar import SIDEBAR_STRUCTURE
 from dash_auth import list_groups
+from config.access_config import SPACE_ACCESS_MAP
 
 
 def _build_search_options():
@@ -71,93 +71,6 @@ def _create_space_selector():
         },
     )
 
-@callback(
-    [Output("space-selector", "data"),
-     Output("space-selector", "value")],
-    Input("url", "pathname"),
-    State("space-selector", "value"),
-    prevent_initial_call=False
-)
-def update_space_selector(pathname, current_value):
-    # Map group names to allowed spaces
-    group_space_map = {
-        "IdM2BCD_holmes_pemely_user": ["sherlock", "watson", "mycroft"],
-        "IdM2BCD_holmes_pemely_management": ["enola"],
-    }
-
-    # Get current user's groups
-    user_groups = list_groups()
-    allowed_spaces = set()
-    if user_groups:
-        for group, spaces in group_space_map.items():
-            if group in user_groups:
-                allowed_spaces.update(spaces)
-
-    # Define all spaces and their logos
-    spaces = [
-        {"label": "Mycroft", "value": "mycroft"},
-        {"label": "Sherlock", "value": "sherlock"},
-        {"label": "Enola", "value": "enola"},
-        {"label": "Watson", "value": "watson"},
-    ]
-
-    # Build options, disabling those not allowed
-    options = []
-    for space in spaces:
-        options.append({
-            "label": space["label"],
-            "value": space["value"],
-            "disabled": space["value"] not in allowed_spaces,
-        })
-
-    # Get current space from URL
-    current_space = pathname.split("/")[1] if pathname and len(pathname.split("/")) > 1 else None
-    
-    # Only update value if it's different from URL space (prevents loop)
-    if current_space and current_space in allowed_spaces:
-        return options, current_space
-    
-    # Default to first allowed space if no valid space in URL
-    default_value = next((s["value"] for s in spaces if s["value"] in allowed_spaces), None)
-    return options, default_value
-
-# Combined callback for logo switching and navigation
-clientside_callback(
-    """
-    function(space) {
-        const logoMap = {
-            "mycroft": "/assets/mycroft_logo.png",
-            "sherlock": "/assets/sherlock_logo.png",
-            "enola": "/assets/enola_logo.png",
-            "watson": "/assets/watson_logo.png"
-        };
-        const img = document.getElementById('space-logo-img');
-        if (img && logoMap[space]) {
-            img.src = logoMap[space];
-        }
-        
-        // Only navigate if user manually changed the selector AND current URL doesn't match
-        if (window.dash_clientside.callback_context.triggered.length > 0) {
-            const trigger = window.dash_clientside.callback_context.triggered[0];
-            const currentPath = window.location.pathname;
-            const currentSpace = currentPath.split('/')[1];
-            
-            // Only navigate if:
-            // 1. Triggered by space-selector value change
-            // 2. Selected space is different from current URL space
-            if (trigger.prop_id === 'space-selector.value' && space && space !== currentSpace) {
-                window.location.href = '/' + space + '/home';
-            }
-        }
-        
-        return window.dash_clientside.no_update;
-    }
-    """,
-    Output("space-selector", "id"),
-    Input("space-selector", "value"),
-    prevent_initial_call=True,
-)
-
 
 def _create_link(icon, href):
     return dmc.Anchor(
@@ -207,6 +120,73 @@ def header_layout():
 
 layout = header_layout
 
+
+# Callbacks registered below
+
+@callback(
+    [Output("space-selector", "data"),
+     Output("space-selector", "value")],
+    Input("url", "pathname"),
+    State("space-selector", "value"),
+    prevent_initial_call=False
+)
+def update_space_selector(pathname, current_value):
+    # If at root path, don't show any space selected
+    if pathname == "/" or pathname == "":
+        # Get current user's groups
+        user_groups = list_groups()
+        
+        # Determine which spaces the user has access to based on SPACE_ACCESS_MAP
+        allowed_spaces = set()
+        for space_path, required_groups in SPACE_ACCESS_MAP.items():
+            space_name = space_path.strip("/")
+            if user_groups and any(group in user_groups for group in required_groups):
+                allowed_spaces.add(space_name)
+        
+        # Build options from SPACE_ACCESS_MAP
+        options = [
+            {
+                "label": space_path.strip("/").capitalize(),
+                "value": space_path.strip("/"),
+                "disabled": False
+            }
+            for space_path in SPACE_ACCESS_MAP.keys()
+        ]
+        
+        return options, None  # No value selected at root
+    
+    # Get current user's groups
+    user_groups = list_groups()
+    
+    # Determine which spaces the user has access to based on SPACE_ACCESS_MAP
+    allowed_spaces = set()
+    for space_path, required_groups in SPACE_ACCESS_MAP.items():
+        space_name = space_path.strip("/")
+        if user_groups and any(group in user_groups for group in required_groups):
+            allowed_spaces.add(space_name)
+    
+    # Build options from SPACE_ACCESS_MAP, disabling those not allowed
+    options = [
+        {
+            "label": space_path.strip("/").capitalize(),
+            "value": space_path.strip("/"),
+            "disabled": False  # Temporarily disabled as requested
+        }
+        for space_path in SPACE_ACCESS_MAP.keys()
+    ]
+    
+    # Get current space from URL
+    current_space = pathname.split("/")[1] if pathname and len(pathname.split("/")) > 1 else None
+    
+    # Always return current space from URL - don't override it
+    if current_space:
+        return options, current_space
+    
+    # Default to first space if no valid space in URL
+    default_value = next((s["value"] for s in options), None)
+    return options, default_value
+
+
 @callback(
     Output("bosch-logo-div", "children"),
     Input("theme-store", "data"),
@@ -226,7 +206,49 @@ def update_bosch_logo(theme):
         style={"cursor": "pointer"},
     )
 
-# Instant logo update on client side
+
+# Clientside callbacks - these reference components that may not exist initially
+clientside_callback(
+    """
+    function(space) {
+        // Don't do anything if space is null or undefined
+        if (!space) {
+            return window.dash_clientside.no_update;
+        }
+        
+        const logoMap = {
+            "mycroft": "/assets/mycroft_logo.png",
+            "sherlock": "/assets/sherlock_logo.png",
+            "enola": "/assets/enola_logo.png",
+            "watson": "/assets/watson_logo.png"
+        };
+        const img = document.getElementById('space-logo-img');
+        if (img && logoMap[space]) {
+            img.src = logoMap[space];
+        }
+        
+        // Only navigate if user manually changed the selector AND current URL doesn't match
+        if (window.dash_clientside.callback_context.triggered.length > 0) {
+            const trigger = window.dash_clientside.callback_context.triggered[0];
+            const currentPath = window.location.pathname;
+            const currentSpace = currentPath.split('/')[1];
+            
+            // Only navigate if:
+            // 1. Triggered by space-selector value change
+            // 2. Selected space is different from current URL space
+            if (trigger.prop_id === 'space-selector.value' && space && space !== currentSpace) {
+                window.location.href = '/' + space + '/home';
+            }
+        }
+        
+        return window.dash_clientside.no_update;
+    }
+    """,
+    Output("space-selector", "id"),
+    Input("space-selector", "value"),
+    prevent_initial_call=True,
+)
+
 clientside_callback(
     """
     function(checked) {
@@ -246,6 +268,7 @@ clientside_callback(
     """,
     Output("theme-switch", "id"),
     Input("theme-switch", "checked"),
+    prevent_initial_call=True,
 )
 
 clientside_callback(
@@ -259,4 +282,26 @@ clientside_callback(
     """,
     Output("header-search", "value"),
     Input("header-search", "value"),
+    prevent_initial_call=True,
+)
+
+clientside_callback(
+    """
+    function(switchOn, storeId) {
+        let theme;
+        if (switchOn !== null && switchOn !== undefined) {
+            // User switched theme
+            theme = switchOn ? 'dark' : 'light';
+        } else {
+            // Auto-detect system theme on first load
+            theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+        document.documentElement.setAttribute('data-mantine-color-scheme', theme);
+        return theme;
+    }
+    """,
+    Output("theme-store", "data"),
+    Input("theme-switch", "checked"),
+    Input("theme-store", "id"),
+    prevent_initial_call=True,
 )
