@@ -7,7 +7,7 @@ from services.backend_service import get_table_as_df
 register_page(
     __name__,
     path="/sherlock/data-exploration/order-overview",
-    title="Order Overview Space"
+    title="HOLMES - Sherlock - Order Overview"
 )
 
 USAGE_TOOLTIP_TEXT = (

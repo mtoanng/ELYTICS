@@ -1,5 +1,19 @@
 # TBP-HOLMES Developer Guide
 
+## Roles
+
+Before we begin setting up our development environment there are some roles which are needed to develop and use the application. Please request the following roles via OneIDM:
+
+| Role | Description |
+| --- | --- |
+| IdM2BCD_holmes_pemely_user | End user access to Sherlock, Watson, Mycroft space |
+| IdM2BCD_holmes_pemely_management | End user access to Enola |
+| IdM2BCD_holmes_pemely_development | End user access to development environment |
+| IdM2BCD_xPlatform_az_kv_holmesprod_read | Read access to Holmes PROD Key Vault |
+| IdM2BCD_xPlatform_az_kv_holmesdev_read | Read access to Holmes DEV Key Vault |
+
+A note about `IdM2BCD_holmes_pemely_development`, this is designed to be the only role used in the development hosting environment on Azure App Service. This way we can easily test fixes/features, and also invite stakeholders who are close to development to view the DEV version throughout sprints. 
+
 ## Getting Started (Recommended: Dev Container)
 
 **We strongly recommend all developers use Docker and the provided Dev Container for a consistent, hassle-free development environment.**

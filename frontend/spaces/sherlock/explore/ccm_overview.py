@@ -10,7 +10,7 @@ from services.backend_service import get_table_as_df
 register_page(
     __name__,
     path="/sherlock/data-exploration/ccm-overview",
-    title="CCM Overview Space"
+    title="HOLMES - Sherlock - CCM Overview"
 )
 
 def ccm_overview_layout():
