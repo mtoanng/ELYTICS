@@ -171,7 +171,7 @@ layout = order_overview_layout
     Input("order-order-table", "id"),
 )
 def load_order_data(_):
-    df = get_table_as_df("order_overview")
+    df = get_table_as_df('sherlock', "order_overview")
     if df.empty:
         return []
     # Round all _max columns and maxh2out to 2 decimals

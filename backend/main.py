@@ -15,7 +15,7 @@ app.include_router(tables_router)
 
 start_scheduler()
 
-if os.environ.get("ENV") == "development":
+if os.environ.get("ENVIRONMENT") == "development":
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["http://localhost:8501"],
