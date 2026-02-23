@@ -14,6 +14,20 @@ Before we begin setting up our development environment there are some roles whic
 
 A note about `IdM2BCD_holmes_pemely_development`, this is designed to be the only role used in the development hosting environment on Azure App Service. This way we can easily test fixes/features, and also invite stakeholders who are close to development to view the DEV version throughout sprints. 
 
+## Environment Variables
+
+### Environment Configuration
+
+After obtaining Azure Key Vault access from the roles above, configure your environment using the setup script:
+
+```sh
+generate-env.sh
+```
+
+Select the `PS-BDO-DX-2-Prod` subscription when prompted. The script generates a `.env` file containing required variables for the frontend and backend. **Do not share these variables—always reference the Key Vault for access.**
+
+Alternatively, manually retrieve secrets from the Azure dashboard (slower method).
+
 ## Getting Started (Recommended: Dev Container)
 
 **We strongly recommend all developers use Docker and the provided Dev Container for a consistent, hassle-free development environment.**
