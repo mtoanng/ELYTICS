@@ -1,5 +1,7 @@
 # TBP-HOLMES Developer Guide
 
+This developer guide will set you up with a development environment, from which you can run the application and start contributing to the codebase from. Roles and prerequisites can be done simultaniously, you can move to quickstart once you have been provisioned with the key vault roles and Docker has been installed.
+
 ## Roles
 
 Before we begin setting up our development environment there are some roles which are needed to develop and use the application. Please request the following roles via OneIDM:
@@ -7,26 +9,12 @@ Before we begin setting up our development environment there are some roles whic
 | Role | Description |
 | --- | --- |
 | IdM2BCD_holmes_pemely_user | End user access to Sherlock, Watson, Mycroft space |
-| IdM2BCD_holmes_pemely_management | End user access to Enola |
+| IdM2BCD_holmes_pemely_management | End user access to Enola space |
 | IdM2BCD_holmes_pemely_development | End user access to development environment |
 | IdM2BCD_xPlatform_az_kv_holmesprod_read | Read access to Holmes PROD Key Vault |
 | IdM2BCD_xPlatform_az_kv_holmesdev_read | Read access to Holmes DEV Key Vault |
 
 A note about `IdM2BCD_holmes_pemely_development`, this is designed to be the only role used in the development hosting environment on Azure App Service. This way we can easily test fixes/features, and also invite stakeholders who are close to development to view the DEV version throughout sprints. 
-
-## Environment Variables
-
-### Environment Configuration
-
-After obtaining Azure Key Vault access from the roles above, configure your environment using the setup script:
-
-```sh
-./generate-env.ps1
-```
-
-Select the `PS-BDO-DX-2-Prod` subscription when prompted. The script generates a `.env` file containing required variables for the frontend and backend. **Do not share these variables—always reference the Key Vault for access.**
-
-Alternatively, manually retrieve secrets from the Azure dashboard (slower method).
 
 ## Getting Started (Recommended: Dev Container)
 
@@ -44,14 +32,19 @@ Docker and Visual Studio Code can be ordered [here](https://service-management.b
 Once Docker is installed and running, you need to add these proxies to the docker config file, located at `C:\Users\<NT-USER>\.docker\config.json`. This is required for the dev container to have access to the internet.
 
 ```json
-  "proxies": {
-      "default": {
-          "httpProxy": "http://host.docker.internal:3128",
-          "httpsProxy": "http://host.docker.internal:3128",
-          "noProxy": "host.docker.internal,localhost,127.0.0.1,.bosch.com"
-      }
-  }
+{
+	// Other settings
+	"proxies": {
+		"default": {
+			"httpProxy": "http://host.docker.internal:3128",
+			"httpsProxy": "http://host.docker.internal:3128",
+			"noProxy": "host.docker.internal,localhost,127.0.0.1,.bosch.com"
+		}
+	}
+}
 ```
+
+---
 
 ### Quick Start with Dev Container
 
@@ -64,7 +57,15 @@ Once Docker is installed and running, you need to add these proxies to the docke
 3. **Reopen in Container:**
 	- When prompted, click "Reopen in Container". If not prompted, open the Command Palette (`Ctrl+Shift+P`), search for `Dev Containers: Reopen in Container` and select it.
 4. **Wait for the container to build and dependencies to install.**
-5. **Run the application:**
+5. **Set up environment variables:**
+	- After obtaining Azure Key Vault access, run:
+		```sh
+		./generate-env.ps1
+		```
+	- Select the `PS-BDO-DX-2-Prod` subscription when prompted. The script generates a `.env` file for frontend and backend. **Do not share these variables—always reference the Key Vault for access.**
+	- Alternatively, manually retrieve secrets from the Azure dashboard (slower method).
+6. **Run the application:**
+	- In separate terminals inside the dev container, run the following:
 	```sh
 	cd backend
 	python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000

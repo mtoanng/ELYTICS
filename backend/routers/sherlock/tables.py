@@ -1,27 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException
-import redis
-import json
+from fastapi import APIRouter, Depends
 
 from internal.auth import require_groups
+from internal.util import get_query_result
 
 SPACE = "sherlock"
-
-redis_client = redis.StrictRedis(host="localhost", port=6379, db=0, decode_responses=True)
 
 router = APIRouter(
     prefix="/api/sherlock/tables",
     tags=["tables"],
 )
-
-def get_query_result(query_name):
-    key = f"query_result:{query_name}"
-    value = redis_client.get(key)
-    if value is None:
-        raise HTTPException(status_code=404, detail=f"No data found for {query_name}")
-    try:
-        return json.loads(value)  # Parse JSON string to Python list
-    except Exception:
-        raise HTTPException(status_code=500, detail="Failed to parse data from Redis")
 
 @router.get("/ccm_overview")
 async def ccm_overview(token=Depends(require_groups(["IdM2BCD_holmes_pemely_user"]))):
@@ -30,6 +17,7 @@ async def ccm_overview(token=Depends(require_groups(["IdM2BCD_holmes_pemely_user
 @router.get("/order_overview")
 async def order_overview(token=Depends(require_groups(["IdM2BCD_holmes_pemely_user"]))):
     return {"data": get_query_result(f"{SPACE}/order_overview")}
+
 @router.get("/polcurve_view_data")
 async def polcurve_view_data(token=Depends(require_groups(["IdM2BCD_holmes_pemely_user"]))):
     return {"data": get_query_result(f"{SPACE}/polcurve_view_data")}
