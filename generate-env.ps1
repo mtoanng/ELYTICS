@@ -3,7 +3,8 @@ param(
 )
 
 $kvName = "kv-ps-bdo-dx-holmesdev"
-$outputFile = ".env"
+$frontendEnvFile = "frontend/.env"
+$backendEnvFile = "backend/.env"
 $targetSubscriptionId = "377f1c95-4cf5-4c86-8bf4-6a274695a8cc"  # PS-BDO-DX-2-Prod
 
 # Function to check if az command is available
@@ -110,11 +111,18 @@ if (-not $SkipLogin) {
     }
 }
 
-# Clear or create the file
-if (Test-Path $outputFile) {
-    Clear-Content $outputFile
-} else {
-    New-Item $outputFile -ItemType File | Out-Null
+# Clear or create the files
+foreach ($envFile in @($frontendEnvFile, $backendEnvFile)) {
+    $dir = Split-Path -Parent $envFile
+    if (-not (Test-Path $dir)) {
+        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+    }
+    
+    if (Test-Path $envFile) {
+        Clear-Content $envFile
+    } else {
+        New-Item $envFile -ItemType File | Out-Null
+    }
 }
 
 # Get all secret names
@@ -129,18 +137,54 @@ try {
     }
     
     foreach ($name in $secrets) {
-        $value = az keyvault secret show `
+        # Get secret value and tags
+        $secretData = az keyvault secret show `
             --vault-name $kvName `
             --name $name `
-            --query "value" -o tsv
-
-        Add-Content $outputFile "$name=$value"
+            --query "{value: value, tags: tags}" -o json | ConvertFrom-Json
+        
+        $value = $secretData.value
+        $tags = $secretData.tags
+        
+        # Determine which environments this secret should be added to
+        $addToFrontend = $false
+        $addToBackend = $false
+        
+        if ($tags) {
+            if ($tags.PSObject.Properties["frontend"] -and $tags.frontend -eq "true") {
+                $addToFrontend = $true
+            }
+            if ($tags.PSObject.Properties["backend"] -and $tags.backend -eq "true") {
+                $addToBackend = $true
+            }
+        }
+        
+        # If no tags, skip the secret (or optionally add to both)
+        if (-not ($addToFrontend -or $addToBackend)) {
+            Write-Warning "Secret '$name' has no applicable tags (frontend or backend not set to true). Skipping."
+            continue
+        }
+        
+        # Replace hyphens with underscores in key name
+        $normalizedName = $name -replace "-", "_"
+        
+        # Add to frontend .env if applicable
+        if ($addToFrontend) {
+            Add-Content $frontendEnvFile "$normalizedName=$value"
+        }
+        
+        # Add to backend .env if applicable
+        if ($addToBackend) {
+            Add-Content $backendEnvFile "$normalizedName=$value"
+        }
     }
 
-    Write-Host "Exported secrets to $outputFile"
+    Write-Host "Secrets exported successfully!"
+    Write-Host "  - Frontend: $frontendEnvFile"
+    Write-Host "  - Backend: $backendEnvFile"
 }
 catch {
     Write-Error "Failed to retrieve secrets from Key Vault: $_"
-    Write-Host "Make sure you're logged in with 'az login' and have access to the vault."
+    Write-Host "Make sure you are logged in with az login and have access to the vault."
     exit 1
 }

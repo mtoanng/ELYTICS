@@ -9,6 +9,7 @@ from flask_session import Session
 
 from dotenv import load_dotenv
 from waitress import serve
+
 load_dotenv()
 
 app = dash.Dash(

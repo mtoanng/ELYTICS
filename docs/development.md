@@ -21,7 +21,7 @@ A note about `IdM2BCD_holmes_pemely_development`, this is designed to be the onl
 After obtaining Azure Key Vault access from the roles above, configure your environment using the setup script:
 
 ```sh
-generate-env.sh
+./generate-env.ps1
 ```
 
 Select the `PS-BDO-DX-2-Prod` subscription when prompted. The script generates a `.env` file containing required variables for the frontend and backend. **Do not share these variables—always reference the Key Vault for access.**
@@ -34,11 +34,24 @@ Alternatively, manually retrieve secrets from the Azure dashboard (slower method
 
 ### Prerequisites
 
-Docker and Visual Studio Code can be ordered [here](https://service-management.bosch.tech/sp?id=sc_cat_item&sys_id=b08ed16c1b83c91078087403dd4bcbb1)
+Docker and Visual Studio Code can be ordered [here](https://service-management.bosch.tech/sp?id=sc_cat_item&sys_id=b08ed16c1b83c91078087403dd4bcbb1).
 
 - [Docker - Docupedia](https://inside-docupedia.bosch.com/confluence/spaces/AABDO/pages/6400935502/Docker+Desktop) (required)
-- [Visual Studio Code](https://code.visualstudio.com/) (recommended)
+- [Visual Studio Code](https://code.visualstudio.com/) (required)
+- [GoNTLM](https://inside-docupedia.bosch.com/confluence/spaces/DEVCORNER/pages/2431652890/GoNTLM) (recommended - preferred alternative to RB Local Proxy Manager)
 - [Dev Containers extension for VS Code](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) (recommended)
+
+Once Docker is installed and running, you need to add these proxies to the docker config file, located at `C:\Users\<NT-USER>\.docker\config.json`. This is required for the dev container to have access to the internet.
+
+```json
+  "proxies": {
+      "default": {
+          "httpProxy": "http://host.docker.internal:3128",
+          "httpsProxy": "http://host.docker.internal:3128",
+          "noProxy": "host.docker.internal,localhost,127.0.0.1,.bosch.com"
+      }
+  }
+```
 
 ### Quick Start with Dev Container
 
@@ -51,18 +64,16 @@ Docker and Visual Studio Code can be ordered [here](https://service-management.b
 3. **Reopen in Container:**
 	- When prompted, click "Reopen in Container". If not prompted, open the Command Palette (`Ctrl+Shift+P`), search for `Dev Containers: Reopen in Container` and select it.
 4. **Wait for the container to build and dependencies to install.**
-5. **Setup your environment:**
-    - Please use the setup script to generate the necessary environment files
-    ```sh
-    az login
-    generate-env.sh
-    ```
-6. **Run the application:**
+5. **Run the application:**
 	```sh
-	# Inside the dev container terminal
-	python app.py
+	cd backend
+	python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
 	```
 
+	```sh
+	cd frontend
+	python app.py
+	```
 ---
 
 # TODO:

@@ -8,7 +8,7 @@
     8501,
     8000
   ],
-  "postCreateCommand": "redis-server --daemonize yes",
+  "postStartCommand": "pgrep redis-server || redis-server",
   "portsAttributes": {
     "8501": {
       "label": "Dash Frontend",
