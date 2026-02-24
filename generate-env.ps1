@@ -52,6 +52,55 @@ function Install-AzCli {
     }
 }
 
+function Configure-AzureCliRootCA {
+    $certName = "RB RootCA RSA G01"
+    $exportPath = "C:\RB RootCA_RSA_G01.cer"
+    $mergedBundle = "C:\azure_cli_cert.pem"
+
+    Write-Host "Configuring Azure CLI custom Root CA..."
+
+    # Locate certifi bundle used by Azure CLI
+    $azPath = (Get-Command az).Source
+    $azRoot = Split-Path $azPath -Parent -Parent
+    $certifiBundle = Join-Path $azRoot "Lib\site-packages\certifi\cacert.pem"
+
+    if (-not (Test-Path $certifiBundle)) {
+        Write-Warning "Could not locate certifi bundle at expected path: $certifiBundle"
+        return
+    }
+
+    # Find certificate in LocalMachine Root store
+    $cert = Get-ChildItem Cert:\LocalMachine\Root, Cert:\CurrentUser\Root |
+        Where-Object { $_.Subject -like "*$certName*" } |
+        Select-Object -First 1
+        
+    if (-not $cert) {
+        Write-Warning "Root CA '$certName' not found in LocalMachine\Root"
+        return
+    }
+
+    # Export certificate
+    Export-Certificate -Cert $cert -FilePath $exportPath -Type CERT -Force | Out-Null
+
+    # Create merged bundle if missing or outdated
+    if (-not (Test-Path $mergedBundle)) {
+        Write-Host "Creating merged certificate bundle..."
+        Get-Content $certifiBundle, $exportPath | Set-Content $mergedBundle
+    }
+
+    # Set environment variable (Machine level)
+    [Environment]::SetEnvironmentVariable(
+        "REQUESTS_CA_BUNDLE",
+        $mergedBundle,
+        "Machine"
+    )
+
+    # Also set for current session
+    $env:REQUESTS_CA_BUNDLE = $mergedBundle
+
+    Write-Host "Azure CLI Root CA configured."
+}
+
 # Check and install Azure CLI if needed
 if (-not (Test-AzCli)) {
     if (-not (Install-AzCli)) {
@@ -67,6 +116,8 @@ if (-not (Test-AzCli)) {
 }
 
 Write-Host "Azure CLI is ready"
+
+Configure-AzureCliRootCA
 
 # Make sure you're logged in (unless skipped)
 if (-not $SkipLogin) {
