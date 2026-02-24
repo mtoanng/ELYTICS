@@ -114,7 +114,7 @@ function Configure-AzureCliRootCA {
     [Environment]::SetEnvironmentVariable(
         "REQUESTS_CA_BUNDLE",
         $mergedBundle,
-        "Machine"
+        "User"
     )
 
     # Also set for current session
