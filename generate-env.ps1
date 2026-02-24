@@ -74,8 +74,8 @@ function Configure-Proxy {
 }
 
 function Configure-AzureCliRootCA {
-    $certName = "RB RootCA RSA G01"
-    $exportPath = "$env:LOCALAPPDATA\RB_RootCA_RSA_G01.cer"
+    $certName = "GlobalSign Root CA"
+    $exportPath = "$env:LOCALAPPDATA\GlobalSign_Root_CA.cer"
     $mergedBundle = "$env:LOCALAPPDATA\azure_cli_cert.pem"
 
     Write-Host "Configuring Azure CLI custom Root CA..."
