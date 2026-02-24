@@ -52,16 +52,38 @@ function Install-AzCli {
     }
 }
 
+function Configure-Proxy {
+    $proxy = "http://localhost:3128"
+
+    Write-Host "Configuring proxy settings..."
+
+    # Current session
+    $env:HTTP_PROXY  = $proxy
+    $env:HTTPS_PROXY = $proxy
+    $env:http_proxy  = $proxy
+    $env:https_proxy = $proxy
+
+    # Persist for current user (no admin required)
+    [Environment]::SetEnvironmentVariable("HTTP_PROXY",  $proxy, "User")
+    [Environment]::SetEnvironmentVariable("HTTPS_PROXY", $proxy, "User")
+    [Environment]::SetEnvironmentVariable("http_proxy",  $proxy, "User")
+    [Environment]::SetEnvironmentVariable("https_proxy", $proxy, "User")
+
+    Write-Host "Proxy configured:"
+    Write-Host "  $proxy"
+}
+
 function Configure-AzureCliRootCA {
     $certName = "RB RootCA RSA G01"
-    $exportPath = "C:\RB RootCA_RSA_G01.cer"
-    $mergedBundle = "C:\azure_cli_cert.pem"
+    $exportPath = "$env:LOCALAPPDATA\RB_RootCA_RSA_G01.cer"
+    $mergedBundle = "$env:LOCALAPPDATA\azure_cli_cert.pem"
 
     Write-Host "Configuring Azure CLI custom Root CA..."
 
     # Locate certifi bundle used by Azure CLI
     $azPath = (Get-Command az).Source
-    $azRoot = Split-Path $azPath -Parent -Parent
+    $azDir = Split-Path $azPath -Parent
+    $azRoot = Split-Path $azDir -Parent
     $certifiBundle = Join-Path $azRoot "Lib\site-packages\certifi\cacert.pem"
 
     if (-not (Test-Path $certifiBundle)) {
@@ -73,7 +95,7 @@ function Configure-AzureCliRootCA {
     $cert = Get-ChildItem Cert:\LocalMachine\Root, Cert:\CurrentUser\Root |
         Where-Object { $_.Subject -like "*$certName*" } |
         Select-Object -First 1
-        
+
     if (-not $cert) {
         Write-Warning "Root CA '$certName' not found in LocalMachine\Root"
         return
@@ -117,6 +139,7 @@ if (-not (Test-AzCli)) {
 
 Write-Host "Azure CLI is ready"
 
+Configure-Proxy
 Configure-AzureCliRootCA
 
 # Make sure you're logged in (unless skipped)
