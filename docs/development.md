@@ -27,6 +27,7 @@ Docker and Visual Studio Code can be ordered [here](https://service-management.b
 - [Docker - Docupedia](https://inside-docupedia.bosch.com/confluence/spaces/AABDO/pages/6400935502/Docker+Desktop) (required)
 - [Visual Studio Code](https://code.visualstudio.com/) (required)
 - [GoNTLM](https://inside-docupedia.bosch.com/confluence/spaces/DEVCORNER/pages/2431652890/GoNTLM) (recommended - preferred alternative to RB Local Proxy Manager)
+- [Azure CLI - Docupedia](https://inside-docupedia.bosch.com/confluence/spaces/AzureIMG/pages/1179022413/Azure+CLI) (recommended - automates `.env` file creation)
 - [Dev Containers extension for VS Code](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) (recommended)
 
 Once Docker is installed and running, you need to add these proxies to the docker config file, located at `C:\Users\<NT-USER>\.docker\config.json`. This is required for the dev container to have access to the internet.

@@ -25,7 +25,7 @@ function Install-AzCli {
     # Try using winget (built-in on Windows 11)
     try {
         Write-Host "Installing Azure CLI using winget..."
-        & winget install Microsoft.AzureCLI -e -h --accept-source-agreements | Out-Null
+        & winget install --exact --id Microsoft.AzureCLI
         Write-Host "Azure CLI installed successfully via winget"
         
         # Refresh PATH to make az available
@@ -35,46 +35,6 @@ function Install-AzCli {
     }
     catch {
         Write-Warning "Failed to install Azure CLI via winget: $_"
-    }
-    
-    # Fallback: Try using Chocolatey
-    try {
-        Write-Host "Attempting to install Azure CLI using Chocolatey..."
-        & choco install azure-cli -y | Out-Null
-        Write-Host "Azure CLI installed successfully via Chocolatey"
-        
-        # Refresh PATH
-        $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
-        
-        return $true
-    }
-    catch {
-        Write-Warning "Failed to install Azure CLI via Chocolatey: $_"
-    }
-    
-    # Fallback: Direct download from Microsoft
-    try {
-        Write-Host "Attempting to install Azure CLI from Microsoft..."
-        $url = "https://aka.ms/installazurecliwindows"
-        $installer = "$env:TEMP\AzureCLI.msi"
-        
-        Write-Host "Downloading Azure CLI installer..."
-        Invoke-WebRequest -Uri $url -OutFile $installer -ErrorAction Stop
-        
-        Write-Host "Running installer..."
-        Start-Process msiexec.exe -ArgumentList "/i `"$installer`" /quiet" -Wait
-        
-        Remove-Item $installer -Force -ErrorAction SilentlyContinue
-        
-        # Refresh PATH
-        $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
-        
-        Write-Host "Azure CLI installed successfully from Microsoft"
-        return $true
-    }
-    catch {
-        Write-Error "Failed to install Azure CLI from Microsoft: $_"
-        return $false
     }
 }
 
