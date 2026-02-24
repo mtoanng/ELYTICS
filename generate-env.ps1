@@ -25,16 +25,30 @@ function Install-AzCli {
     # Try using winget (built-in on Windows 11)
     try {
         Write-Host "Installing Azure CLI using winget..."
-        & winget install --exact --id Microsoft.AzureCLI
-        Write-Host "Azure CLI installed successfully via winget"
-        
-        # Refresh PATH to make az available
-        $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
-        
-        return $true
+
+        winget install `
+            --exact `
+            --id Microsoft.AzureCLI `
+            --source winget `
+            --accept-package-agreements `
+            --accept-source-agreements
+
+        # Refresh PATH
+        $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" +
+                    [System.Environment]::GetEnvironmentVariable("Path","User")
+
+        # Verify installation
+        if (Get-Command az -ErrorAction SilentlyContinue) {
+            Write-Host "Azure CLI installed successfully."
+            return $true
+        } else {
+            Write-Warning "Installation completed but 'az' not found in PATH."
+            return $false
+        }
     }
     catch {
         Write-Warning "Failed to install Azure CLI via winget: $_"
+        return $false
     }
 }
 
