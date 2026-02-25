@@ -77,7 +77,6 @@ Once Docker is installed and running, you need to add these proxies to the docke
 	```
 ---
 
-# TODO:
-- add most popular forms of contribution to the repo
-    - new page -> add page, add query to backend, create backend route, create filters if needed etc
-    - new component -> find n occurances where component can be used, create and update all code, more modular 
+## Guides
+
+Please check this [migration guide](./examples/migration.md), should include all necessary information to migrate pages from sub spaces into this Holmes repository.

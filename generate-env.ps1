@@ -21,7 +21,15 @@ function Test-AzCli {
 # Function to install Azure CLI
 function Install-AzCli {
     Write-Host "Azure CLI not found. Attempting to install..."
+    Write-Host ""
+    Write-Host "This will install Azure CLI using winget. (Requires Admin rights)"
+    $confirm = Read-Host "Continue with installation? (Y/N)"
     
+    if ($confirm -ne "Y" -and $confirm -ne "y") {
+        Write-Host "Installation cancelled."
+        return $false
+    }
+
     # Try using winget (built-in on Windows 11)
     try {
         Write-Host "Installing Azure CLI using winget..."
@@ -56,6 +64,29 @@ function Configure-Proxy {
     $proxy = "http://localhost:3128"
 
     Write-Host "Configuring proxy settings..."
+
+    # Check if proxy is listening on port 3128
+    $proxyRunning = $false
+    try {
+        $tcpClient = New-Object System.Net.Sockets.TcpClient
+        $tcpClient.Connect("localhost", 3128)
+        $tcpClient.Close()
+        $proxyRunning = $true
+    }
+    catch {
+        $proxyRunning = $false
+    }
+
+    if (-not $proxyRunning) {
+        Write-Warning "No proxy detected on port 3128!"
+        Write-Host ""
+        Write-Host "You need to be running a proxy client. Recommended option:"
+        Write-Host "  - GoNTLM: https://inside-docupedia.bosch.com/confluence/spaces/DEVCORNER/pages/2431652890/GoNTLM"
+        Write-Host "    (preferred alternative to RB Local Proxy Manager)"
+        Write-Host ""
+        Write-Error "Please start your proxy client and try again."
+        exit 1
+    }
 
     # Current session
     $env:HTTP_PROXY  = $proxy
