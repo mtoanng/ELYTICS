@@ -74,7 +74,7 @@ function Configure-Proxy {
 }
 
 function Configure-AzureCliRootCA {
-    $certName = "GlobalSign Root CA"
+    $certName = "RB RootCA RSA G01"
     $exportPath = "$env:LOCALAPPDATA\GlobalSign_Root_CA.cer"
     $mergedBundle = "$env:LOCALAPPDATA\azure_cli_cert.pem"
 
@@ -101,16 +101,23 @@ function Configure-AzureCliRootCA {
         return
     }
 
-    # Export certificate
+    # Export certificate to CER format first
     Export-Certificate -Cert $cert -FilePath $exportPath -Type CERT -Force | Out-Null
 
-    # Create merged bundle if missing or outdated
-    if (-not (Test-Path $mergedBundle)) {
-        Write-Host "Creating merged certificate bundle..."
-        Get-Content $certifiBundle, $exportPath | Set-Content $mergedBundle
-    }
+    # Convert CER to PEM format
+    $certContent = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($exportPath), [System.Base64FormattingOptions]::InsertLineBreaks)
+    $customCertPem = "-----BEGIN CERTIFICATE-----`r`n$certContent`r`n-----END CERTIFICATE-----"
 
-    # Set environment variable (Machine level)
+    # Create merged bundle if missing or outdated
+    Write-Host "Creating merged certificate bundle..."
+    
+    # Read the original certifi bundle and append our custom cert
+    $bundleContent = Get-Content $certifiBundle -Raw
+    $mergedContent = $bundleContent + "`r`n" + $customCertPem
+    
+    Set-Content -Path $mergedBundle -Value $mergedContent -NoNewline
+
+    # Set environment variable (User level)
     [Environment]::SetEnvironmentVariable(
         "REQUESTS_CA_BUNDLE",
         $mergedBundle,
