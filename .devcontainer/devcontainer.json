@@ -4,11 +4,11 @@
     "dockerfile": "Dockerfile",
     "context": ".."
   },
+  "postStartCommand": "redis-server --daemonize yes",
   "forwardPorts": [
     8501,
     8000
   ],
-  "postStartCommand": "pgrep redis-server || redis-server",
   "portsAttributes": {
     "8501": {
       "label": "Dash Frontend",
@@ -26,8 +26,8 @@
         "ms-python.vscode-pylance",
         "ms-python.black-formatter",
         "ms-python.isort",
-        "ms-toolsai.jupyter",
-        "njpwerner.autodocstring"
+        "njpwerner.autodocstring",
+        "github.copilot"
       ],
       "settings": {
         "python.defaultInterpreterPath": "/usr/local/bin/python",
