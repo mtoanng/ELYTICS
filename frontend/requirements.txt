@@ -1,0 +1,15 @@
+dash
+dash-mantine-components
+dash-ag-grid
+dash-iconify
+dash-table
+dash-auth
+authlib
+requests
+pandas
+python-dotenv
+databricks
+databricks-sql-connector
+waitress
+flask-session
+redis

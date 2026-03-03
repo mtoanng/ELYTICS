@@ -1,0 +1,43 @@
+{
+  "name": "TBP-HOLMES Dev Container",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "postStartCommand": "redis-server --daemonize yes",
+  "forwardPorts": [
+    8501,
+    8000
+  ],
+  "portsAttributes": {
+    "8501": {
+      "label": "Dash Frontend",
+      "onAutoForward": "openBrowser"
+    },
+    "8000": {
+      "label": "FastAPI Backend",
+      "onAutoForward": "notify"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-python.black-formatter",
+        "ms-python.isort",
+        "njpwerner.autodocstring",
+        "github.copilot"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.analysis.typeCheckingMode": "basic",
+        "python.formatting.provider": "none",
+        "editor.formatOnSave": true,
+        "[python]": {
+          "editor.defaultFormatter": "ms-python.python"
+        }
+      }
+    }
+  }
+}

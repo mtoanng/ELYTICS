@@ -1,0 +1,307 @@
+from dash.dependencies import Input, Output, State
+from dash import callback, clientside_callback, html
+import dash_mantine_components as dmc
+from dash_iconify import DashIconify
+
+from components.sidebar import SIDEBAR_STRUCTURE
+from dash_auth import list_groups
+from config.access_config import SPACE_ACCESS_MAP
+
+
+def _build_search_options():
+    options = []
+    for space, groups in SIDEBAR_STRUCTURE.items():
+        if None in groups:
+            for page in groups[None]:
+                options.append({
+                    "label": f"{space.title()} / {page['label']}",
+                    "value": f"/{space}/{page['path']}"
+                })
+        for group, group_data in groups.items():
+            if group is None or isinstance(group_data, list):
+                continue
+            
+            # group_data is now a dict with "path" and "pages"
+            group_path = group_data.get("path", group.lower().replace(" ", "-"))
+            pages = group_data.get("pages", [])
+            
+            for page in pages:
+                options.append({
+                    "label": f"{space.title()} / {group} / {page['label']}",
+                    "value": f"/{space}/{group_path}/{page['path']}"
+                })
+    return options
+
+def _create_search():
+    return dmc.Select(
+        id="header-search",
+        placeholder="Search",
+        searchable=True,
+        clearable=True,
+        leftSection=DashIconify(icon="mingcute:search-3-line"),
+        data=_build_search_options(),
+        w=260,
+        nothingFoundMessage="No matches",
+        visibleFrom="sm",
+        comboboxProps={"shadow": "md"},
+    )
+
+def _create_space_selector():
+    # Initial placeholder - will be updated by callback after auth
+    return dmc.Select(
+        id="space-selector",
+        data=[],
+        placeholder="Select Space",
+        leftSectionPointerEvents="none",
+        leftSection=html.Img(
+            id="space-logo-img",
+            src="/assets/sherlock_logo.png",
+            height="32px",
+            style={"marginLeft": "8px"},
+        ),
+        w=240,
+        size="md",
+        value=None,
+        styles={
+            "input": {
+                "fontWeight": 700,
+                "fontSize": "18px",
+                "paddingLeft": "48px",
+            }
+        },
+    )
+
+
+def _create_link(icon, href):
+    return dmc.Anchor(
+        dmc.ActionIcon(
+            DashIconify(icon=icon, width=22),
+            variant="transparent",
+            size="lg",
+        ),
+        href=href,
+        target="_blank",
+        visibleFrom="xs",
+    )
+
+
+def header_layout():
+    return dmc.Group(
+        justify="space-between",
+        h="100%",
+        px=20,
+        children=[
+            dmc.Group(
+                gap="md",
+                children=[
+                    _create_space_selector(),
+                ],
+            ),
+            dmc.Group(
+                gap="md",
+                children=[
+                    _create_search(),
+                    _create_link("radix-icons:reader", "https://inside-docupedia.bosch.com/confluence/spaces/ELYSTACK/pages/6751345063/HOLMES+Application"),                    
+                    dmc.Switch(
+                        id="theme-switch",
+                        checked=False,
+                        size="md",
+                        color="gray",
+                        persistence=True,
+                        persistence_type="local",
+                        onLabel=DashIconify(icon="radix-icons:moon", width=15, color="var(--mantine-color-yellow-6)"),
+                        offLabel=DashIconify(icon="radix-icons:sun", width=15, color="var(--mantine-color-yellow-8)"),
+                    ),
+                    html.Div(id="bosch-logo-div"),
+                ],
+            ),
+        ],
+    )
+
+layout = header_layout
+
+
+# Callbacks registered below
+
+@callback(
+    [Output("space-selector", "data"),
+     Output("space-selector", "value")],
+    Input("url", "pathname"),
+    State("space-selector", "value"),
+    prevent_initial_call=False
+)
+def update_space_selector(pathname, current_value):
+    # If at root path, don't show any space selected
+    if pathname == "/" or pathname == "":
+        # Get current user's groups
+        user_groups = list_groups()
+        
+        # Determine which spaces the user has access to based on SPACE_ACCESS_MAP
+        allowed_spaces = set()
+        for space_path, required_groups in SPACE_ACCESS_MAP.items():
+            space_name = space_path.strip("/")
+            if user_groups and any(group in user_groups for group in required_groups):
+                allowed_spaces.add(space_name)
+        
+        # Build options from SPACE_ACCESS_MAP
+        options = [
+            {
+                "label": space_path.strip("/").capitalize(),
+                "value": space_path.strip("/"),
+                "disabled": False
+            }
+            for space_path in SPACE_ACCESS_MAP.keys()
+        ]
+        
+        return options, None  # No value selected at root
+    
+    # Get current user's groups
+    user_groups = list_groups()
+    
+    # Determine which spaces the user has access to based on SPACE_ACCESS_MAP
+    allowed_spaces = set()
+    for space_path, required_groups in SPACE_ACCESS_MAP.items():
+        space_name = space_path.strip("/")
+        if user_groups and any(group in user_groups for group in required_groups):
+            allowed_spaces.add(space_name)
+    
+    # Build options from SPACE_ACCESS_MAP, disabling those not allowed
+    options = [
+        {
+            "label": space_path.strip("/").capitalize(),
+            "value": space_path.strip("/"),
+            "disabled": False  # Temporarily disabled as requested
+        }
+        for space_path in SPACE_ACCESS_MAP.keys()
+    ]
+    
+    # Get current space from URL
+    current_space = pathname.split("/")[1] if pathname and len(pathname.split("/")) > 1 else None
+    
+    # Always return current space from URL - don't override it
+    if current_space:
+        return options, current_space
+    
+    # Default to first space if no valid space in URL
+    default_value = next((s["value"] for s in options), None)
+    return options, default_value
+
+
+@callback(
+    Output("bosch-logo-div", "children"),
+    Input("theme-store", "data"),
+    prevent_initial_call=False
+)
+def update_bosch_logo(theme):
+    if theme == "dark":
+        src = "/assets/Bosch_symbol_logo_black.png"
+        class_name = "header-logo-right invert-logo"
+    else:
+        src = "/assets/Bosch_symbol_logo_black_red.png"
+        class_name = "header-logo-right"
+    return html.Img(
+        src=src,
+        height="50px",
+        className=class_name,
+        style={"cursor": "pointer"},
+    )
+
+
+# Clientside callbacks - these reference components that may not exist initially
+clientside_callback(
+    """
+    function(space) {
+        // Don't do anything if space is null or undefined
+        if (!space) {
+            return window.dash_clientside.no_update;
+        }
+        
+        const logoMap = {
+            "mycroft": "/assets/mycroft_logo.png",
+            "sherlock": "/assets/sherlock_logo.png",
+            "enola": "/assets/enola_logo.png",
+            "watson": "/assets/watson_logo.png"
+        };
+        const img = document.getElementById('space-logo-img');
+        if (img && logoMap[space]) {
+            img.src = logoMap[space];
+        }
+        
+        // Only navigate if user manually changed the selector AND current URL doesn't match
+        if (window.dash_clientside.callback_context.triggered.length > 0) {
+            const trigger = window.dash_clientside.callback_context.triggered[0];
+            const currentPath = window.location.pathname;
+            const currentSpace = currentPath.split('/')[1];
+            
+            // Only navigate if:
+            // 1. Triggered by space-selector value change
+            // 2. Selected space is different from current URL space
+            if (trigger.prop_id === 'space-selector.value' && space && space !== currentSpace) {
+                window.location.href = '/' + space + '/home';
+            }
+        }
+        
+        return window.dash_clientside.no_update;
+    }
+    """,
+    Output("space-selector", "id"),
+    Input("space-selector", "value"),
+    prevent_initial_call=True,
+)
+
+clientside_callback(
+    """
+    function(checked) {
+        const logoDiv = document.getElementById('bosch-logo-div');
+        if (logoDiv && logoDiv.querySelector('img')) {
+            const img = logoDiv.querySelector('img');
+            if (checked) {
+                img.src = '/assets/Bosch_symbol_logo_black.png';
+                img.classList.add('invert-logo');
+            } else {
+                img.src = '/assets/Bosch_symbol_logo_black_red.png';
+                img.classList.remove('invert-logo');
+            }
+        }
+        return window.dash_clientside.no_update;
+    }
+    """,
+    Output("theme-switch", "id"),
+    Input("theme-switch", "checked"),
+    prevent_initial_call=True,
+)
+
+clientside_callback(
+    """
+    function(value) {
+        if (value) {
+            window.location.href = value;
+        }
+        return window.dash_clientside.no_update;
+    }
+    """,
+    Output("header-search", "value"),
+    Input("header-search", "value"),
+    prevent_initial_call=True,
+)
+
+clientside_callback(
+    """
+    function(switchOn, storeId) {
+        let theme;
+        if (switchOn !== null && switchOn !== undefined) {
+            // User switched theme
+            theme = switchOn ? 'dark' : 'light';
+        } else {
+            // Auto-detect system theme on first load
+            theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+        document.documentElement.setAttribute('data-mantine-color-scheme', theme);
+        return theme;
+    }
+    """,
+    Output("theme-store", "data"),
+    Input("theme-switch", "checked"),
+    Input("theme-store", "id"),
+    prevent_initial_call=True,
+)
