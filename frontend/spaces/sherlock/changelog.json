@@ -1,4 +1,10 @@
 {
-  "unreleased": [],
+  "unreleased": [
+    {
+      "pr": 649,
+      "title": "$(System.PullRequest.Title)",
+      "date": "2026-03-03"
+    }
+  ],
   "releases": {}
 }
