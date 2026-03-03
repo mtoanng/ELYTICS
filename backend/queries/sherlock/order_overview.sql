@@ -22,13 +22,13 @@ FROM
 INNER JOIN (
   SELECT 
     order_id,
-    MAX(jStck_max) AS jStack_max, 
-    MAX(uCell_max) AS uCell_max,
-    MAX(tAndeIn_max) AS tAndeIn_max,
-    MAX(tAndeOut_max) AS tAndeOut_max,
-    MAX(pCtdeOut_max) AS pCtdeOut_max,
-    MAX(pAndeIn_max) AS pAndeIn_max,
-    MAX(vfAndeIn_max) AS vfAndeIn_max
+    MAX(CASE WHEN jStck_max IS NOT NULL AND jStck_max != 'NaN' THEN jStck_max END) AS jStack_max, 
+    MAX(CASE WHEN uCell_max IS NOT NULL AND uCell_max != 'NaN' THEN uCell_max END) AS uCell_max,
+    MAX(CASE WHEN tAndeIn_max IS NOT NULL AND tAndeIn_max != 'NaN' THEN tAndeIn_max END) AS tAndeIn_max,
+    MAX(CASE WHEN tAndeOut_max IS NOT NULL AND tAndeOut_max != 'NaN' THEN tAndeOut_max END) AS tAndeOut_max,
+    MAX(CASE WHEN pCtdeOut_max IS NOT NULL AND pCtdeOut_max != 'NaN' THEN pCtdeOut_max END) AS pCtdeOut_max,
+    MAX(CASE WHEN pAndeIn_max IS NOT NULL AND pAndeIn_max != 'NaN' THEN pAndeIn_max END) AS pAndeIn_max,
+    MAX(CASE WHEN vfAndeIn_max IS NOT NULL AND vfAndeIn_max != 'NaN' THEN vfAndeIn_max END) AS vfAndeIn_max
   FROM 
     ps_xplatform_dev.pemely_ops.gold_genericstack_static
   GROUP BY
