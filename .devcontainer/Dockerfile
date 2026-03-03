@@ -5,10 +5,13 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-# Install git, tmux and clean up apt cache
 RUN apt-get update \
-    && apt-get install -y git tmux redis-server \
+    && apt-get install -y git ca-certificates curl redis-server \
     && rm -rf /var/lib/apt/lists/*
+
+# Copy corporate root certificate into system trust store
+COPY root_ca.pem /usr/local/share/ca-certificates/root_ca.crt
+RUN update-ca-certificates
 
 # Copy and install backend requirements
 COPY backend/requirements.txt ./backend-requirements.txt
@@ -19,7 +22,5 @@ COPY frontend/requirements.txt ./frontend-requirements.txt
 RUN pip install -r frontend-requirements.txt
 
 COPY . .
-
-RUN chmod +x /app/manual_deployment.sh
 
 EXPOSE 8501 8000
