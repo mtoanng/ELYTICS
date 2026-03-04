@@ -1,5 +1,6 @@
 import dash_mantine_components as dmc
-from services.changelog_service import get_latest_released_version
+from pathlib import Path
+import json
 
 SIDEBAR_STRUCTURE = {
     "mycroft": {
@@ -147,9 +148,28 @@ def create_content(space: str, groups: dict, latest_version: str):
         style={"height": "100%"},
     )
 
+def get_latest_version_from_changelog(changelog_path: Path) -> str:
+    """Read the latest released version from a JSON changelog file."""
+    try:
+        if changelog_path.exists():
+            with changelog_path.open(encoding="utf-8") as f:
+                changelog = json.load(f)
+            releases = changelog.get("releases", {})
+            if releases:
+                # Get the first key (latest version)
+                return next(iter(releases.keys()))
+    except (json.JSONDecodeError, OSError):
+        pass
+    return "0.0.0"
+
 def sidebar_layout(pathname: str | None = None):
-    latest_version = get_latest_released_version() or "Unknown"
     space = get_space_from_path(pathname)
+    
+    # Get the changelog path for the space
+    latest_version = "0.0.0"
+    if space:
+        changelog_path = Path(__file__).resolve().parents[1] / "spaces" / space / "changelog.json"
+        latest_version = get_latest_version_from_changelog(changelog_path)
 
     if space and space in SIDEBAR_STRUCTURE:
         groups = SIDEBAR_STRUCTURE[space]
