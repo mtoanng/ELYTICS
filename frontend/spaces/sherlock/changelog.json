@@ -1,15 +1,4 @@
 {
-  "unreleased": [
-    {
-      "pr": 649,
-      "title": "$(System.PullRequest.Title)",
-      "date": "2026-03-03"
-    },
-    {
-      "pr": 650,
-      "title": "$(System.PullRequest.Title)",
-      "date": "2026-03-04"
-    }
-  ],
+  "unreleased": [],
   "releases": {}
 }
