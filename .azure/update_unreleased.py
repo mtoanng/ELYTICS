@@ -71,6 +71,18 @@ def _run_git_changed_files(repo_root: Path) -> list[str]:
 	return [line.strip() for line in output.splitlines() if line.strip()]
 
 
+def _git_last_commit_message(repo_root: Path) -> str:
+	try:
+		output = subprocess.check_output(
+			["git", "log", "-1", "--pretty=%B"],
+			cwd=repo_root,
+			text=True,
+		)
+	except Exception:
+		return ""
+	return output.strip()
+
+
 def _changed_files(repo_root: Path) -> list[str]:
 	from_env = os.getenv("CHANGED_FILES", "").strip()
 	if from_env:
@@ -97,7 +109,7 @@ def _extract_pr_from_message(message: str) -> tuple[int | None, str | None]:
 	return None, None
 
 
-def _pull_request_info() -> PullRequestInfo | None:
+def _pull_request_info(repo_root: Path) -> PullRequestInfo | None:
 	raw_pr = (
 		os.getenv("PR_ID")
 		or os.getenv("SYSTEM_PULLREQUEST_PULLREQUESTID")
@@ -112,6 +124,8 @@ def _pull_request_info() -> PullRequestInfo | None:
 
 	if pr_id is None or not title:
 		message = (os.getenv("BUILD_SOURCEVERSIONMESSAGE") or "").strip()
+		if not message:
+			message = _git_last_commit_message(repo_root)
 		parsed_pr, parsed_title = _extract_pr_from_message(message)
 		pr_id = pr_id or parsed_pr
 		title = title or (parsed_title or "")
@@ -167,7 +181,7 @@ def main() -> int:
 		print("No changed files detected; nothing to update.")
 		return 0
 
-	pr_info = _pull_request_info()
+	pr_info = _pull_request_info(repo_root)
 	if pr_info is None:
 		print("PR metadata not found; skipping changelog update.")
 		return 0
