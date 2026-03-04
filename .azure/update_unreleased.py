@@ -94,7 +94,9 @@ def _changed_files(repo_root: Path) -> list[str]:
 def _extract_pr_from_message(message: str) -> tuple[int | None, str | None]:
 	patterns = [
 		r"Merged PR\s+(\d+)\s*:\s*(.+)",
+		r"Merged PR\s+(\d+)\s*\n+(.+)",
 		r"Merge pull request\s+#(\d+)\s+from\s+.+\n\n(.+)",
+		r"Merge pull request\s+(\d+)\s+from\s+.+\n\n(.+)",
 		r"(.+?)\s+\(#(\d+)\)",
 	]
 	for index, pattern in enumerate(patterns):
