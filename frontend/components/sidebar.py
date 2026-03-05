@@ -96,11 +96,7 @@ def create_content(space: str, groups: dict, latest_version: str):
 
         body.append(
             dmc.Divider(
-                label=dmc.Anchor(
-                    dmc.Text(group, size="sm", fw=700),
-                    href=f"/{space}/{group_path}",
-                    underline=False,
-                ),
+                label=dmc.Text(group, size="sm", fw=700),
                 labelPosition="left",
                 mt=24,
                 mb=8,
@@ -123,7 +119,7 @@ def create_content(space: str, groups: dict, latest_version: str):
         gap=0,
         children=[
             dmc.ScrollArea(
-                offsetScrollbars=True,
+                offsetScrollbars=False,
                 type="scroll",
                 style={"height": "100%", "flex": 1},
                 children=dmc.Stack(
@@ -137,7 +133,8 @@ def create_content(space: str, groups: dict, latest_version: str):
             dmc.Divider(m=0),
             dmc.NavLink(
                 label="Submit Feedback",
-                href="#",
+                href="https://apps-p-p3-outsystems.de.bosch.com/pemely/Main?inp_Screen=Feedback&inp_Id=0",
+                target="_blank",
                 active=False,
                 className="navbar-link",
                 h=50,
