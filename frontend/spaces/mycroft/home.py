@@ -1,20 +1,13 @@
 from dash import register_page
 import dash_mantine_components as dmc
-from components.changelog import build_update_cards
-import json
+from components.changelog import build_update_cards, load_changelog_json
 from pathlib import Path
 
 register_page(__name__, path="/mycroft/home", title="HOLMES - Mycroft")
 
-def _load_changelog_json(changelog_path: Path) -> dict:
-    if not changelog_path.exists():
-        return {}
-    with changelog_path.open(encoding="utf-8") as handle:
-        return json.load(handle)
-
 def mycroft_layout():
     changelog_path = Path(__file__).resolve().parent / "changelog.json"
-    changelog = _load_changelog_json(changelog_path)
+    changelog = load_changelog_json(changelog_path)
     
     return dmc.Container(
         size="md",

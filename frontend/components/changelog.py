@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from typing import Any
+import json
+from pathlib import Path
 
 import dash_mantine_components as dmc
 
@@ -19,6 +21,13 @@ def _format_item(item: Any) -> dict[str, Any] | None:
 		if pr:
 			return {"text": f"PR #{pr}", "date": date}
 	return None
+
+
+def load_changelog_json(changelog_path: Path) -> dict[str, Any]:
+	if not changelog_path.exists():
+		return {}
+	with changelog_path.open(encoding="utf-8") as handle:
+		return json.load(handle)
 
 
 def _normalize_changelog(changelog: dict[str, Any] | None) -> list[dict[str, Any]]:

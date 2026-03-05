@@ -1,10 +1,9 @@
 import dash_mantine_components as dmc
 from dash import register_page, Output, Input, clientside_callback, html, callback
 from dash_iconify import DashIconify
-from components.changelog import build_update_cards
+from components.changelog import build_update_cards, load_changelog_json
 from config.access_config import SPACE_ACCESS_MAP
 from dash_auth import list_groups
-import json
 from pathlib import Path
 
 register_page(__name__, path="/", title="HOLMES - Home")
@@ -14,28 +13,28 @@ SPACE_INFO = {
     "sherlock": {
         "title": "Sherlock",
         "description": "Advanced analytics and AI/ML model management for predictive insights and data exploration.",
-        "version": "v2.1.0",
+        "version": None,
         "color": "blue",
         "icon": "tabler:chart-line",
     },
     "watson": {
         "title": "Watson",
         "description": "Intelligent data processing and natural language analysis for enhanced decision-making.",
-        "version": "v1.8.3",
+        "version": None,
         "color": "cyan",
         "icon": "tabler:brain",
     },
     "mycroft": {
         "title": "Mycroft",
         "description": "Data visualization and reporting tools for comprehensive business intelligence.",
-        "version": "v2.0.1",
+        "version": None,
         "color": "grape",
         "icon": "tabler:chart-bar",
     },
     "enola": {
         "title": "Enola",
         "description": "Management and administration tools for system configuration and user access control.",
-        "version": "v1.5.0",
+        "version": None,
         "color": "red",
         "icon": "tabler:settings",
     },
@@ -45,13 +44,40 @@ ROOT_CHANGELOG_LABEL = "HOLMES"
 ROOT_CHANGELOG_COLOR = "blue"
 
 
-def _load_changelog_json(changelog_path: Path) -> dict:
-    if not changelog_path.exists():
-        return {}
-    with changelog_path.open(encoding="utf-8") as handle:
-        return json.load(handle)
+def _extract_latest_version(changelog: dict) -> str:
+    releases = changelog.get("releases") or {}
+    candidates: list[tuple[str, str | None]] = []
 
-def _create_space_card(space_name, space_data, has_access=False):
+    if isinstance(releases, dict):
+        for version, payload in releases.items():
+            date = None
+            if isinstance(payload, dict):
+                date = (
+                    payload.get("date")
+                    or payload.get("released")
+                    or payload.get("released_at")
+                )
+            candidates.append((version, date))
+    elif isinstance(releases, list):
+        for payload in releases:
+            if not isinstance(payload, dict):
+                continue
+            version = payload.get("version") or payload.get("tag")
+            if not version:
+                continue
+            date = payload.get("date") or payload.get("released")
+            candidates.append((version, date))
+
+    if not candidates:
+        return "N/A"
+
+    dated = [item for item in candidates if item[1]]
+    if dated:
+        return max(dated, key=lambda item: item[1] or "")[0]
+
+    return max((version for version, _ in candidates), default="N/A")
+
+def _create_space_card(space_name, space_data, version, has_access=False):
     """Create a card for a single space."""
     required_groups = SPACE_ACCESS_MAP.get(f"/{space_name}", [])
     required_role = required_groups[0] if required_groups else "No role required"
@@ -83,7 +109,7 @@ def _create_space_card(space_name, space_data, has_access=False):
                             variant="light",
                         ),
                         dmc.Badge(
-                            space_data["version"],
+                            version,
                             color=space_data["color"],
                             variant="dot",
                         ),
@@ -140,6 +166,14 @@ def _create_space_card(space_name, space_data, has_access=False):
 
 def create_landing():
     """Create the landing page layout."""
+    base_path = Path(__file__).resolve().parents[1]
+
+    space_versions = {}
+    for space_name in SPACE_INFO.keys():
+        space_path = base_path / "spaces" / space_name / "changelog.json"
+        space_changelog = load_changelog_json(space_path)
+        space_versions[space_name] = _extract_latest_version(space_changelog)
+
     # Get current user's groups
     user_groups = list_groups()
     
@@ -182,7 +216,12 @@ def create_landing():
                         cols={"base": 1, "sm": 2, "lg": 4},
                         spacing="lg",
                         children=[
-                            _create_space_card(space_name, space_data, user_access.get(space_name, False))
+                            _create_space_card(
+                                space_name,
+                                space_data,
+                                space_versions.get(space_name) or "N/A",
+                                user_access.get(space_name, False),
+                            )
                             for space_name, space_data in SPACE_INFO.items()
                         ],
                     ),
@@ -244,12 +283,12 @@ def update_changelog_list(selected_spaces):
     cards = []
 
     base_path = Path(__file__).resolve().parents[1]
-    root_changelog = _load_changelog_json(base_path / "changelog.json")
+    root_changelog = load_changelog_json(base_path / "changelog.json")
     cards.extend(build_update_cards(root_changelog, ROOT_CHANGELOG_LABEL, ROOT_CHANGELOG_COLOR))
 
     for space_name in selected_spaces:
         space_path = base_path / "spaces" / space_name / "changelog.json"
-        space_changelog = _load_changelog_json(space_path)
+        space_changelog = load_changelog_json(space_path)
         cards.extend(
             build_update_cards(
                 space_changelog,

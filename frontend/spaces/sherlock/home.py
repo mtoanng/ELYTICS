@@ -1,23 +1,15 @@
 from dash import register_page
 import dash_mantine_components as dmc
-from components.changelog import build_update_cards
+from components.changelog import build_update_cards, load_changelog_json
 import json
 from pathlib import Path
 
 register_page(__name__, path="/sherlock/home", title="Sherlock Space")
 
-def _load_changelog_json(changelog_path: Path) -> dict:
-    if not changelog_path.exists():
-        return {}
-    with changelog_path.open(encoding="utf-8") as handle:
-        return json.load(handle)
-
-def get_latest_updates():
-    changelog_path = Path(__file__).resolve().parent / "changelog.json"
-    changelog = _load_changelog_json(changelog_path)
-    return build_update_cards(changelog, "Sherlock", "blue")
-
 def sherlock_layout():
+    changelog_path = Path(__file__).resolve().parent / "changelog.json"
+    changelog = load_changelog_json(changelog_path)
+
     return dmc.Container(
         size="md",
         children=[
@@ -55,7 +47,7 @@ def sherlock_layout():
                 [
                     dmc.Title("Latest Updates & Features", order=2),
                     dmc.Stack(
-                        get_latest_updates(),
+                        build_update_cards(changelog, "Sherlock", "blue"),
                         gap="md",
                     ),
                 ],
