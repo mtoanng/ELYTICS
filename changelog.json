@@ -1,4 +1,10 @@
 {
-  "unreleased": [],
+  "unreleased": [
+    {
+      "pr": 655,
+      "title": "feat(core): Updated logic of changelog usage within landing pages and sidebar",
+      "date": "2026-03-05"
+    }
+  ],
   "releases": {}
 }
