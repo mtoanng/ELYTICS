@@ -1,23 +1,15 @@
 from dash import register_page
 import dash_mantine_components as dmc
+from components.changelog import build_update_cards, load_changelog_json
+import json
+from pathlib import Path
 
 register_page(__name__, path="/sherlock/home", title="Sherlock Space")
 
-# all example content in here, needs changing
-
-example_updates = [
-    "🔹 New: AI/ML Predictions page now available for advanced forecasting.",
-    "🔹 Improved: Timeseries Overview supports larger datasets.",
-    "🔹 Update: Enhanced visualization in Polarization Curves.",
-]
-
-def get_latest_updates():
-    return dmc.List(
-        [dmc.ListItem(update) for update in example_updates],
-        icon=None,
-    )
-
 def sherlock_layout():
+    changelog_path = Path(__file__).resolve().parent / "changelog.json"
+    changelog = load_changelog_json(changelog_path)
+
     return dmc.Container(
         size="md",
         children=[
@@ -51,8 +43,17 @@ def sherlock_layout():
                 ],
                 spacing="md",
             ),
-            dmc.Title("Latest Updates & Features", order=2, mt="xl"),
-            get_latest_updates(),
+            dmc.Stack(
+                [
+                    dmc.Title("Latest Updates & Features", order=2),
+                    dmc.Stack(
+                        build_update_cards(changelog, "Sherlock", "blue"),
+                        gap="md",
+                    ),
+                ],
+                gap="lg",
+                mt="xl",
+            ),
         ],
         py="xl",
     )
