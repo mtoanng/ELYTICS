@@ -1,6 +1,7 @@
-from dash import html, dcc, callback, Output, Input, State, register_page, no_update
-from dash import dash_table
+from dash import html, dcc, callback, Output, Input, State, register_page, no_update, clientside_callback
 from dash.dcc.express import send_data_frame
+import dash_mantine_components as dmc
+import dash_ag_grid as dag
 
 import pandas as pd
 import plotly.express as px
@@ -14,152 +15,162 @@ register_page(
 )
 
 def ccm_overview_layout():
-    return html.Div([
-        html.H2("CCM Runtime Overview", style={"marginTop": "1rem"}),
-        html.P("Timeline view of stack-level CCM executions."),
-
-        dcc.Store(id="ccm-data-store"),
-
-        html.Div([
-            html.Div([
-                html.Label("Filter by Testrig Location"),
-                dcc.Dropdown(
-                    id="testrig-location-filter",
-                    options=[],  # Populated by callback
-                    multi=True,
-                    placeholder="Select one or more locations",
-                ),
-            ], style={
-                "width": "350px",
-                "minWidth": "260px",
-            }),
-
-            html.Div([
-                html.Label("Filter by CCM Name"),
-                dcc.Dropdown(
-                    id="ccm-filter",
-                    options=[],  # Populated by callback
-                    multi=True,
-                    placeholder="Select CCM names",
-                )
-            ], style={
-                "width": "500px",
-                "minWidth": "280px",
-            }),
-
-            html.Div([
-                html.Div([
-                    html.Label("Time Range"),
-                    html.Div([
-                        dcc.RadioItems(
-                            id="time-range",
-                            options=[
-                                {"label": " Last 7 Days", "value": 7},
-                                {"label": " Last 14 Days", "value": 14},
-                                {"label": " Last 30 Days", "value": 30},
-                                {"label": " Last 60 Days", "value": 60},
-                                {"label": " Custom", "value": "custom"},
-                            ],
-                            value=30,
-                            labelStyle={
-                                "display": "inline-block",
-                                "marginRight": "16px",
-                            },
-                        ),
-                        html.Div([
-                            html.Span("Last"),
-                            dcc.Input(
-                                id="custom-days",
-                                type="number",
-                                min=1,
-                                step=1,
-                                placeholder="N",
-                                style={
-                                    "width": "90px",
-                                    "margin": "0 6px",
-                                    "padding": "6px 10px",
-                                    "borderRadius": "8px",
-                                    "border": "1px solid #ccc",
-                                    "fontSize": "14px",
-                                },
+    return dmc.Container(
+        size="xl",
+        py="md",
+        children=[
+            dmc.Stack(
+                gap="md",
+                children=[
+                    dmc.Stack(
+                        gap=2,
+                        children=[
+                            dmc.Title("CCM Runtime Overview", order=2),
+                            dmc.Text("Timeline view of stack-level CCM executions.", c="dimmed"),
+                        ],
+                    ),
+                    dcc.Store(id="ccm-data-store"),
+                    dmc.Paper(
+                        withBorder=True,
+                        p="md",
+                        radius="md",
+                        children=[
+                            dmc.Group(
+                                gap="md",
+                                align="flex-end",
+                                style={"flexWrap": "wrap"},
+                                children=[
+                                    dmc.InputWrapper(
+                                        dcc.Dropdown(
+                                            id="testrig-location-filter",
+                                            options=[],
+                                            value=[],
+                                            multi=True,
+                                            placeholder="Select one or more locations",
+                                            style={"width": "100%"},
+                                        ),
+                                        label="Filter by Testrig Location",
+                                        htmlFor="testrig-location-filter",
+                                        className="dmc",
+                                        styles={"label": {"marginBottom": "6px"}},
+                                        style={"flex": "1", "minWidth": "280px"},
+                                    ),
+                                    dmc.InputWrapper(
+                                        dcc.Dropdown(
+                                            id="ccm-filter",
+                                            options=[],
+                                            value=[],
+                                            multi=True,
+                                            placeholder="Select CCM names",
+                                            style={"width": "360px"},
+                                        ),
+                                        label="Filter by CCM Name",
+                                        htmlFor="ccm-filter",
+                                        className="dmc",
+                                        styles={"label": {"marginBottom": "6px"}},
+                                    ),
+                                    dmc.Stack(
+                                        gap=6,
+                                        children=[
+                                            dmc.Text("Last N days", size="sm", fw=600),
+                                            dmc.NumberInput(
+                                                id="last-n-days",
+                                                value=30,
+                                                min=1,
+                                                step=1,
+                                                style={"width": "160px"},
+                                            ),
+                                        ],
+                                    ),
+                                    dmc.Button(
+                                        [
+                                            html.I(className="bi bi-download", style={"marginRight": "10px", "fontSize": "1.1em"}),
+                                            "Download CSV",
+                                        ],
+                                        id="ccm-download-btn",
+                                        n_clicks=0,
+                                        className="download-btn",
+                                    ),
+                                    dcc.Download(id="ccm-download-csv"),
+                                ],
                             ),
-                            html.Span("Days"),
-                        ], style={
-                            "display": "inline-flex",
-                            "alignItems": "center",
-                            "marginRight": "16px",
-                        }),
-                    ], style={
-                        "display": "flex",
-                        "alignItems": "center",
-                    }),
-                ]),
-
-                html.Button(
-                    [
-                        html.I(className="bi bi-download", style={"marginRight": "15px", "fontSize": "1.2em"}),
-                        "Download CSV",
-                    ],
-                    id="ccm-download-btn",
-                    n_clicks=0,
-                    className="download-btn",
-                    style={
-                        "display": "flex",
-                        "alignItems": "center",
-                        "borderRadius": "6px",
-                        "padding": "6px 12px",
-                        "fontWeight": "600",
-                        "fontSize": "14px",
-                        "cursor": "pointer",
-                        "whiteSpace": "nowrap",
-                        "marginLeft": "20px",
-                        "marginTop": "23px",
-                    },
-                ),
-                dcc.Download(id="ccm-download-csv"),
-            ], style={"display": "flex", "alignItems": "center", "flex": "1"}),
-        ], style={"display": "flex", "gap": "30px", "width": "100%"}),
-
-        html.Br(),
-        html.Br(),
-
-        dcc.Loading(
-            id="ccm-runtime-loading",
-            children=[dcc.Graph(id="ccm-runtime-plot")],
-            type="default"
-        ),
-
-        html.Br(),
-        html.H3("Full Dataset Table"),
-
-        dcc.Loading(
-            id="ccm-table-loading",
-            children=[
-                dash_table.DataTable(
-                    id="ccm-table",
-                    columns=[],  # Populated by callback
-                    data=[],
-                    page_size=15,
-                    style_table={"overflowX": "auto"},
-                    style_cell={"fontSize": "12px"},
-                )
-            ],
-            type="default"
-        ),
-    ])
+                        ],
+                    ),
+                    dmc.Paper(
+                        withBorder=True,
+                        p="md",
+                        radius="md",
+                        children=[
+                            dcc.Loading(
+                                id="ccm-runtime-loading",
+                                children=[dcc.Graph(id="ccm-runtime-plot")],
+                                type="default",
+                            )
+                        ],
+                    ),
+                    dmc.Stack(
+                        gap="sm",
+                        children=[
+                            dmc.Title("Full Dataset Table", order=3),
+                            dmc.Paper(
+                                withBorder=True,
+                                p="md",
+                                radius="md",
+                                children=[
+                                    dcc.Loading(
+                                        id="ccm-table-loading",
+                                        children=[
+                                            dag.AgGrid(
+                                                id="ccm-table",
+                                                columnDefs=[],
+                                                rowData=[],
+                                                defaultColDef={
+                                                    "resizable": True,
+                                                    "sortable": True,
+                                                    "filter": True,
+                                                },
+                                                dashGridOptions={
+                                                    "pagination": True,
+                                                    "paginationPageSize": 15,
+                                                    "theme": {
+                                                        "function": (
+                                                            "themeQuartz.withParams({"
+                                                            "accentColor: 'var(--mantine-primary-color-filled)', "
+                                                            "fontFamily: 'var(--mantine-font-family)', "
+                                                            "headerFontWeight: 'bold'"
+                                                            "})"
+                                                        )
+                                                    },
+                                                },
+                                                style={"height": "600px"},
+                                            )
+                                        ],
+                                        type="default",
+                                    ),
+                                ],
+                            ),
+                        ],
+                    ),
+                    html.Div(id="ccm-table-theme-dummy"),
+                ],
+            )
+        ],
+    )
 
 # Load data and populate dropdowns/table columns
 @callback(
     Output("ccm-data-store", "data"),
     Output("testrig-location-filter", "options"),
     Output("ccm-filter", "options"),
-    Output("ccm-table", "columns"),
+    Output("ccm-table", "columnDefs"),
+    Output("testrig-location-filter", "value"),
+    Output("ccm-filter", "value"),
     Input("ccm-runtime-plot", "id"),  # Dummy input to trigger on page load
 )
 def load_ccm_data(_):
-    df = get_table_as_df("ccm_overview")
+    df = get_table_as_df("sherlock", "ccm_overview")
     if df.empty:
-        return [], [], [], []
+        return [], [], [], [], [], []
     for col in ["start_time", "end_time"]:
         # Convert only if value is not null and is numeric
         df[col] = pd.to_numeric(df[col], errors="coerce")
@@ -174,21 +185,25 @@ def load_ccm_data(_):
         {"label": c, "value": c}
         for c in sorted(df["ccm_name"].unique())
     ]
-    columns = [{"name": col, "id": col} for col in df.columns]
-    return df.to_dict("records"), testrig_options, ccm_options, columns
+    columnDefs = [{"field": col} for col in df.columns]
+    
+    # Set default values to show all options
+    testrig_values = [x["value"] for x in testrig_options]
+    ccm_values = [x["value"] for x in ccm_options]
+    
+    return df.to_dict("records"), testrig_options, ccm_options, columnDefs, testrig_values, ccm_values
 
 # Main Gantt callback
 @callback(
     Output("ccm-runtime-plot", "figure"),
-    Output("ccm-table", "data"),
+    Output("ccm-table", "rowData"),
     Input("ccm-filter", "value"),
     Input("testrig-location-filter", "value"),
-    Input("time-range", "value"),
-    Input("custom-days", "value"),
+    Input("last-n-days", "value"),
     Input("theme-store", "data"),
     State("ccm-data-store", "data"),
 )
-def update_ccm_plot(ccm_filter, testrig_location_filter, days_selected, custom_days, theme_store, data_store):
+def update_ccm_plot(ccm_filter, testrig_location_filter, days_selected, theme_store, data_store):
     if not data_store:
         return no_update, no_update
 
@@ -202,10 +217,7 @@ def update_ccm_plot(ccm_filter, testrig_location_filter, days_selected, custom_d
     dff = df.copy()
 
     # Time filter
-    if days_selected == "custom":
-        days = custom_days if custom_days and custom_days > 0 else 30
-    else:
-        days = days_selected
+    days = days_selected if days_selected and days_selected > 0 else 30
     cutoff = dff["end_time"].max() - pd.Timedelta(days=days)
     dff = dff[dff["end_time"] >= cutoff]
 
@@ -327,20 +339,31 @@ def update_ccm_plot(ccm_filter, testrig_location_filter, days_selected, custom_d
 @callback(
     Output("ccm-download-csv", "data"),
     Input("ccm-download-btn", "n_clicks"),
-    State("ccm-table", "data"),
-    State("time-range", "value"),
-    State("custom-days", "value"),
+    State("ccm-table", "rowData"),
+    State("last-n-days", "value"),
     prevent_initial_call=True,
 )
-def download_ccm_table(n_clicks, table_data, days_selected, custom_days):
+def download_ccm_table(n_clicks, table_data, days_selected):
     if not table_data:
         return no_update
-    days = custom_days if custom_days and custom_days > 0 else days_selected
+    days = days_selected if days_selected and days_selected > 0 else 30
     df_filtered = pd.DataFrame(table_data)
     return send_data_frame(
         df_filtered.to_csv,
         f"ccm_runtime_last_{days}_days.csv",
         index=False,
     )
+
+# Clientside callback to update AG Grid theme based on Mantine color scheme
+clientside_callback(
+    """
+    (theme) => {
+       document.documentElement.setAttribute('data-ag-theme-mode', theme === 'dark' ? 'dark' : 'light');  
+       return window.dash_clientside.no_update;        
+    }
+    """,
+    Output("ccm-table-theme-dummy", "children"),
+    Input("theme-store", "data"),
+)
 
 layout = ccm_overview_layout
