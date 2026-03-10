@@ -19,6 +19,11 @@
       "pr": 673,
       "title": "fix(core): Added docker ignore for env file",
       "date": "2026-03-10"
+    },
+    {
+      "pr": 674,
+      "title": "fix(core): Updated environment handling",
+      "date": "2026-03-10"
     }
   ],
   "releases": {}
