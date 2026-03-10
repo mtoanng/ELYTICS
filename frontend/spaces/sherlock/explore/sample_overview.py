@@ -14,7 +14,7 @@ import dash_mantine_components as dmc
 import dash_ag_grid as dag
 import pandas as pd
 from dash.exceptions import PreventUpdate
-from typing import Any
+from dash_iconify import DashIconify
 
 from services.backend_service import get_table_as_df
 
@@ -67,23 +67,39 @@ def sample_overview_layout():
                     dmc.Stack(
                         gap=2,
                         children=[
-                            dmc.Title("Sample Overview", order=2),
+                            dmc.Group(
+                                gap="xs",
+                                align="center",
+                                children=[
+                                    dmc.Title("Sample Overview", order=2),
+                                    dmc.ActionIcon(
+                                        DashIconify(icon="material-symbols:info-outline", width=20),
+                                        id="sample-usage-toggle",
+                                        variant="subtle",
+                                        color="blue",
+                                        size="md",
+                                        radius="xl",
+                                    ),
+                                ],
+                            ),
                             dmc.Text("This page provides an overview of all samples.", c="dimmed"),
-                            dmc.Blockquote(
-                                dmc.List(
-                                    spacing=4,
-                                    size="sm",
-                                    styles={"root": {"margin": 0, "paddingLeft": "1.1rem"}},
-                                    children=[
-                                        dmc.ListItem(item)
-                                        for item in USAGE_BLOCKQUOTE_TEXT
-                                    ],
+                            dmc.Collapse(
+                                dmc.Blockquote(
+                                    dmc.List(
+                                        withPadding=False,
+                                        children=[
+                                            dmc.ListItem(item)
+                                            for item in USAGE_BLOCKQUOTE_TEXT
+                                        ],
+                                    ),
+                                    color="blue",
                                 ),
-                                color="blue",
-                                radius="md",
+                                opened=False,
+                                id="sample-usage-collapse",
                             ),
                         ],
                     ),
+                    dcc.Store(id="sample-usage-open", data=False),
                     dcc.Store(id="sample-data-store"),
                     dmc.Paper(
                         withBorder=True,
@@ -346,3 +362,23 @@ def update_filter_on_cell_dblclick(cell):
     if col == "cellunit_name":
         return [], [], [val]
     raise PreventUpdate
+
+
+@callback(
+    Output("sample-usage-open", "data"),
+    Input("sample-usage-toggle", "n_clicks"),
+    State("sample-usage-open", "data"),
+    prevent_initial_call=True,
+)
+def toggle_usage_blockquote(n_clicks, is_open):
+    if n_clicks is None:
+        return no_update
+    return not bool(is_open)
+
+
+@callback(
+    Output("sample-usage-collapse", "opened"),
+    Input("sample-usage-open", "data"),
+)
+def sync_usage_blockquote(is_open):
+    return bool(is_open)
