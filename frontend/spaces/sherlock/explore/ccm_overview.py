@@ -231,13 +231,13 @@ def update_ccm_plot(ccm_filter, testrig_location_filter, days_selected, theme_st
 
     # Sort
     dff = dff.sort_values(
-        by=["testrig_id", "test_id", "start_time"],
+        by=["testrig_id", "order_id", "start_time"],
         ascending=[True, True, True],
     )
 
-    dff["test_id"] = pd.Categorical(
-        dff["test_id"],
-        categories=dff["test_id"].unique(),
+    dff["order_id"] = pd.Categorical(
+        dff["order_id"],
+        categories=dff["order_id"].unique(),
         ordered=True,
     )
 
@@ -254,7 +254,7 @@ def update_ccm_plot(ccm_filter, testrig_location_filter, days_selected, theme_st
         dff,
         x_start="start_time",
         x_end="end_time",
-        y="test_id",
+        y="order_id",
         color="testrig_label",
         text="bar_text",
         custom_data=[
@@ -298,7 +298,7 @@ def update_ccm_plot(ccm_filter, testrig_location_filter, days_selected, theme_st
         rig_df = dff[dff["testrig_label"] == rig]
         fig.add_scatter(
             x=rig_df["end_time"],
-            y=rig_df["test_id"],
+            y=rig_df["order_id"],
             text=" " + rig_df["right_label"],
             mode="text",
             textposition="middle right",
@@ -309,9 +309,9 @@ def update_ccm_plot(ccm_filter, testrig_location_filter, days_selected, theme_st
 
     fig.update_yaxes(
         autorange="reversed",
-        title="Test ID",
+        title="Order ID",
         categoryorder="array",
-        categoryarray=dff["test_id"].astype(str).unique(),
+        categoryarray=dff["order_id"].astype(str).unique(),
     )
 
     fig.update_xaxes(
