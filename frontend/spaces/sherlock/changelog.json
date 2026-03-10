@@ -9,6 +9,11 @@
       "pr": 661,
       "title": "feat(sherlock): Migrate CCM Overview page",
       "date": "2026-03-10"
+    },
+    {
+      "pr": 663,
+      "title": "feat(sherlock): Migrate Sample overview page",
+      "date": "2026-03-10"
     }
   ],
   "releases": {}
