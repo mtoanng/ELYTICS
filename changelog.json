@@ -14,6 +14,11 @@
       "pr": 658,
       "title": "feat(core): Added DEV banner to header & improved space selector",
       "date": "2026-03-10"
+    },
+    {
+      "pr": 673,
+      "title": "fix(core): Added docker ignore for env file",
+      "date": "2026-03-10"
     }
   ],
   "releases": {}
