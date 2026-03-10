@@ -1,3 +1,5 @@
+import os
+
 from dash.dependencies import Input, Output, State
 from dash import callback, clientside_callback, html
 import dash_mantine_components as dmc
@@ -6,6 +8,8 @@ from dash_iconify import DashIconify
 from components.sidebar import SIDEBAR_STRUCTURE
 from dash_auth import list_groups
 from config.access_config import SPACE_ACCESS_MAP
+
+IS_DEVELOPMENT = os.getenv("ENVIRONMENT", "development").lower() == "development"
 
 
 def _build_search_options():
@@ -59,6 +63,7 @@ def _create_space_selector():
             height="32px",
             style={"marginLeft": "8px"},
         ),
+        checkIconPosition="right",
         w=240,
         size="md",
         value=None,
@@ -86,6 +91,16 @@ def _create_link(icon, href):
 
 
 def header_layout():
+    dev_banner = None
+    if IS_DEVELOPMENT:
+        dev_banner = dmc.Text(
+            "DEVELOPMENT",
+            fw=900,
+            size="32px",
+            c="red",
+            style={"letterSpacing": "1px"},
+        )
+
     return dmc.Group(
         justify="space-between",
         h="100%",
@@ -97,11 +112,16 @@ def header_layout():
                     _create_space_selector(),
                 ],
             ),
+            *(
+                [dmc.Group(gap=0, justify="center", children=[dev_banner])]
+                if dev_banner
+                else []
+            ),
             dmc.Group(
                 gap="md",
                 children=[
                     _create_search(),
-                    _create_link("radix-icons:reader", "https://inside-docupedia.bosch.com/confluence/spaces/ELYSTACK/pages/6751345063/HOLMES+Application"),                    
+                    _create_link("radix-icons:reader", "https://inside-docupedia.bosch.com/confluence/spaces/ELYSTACK/pages/6751345063/HOLMES+Application"),
                     dmc.Switch(
                         id="theme-switch",
                         checked=False,
@@ -143,17 +163,27 @@ def update_space_selector(pathname, current_value):
             if user_groups and any(group in user_groups for group in required_groups):
                 allowed_spaces.add(space_name)
         
-        # Build options from SPACE_ACCESS_MAP
         options = [
+            {
+                "label": "Home",
+                "value": "home",
+                "disabled": False,
+            },
+            {
+                "group": "Spaces",
+                "items": [],
+            },
+        ]
+        options[1]["items"].extend(
             {
                 "label": space_path.strip("/").capitalize(),
                 "value": space_path.strip("/"),
-                "disabled": False
+                "disabled": False,
             }
             for space_path in SPACE_ACCESS_MAP.keys()
-        ]
-        
-        return options, None  # No value selected at root
+        )
+
+        return options, "home"
     
     # Get current user's groups
     user_groups = list_groups()
@@ -165,15 +195,26 @@ def update_space_selector(pathname, current_value):
         if user_groups and any(group in user_groups for group in required_groups):
             allowed_spaces.add(space_name)
     
-    # Build options from SPACE_ACCESS_MAP, disabling those not allowed
+    # Build options from SPACE_ACCESS_MAP, grouped under "Spaces"
     options = [
+        {
+            "label": "Home",
+            "value": "home",
+            "disabled": False,
+        },
+        {
+            "group": "Spaces",
+            "items": [],
+        },
+    ]
+    options[1]["items"].extend(
         {
             "label": space_path.strip("/").capitalize(),
             "value": space_path.strip("/"),
-            "disabled": False  # Temporarily disabled as requested
+            "disabled": False,
         }
         for space_path in SPACE_ACCESS_MAP.keys()
-    ]
+    )
     
     # Get current space from URL
     current_space = pathname.split("/")[1] if pathname and len(pathname.split("/")) > 1 else None
@@ -183,8 +224,7 @@ def update_space_selector(pathname, current_value):
         return options, current_space
     
     # Default to first space if no valid space in URL
-    default_value = next((s["value"] for s in options), None)
-    return options, default_value
+    return options, "home"
 
 
 @callback(
@@ -236,8 +276,14 @@ clientside_callback(
             // Only navigate if:
             // 1. Triggered by space-selector value change
             // 2. Selected space is different from current URL space
-            if (trigger.prop_id === 'space-selector.value' && space && space !== currentSpace) {
-                window.location.href = '/' + space + '/home';
+            if (trigger.prop_id === 'space-selector.value' && space) {
+                if (space === 'home' && currentPath !== '/') {
+                    window.location.href = '/';
+                    return window.dash_clientside.no_update;
+                }
+                if (space !== 'home' && space !== currentSpace) {
+                    window.location.href = '/' + space + '/home';
+                }
             }
         }
         
