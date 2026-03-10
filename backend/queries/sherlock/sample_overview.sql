@@ -22,3 +22,8 @@ INNER JOIN (
 ) o
 ON
   o.sample_id = s.sample_id
+WHERE 1 = 1
+{{filters}}
+{{sorting}}
+{{limit}}
+{{offset}};

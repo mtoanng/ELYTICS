@@ -32,6 +32,7 @@ async def sample_overview(token=Depends(require_groups(["IdM2BCD_holmes_pemely_u
 @router.get("/testrig_activity_overview")
 async def testrig_activity_overview(token=Depends(require_groups(["IdM2BCD_holmes_pemely_user"]))):
     return {"data": get_query_result(f"{SPACE}/testrig_activity_overview")}
+
 @router.get("/testrig_statistics_overview")
 async def testrig_statistics_overview(token=Depends(require_groups(["IdM2BCD_holmes_pemely_user"]))):
     return {"data": get_query_result(f"{SPACE}/testrig_statistics_overview")}

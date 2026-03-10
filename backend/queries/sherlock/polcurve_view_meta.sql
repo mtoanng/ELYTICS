@@ -15,4 +15,8 @@ SELECT
 FROM event_selected e
 INNER JOIN order_selected o
   ON e.order_id = o.order_id
-ORDER BY e.start
+WHERE 1 = 1
+{{filters}}
+{{sorting}}
+{{limit}}
+{{offset}}

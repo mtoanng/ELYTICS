@@ -37,7 +37,9 @@ filtered AS (
             WHEN lower(raw_location) LIKE '%bap%' THEN 'BaP'
             WHEN lower(raw_location) LIKE '%rng%' THEN 'RnG'
             WHEN lower(raw_location) LIKE '%tbp%' THEN 'TbP'
-            WHEN lower(raw_location) IN ('avl','liz','kst','hycenta','fz j') THEN 'External'
+            WHEN lower(raw_location) LIKE '%liz%' THEN 'Liz'
+            WHEN lower(raw_location) LIKE '%fz j%' THEN 'External'
+            WHEN lower(raw_location) IN ('avl','kst','hycenta') THEN 'External'
             ELSE raw_location
         END                                           AS location,
 
@@ -79,10 +81,15 @@ SELECT
     number_of_cells,
     SUM(run_hour)                                    AS run_hours
 FROM filtered
+WHERE 1 = 1
+{{filters}}
 GROUP BY
     year,
     testrig_id,
     testrig_label,
     location,
     sample_type_state,
-    number_of_cells;
+    number_of_cells
+{{sorting}}
+{{limit}}
+{{offset}};

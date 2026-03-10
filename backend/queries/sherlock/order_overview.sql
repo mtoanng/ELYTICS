@@ -61,3 +61,8 @@ LEFT JOIN (
     order_id
 ) e
   ON o.order_id = e.order_id
+WHERE 1 = 1
+{{filters}}
+{{sorting}}
+{{limit}}
+{{offset}};

@@ -1,6 +1,5 @@
--- Common Table Expressions to pre-select columns and calculate per-event temp_set for efficiency
 WITH static_selected AS (
-  SELECT order_id, is_static, start, end, uCell, jStck, tAndeIn, time
+  SELECT order_id, is_static, start, end, jStck, uCell, tAndeIn, tAndeOut, pAndeIn, pAndeOut, pCtdeIn, pCtdeOut, vfAndeIn 
   FROM ps_xplatform_dev.pemely_ops.gold_genericstack_static
 ),
 event_selected AS (
@@ -8,7 +7,7 @@ event_selected AS (
   FROM ps_xplatform_dev.pemely_ops.gold_polarization_event
 ),
 order_selected AS (
-  SELECT order_id, testrig_id, number_of_cells, active_area_per_cell, sample_name
+  SELECT order_id, sample_name
   FROM ps_xplatform_dev.pemely_ops.gold_genericstack_order
 ),
 -- Calculate the average tAndeIn for each event_id, rounded to nearest decade
@@ -27,18 +26,18 @@ event_temp_set AS (
 SELECT 
     s.order_id,
     o.sample_name,
-    o.testrig_id,
-    o.number_of_cells,
-    o.active_area_per_cell,
-    DATE(s.time) AS date,
-    DATE_FORMAT(s.start, 'HH:mm:ss') AS start_time,
-    DATE_FORMAT(s.end, 'HH:mm:ss') AS end_time,
-    s.uCell,
     s.jStck,
+    s.uCell,
     s.tAndeIn,
+    s.tAndeOut,
+    s.pAndeIn,
+    s.pAndeOut,
+    s.pCtdeIn,
+    s.pCtdeOut,
+    s.vfAndeIn,
     ets.temp_set_avg AS tSp, -- constant per event_id
-    COALESCE(e.event_id, 'not part of a pol curve') AS event_id,
-    e.is_rising
+    e.is_rising,
+    COALESCE(e.event_id, 'not part of a pol curve') AS event_id
 FROM static_selected s
 INNER JOIN event_selected e
   ON s.order_id = e.order_id
