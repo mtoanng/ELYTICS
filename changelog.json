@@ -9,6 +9,11 @@
       "pr": 661,
       "title": "feat(sherlock): Migrate CCM Overview page",
       "date": "2026-03-10"
+    },
+    {
+      "pr": 658,
+      "title": "feat(core): Added DEV banner to header & improved space selector",
+      "date": "2026-03-10"
     }
   ],
   "releases": {}
