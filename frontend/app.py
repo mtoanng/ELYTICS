@@ -40,8 +40,8 @@ auth.register_provider(
 app.layout = create_appshell()
 
 if __name__ == "__main__":
-    debug_mode = os.getenv("ENVIRONMENT", "development") == "development"
-    if debug_mode:
+    use_dash_debug_server = os.getenv("USE_DASH_DEBUG_SERVER", "false").lower() == "true"
+    if use_dash_debug_server:
         app.run(debug=True, host="0.0.0.0", port=8501, use_reloader=True)
     else:
         serve(app.server, host="0.0.0.0", port=8501, 
