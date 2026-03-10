@@ -15,6 +15,7 @@ import dash_ag_grid as dag
 import pandas as pd
 from dash.exceptions import PreventUpdate
 from typing import Any
+from dash_iconify import DashIconify
 
 from services.backend_service import get_table_as_df
 
@@ -24,15 +25,13 @@ register_page(
     title="HOLMES - Sherlock - Order Overview"
 )
 
-USAGE_TOOLTIP_TEXT = (
-    "This page provides an overview of all test orders.\n\n"
-    "How to use this page:\n\n"
-    "• Use the filters on the left or double-click a cell to quickly filter by that value.\n"
-    "• !!NOTE!!: double clicking a cell resets all previous filters.\n"
-    "• By clicking on the column headers you can sort the data.\n"
-    "• Next to the column headers there are filter options for that column.\n"
-    "• Download the table as CSV using the Download CSV button below the filters."
-)
+USAGE_BLOCKQUOTE_TEXT = [
+    "Use the filters on the left or double-click a cell to quickly filter by that value.",
+    "Double clicking a cell resets all previous filters.",
+    "By clicking on the column headers you can sort the data.",
+    "Next to the column headers there are filter options for that column.",
+    "Download the table as CSV using the Download CSV button below the filters."
+]
 
 # Column metadata keeps field mapping in one place and avoids repetitive hard-coded dicts.
 BASE_ORDER_COLUMNS = [
@@ -102,37 +101,37 @@ def order_overview_layout():
                         children=[
                             dmc.Group(
                                 gap="xs",
+                                align="center",
                                 children=[
                                     dmc.Title("Order Overview", order=2),
-                                    dmc.Tooltip(
-                                        multiline=True,
-                                        w=360,
-                                        label=USAGE_TOOLTIP_TEXT,
-                                        children=html.Span(
-                                            "i",
-                                            style={
-                                                "display": "inline-flex",
-                                                "alignItems": "center",
-                                                "justifyContent": "center",
-                                                "width": "18px",
-                                                "height": "18px",
-                                                "borderRadius": "50%",
-                                                "fontSize": "12px",
-                                                "fontWeight": "700",
-                                                "cursor": "help",
-                                                "border": "1px solid var(--mantine-color-gray-6)",
-                                                "color": "var(--mantine-color-gray-7)",
-                                            },
-                                        ),
+                                    dmc.ActionIcon(
+                                        DashIconify(icon="material-symbols:info-outline", width=20),
+                                        id="order-usage-toggle",
+                                        variant="subtle",
+                                        color="blue",
+                                        size="md",
+                                        radius="xl",
                                     ),
                                 ],
                             ),
-                            dmc.Text(
-                                "Overview of test orders with cross-filtering and quick double-click filtering.",
-                                c="dimmed",
+                            dmc.Text("This page provides an overview of all test orders.", c="dimmed"),
+                            dmc.Collapse(
+                                dmc.Blockquote(
+                                    dmc.List(
+                                        withPadding=False,
+                                        children=[
+                                            dmc.ListItem(item)
+                                            for item in USAGE_BLOCKQUOTE_TEXT
+                                        ],
+                                    ),
+                                    color="blue",
+                                ),
+                                opened=False,
+                                id="order-usage-collapse",
                             ),
                         ],
                     ),
+                    dcc.Store(id="order-usage-open", data=False),
                     dcc.Store(id="order-data-store"),
                     dmc.Paper(
                         withBorder=True,
@@ -442,6 +441,24 @@ def download_order_table(n_clicks, table_data):
     df_filtered = pd.DataFrame(table_data)
     return send_data_frame(df_filtered.to_csv, "order_table.csv", index=False)
 
+@callback(
+    Output("order-usage-open", "data"),
+    Input("order-usage-toggle", "n_clicks"),
+    State("order-usage-open", "data"),
+    prevent_initial_call=True,
+)
+def toggle_usage_blockquote(n_clicks, is_open):
+    if n_clicks is None:
+        return no_update
+    return not bool(is_open)
+
+
+@callback(
+    Output("order-usage-collapse", "opened"),
+    Input("order-usage-open", "data"),
+)
+def sync_usage_blockquote(is_open):
+    return bool(is_open)
 
 # Clientside callback to update AG Grid theme based on Mantine color scheme
 clientside_callback(
