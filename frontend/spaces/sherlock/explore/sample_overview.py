@@ -1,8 +1,21 @@
-import dash
-from dash import html, dcc, Input, Output, State, callback, register_page
-from dash.exceptions import PreventUpdate
+from dash import (
+    html,
+    dcc,
+    callback,
+    Output,
+    Input,
+    State,
+    register_page,
+    no_update,
+    clientside_callback,
+)
+from dash.dcc.express import send_data_frame
+import dash_mantine_components as dmc
 import dash_ag_grid as dag
 import pandas as pd
+from dash.exceptions import PreventUpdate
+from dash_iconify import DashIconify
+
 from services.backend_service import get_table_as_df
 
 register_page(
@@ -11,136 +24,210 @@ register_page(
     title="HOLMES - Sherlock - Sample Overview"
 )
 
-USAGE_TOOLTIP_TEXT = (
-    "This page provides an overview of all samples.\n\n"
-    "How to use this page:\n\n"
-    "• Use the filters on the left or double-click a cell to quickly filter by that value.\n"
-    "• !!NOTE!!: double clicking a cell resets all previous filters.\n"
-    "• By clicking on the column headers you can sort the data.\n"
-    "• Next to the column headers there are filter options for that column.\n"
-    "• Download the table as CSV using the Download CSV button below the filters."
-)
+USAGE_BLOCKQUOTE_TEXT = [
+    "Use the filters above or double-click a cell to quickly filter by that value.",
+    "Double-clicking a cell resets all previous filters.",
+    "Click column headers to sort the data.",
+    "Use filter controls in the column headers for per-column filtering.",
+    "Use Download CSV to export the currently filtered table."
+]
+
+# Column metadata keeps field mapping in one place and avoids repetitive hard-coded dicts.
+SAMPLE_COLUMNS = [
+    ("Sample name", "name", "text"),
+    ("Leepa number", "leepa_number", "text"),
+    ("Type", "type", "text"),
+    ("State", "state", "text"),
+    ("Plant", "production_plant", "text"),
+    ("Cell description", "description", "text"),
+    ("Cell name", "cellunit_name", "text"),
+    ("CCM", "ccm_name", "text"),
+    ("PTL", "ptl_name", "text"),
+    ("GDL", "gdl_name", "text"),
+    ("Active area / cell", "active_area_per_cell", "numeric"),
+    ("Order id", "order_id", "numeric"),
+]
+
+
+def build_sample_column_defs():
+    """Build column definitions from metadata to avoid repetitive hard-coded dicts."""
+    return [
+        {"headerName": header, "field": field, "type": col_type}
+        for header, field, col_type in SAMPLE_COLUMNS
+    ]
 
 def sample_overview_layout():
-    return html.Div([
-        html.Div([
-            html.H2("Sample Overview"),
-            html.Span(
-                "ℹ️",
-                title=USAGE_TOOLTIP_TEXT,
-                style={
-                    "cursor": "help",
-                    "marginLeft": "6px",
-                    "fontSize": "16px",
-                    "opacity": 0.75,
-                },
-            ),
-        ], style={
-            "display": "flex",
-            "alignItems": "center",
-            "gap": "4px",
-            "marginBottom": "12px",
-        }),
-
-        dcc.Store(id="sample-data-store"),
-        dcc.Store(id="sample-cell-dblclick-store"),
-
-        html.Div([
-            html.Div([
-                html.Label("Order ID:"),
-                dcc.Dropdown(
-                    id="sample-order-id-filter",
-                    options=[],
-                    multi=True,
-                    searchable=True,
-                    clearable=True,
-                    style={"width": "180px"}
-                ),
-                html.Label("Sample Name:"),
-                dcc.Dropdown(
-                    id="sample-sample-name-filter",
-                    options=[],
-                    multi=True,
-                    searchable=True,
-                    clearable=True,
-                    style={"width": "180px"}
-                ),
-                html.Label("Cell Name:"),
-                dcc.Dropdown(
-                    id="sample-cell-name-filter",
-                    options=[],
-                    multi=True,
-                    searchable=True,
-                    clearable=True,
-                    style={"width": "180px"}
-                ),
-                html.Br(),
-                html.Button([
-                    html.I(className="bi bi-download", style={"marginRight": "8px", "fontSize": "1.2em"}),
-                    "Download CSV"
-                ], id="sample-download-btn", n_clicks=0, className="download-btn", style={
-                    "marginTop": "4px",
-                    "display": "flex",
-                    "alignItems": "center",
-                    "marginBottom": "30px",
-                    "borderRadius": "6px",
-                    "padding": "6px 12px",
-                    "fontWeight": "600",
-                    "fontSize": "14px",
-                    "cursor": "pointer"
-                }),
-                dcc.Download(id="sample-download-csv"),
-            ], style={"width": "200px", "display": "inline-block", "verticalAlign": "top", "marginRight": "20px"}),
-
-            html.Div([
-                dag.AgGrid(
-                    id="sample-sample-table",
-                    columnDefs=[
-                        {"headerName": "Sample name", "field": "name", "type": "text", "filter": True, "sortable": True, "minWidth": 110},
-                        {"headerName": "Leepa number", "field": "leepa_number", "type": "text", "filter": True, "sortable": True, "minWidth": 120},
-                        {"headerName": "Type", "field": "type", "type": "text", "filter": True, "sortable": True, "minWidth": 65},
-                        {"headerName": "State", "field": "state", "type": "text", "filter": True, "sortable": True, "minWidth": 65},
-                        {"headerName": "Plant", "field": "production_plant", "type": "text", "filter": True, "sortable": True, "minWidth": 60},
-                        {"headerName": "Cell description", "field": "description", "type": "text", "filter": True, "sortable": True, "minWidth": 120},
-                        {"headerName": "Cell name", "field": "cellunit_name", "type": "text", "filter": True, "sortable": True, "minWidth": 90},
-                        {"headerName": "CCM", "field": "ccm_name", "type": "text", "filter": True, "sortable": True, "minWidth": 75},
-                        {"headerName": "PTL", "field": "ptl_name", "type": "text", "filter": True, "sortable": True, "minWidth": 75},
-                        {"headerName": "GDL", "field": "gdl_name", "type": "text", "filter": True, "sortable": True, "minWidth": 75},
-                        {"headerName": "Active area / cell", "field": "active_area_per_cell", "type": "numeric", "filter": True, "sortable": True, "minWidth": 130},
-                        {"headerName": "Order id", "field": "order_id", "type": "numeric", "filter": True, "sortable": True, "minWidth": 90},
-                    ],
-                    rowData=[],
-                    defaultColDef={
-                        "resizable": True,
-                        "sortable": True,
-                        "filter": True,
-                        "maxWidth": 140,
-                        "flex": 1,
-                        "cellStyle": {"fontSize": "12px", "whiteSpace": "nowrap", "overflow": "hidden", "textOverflow": "ellipsis"},
-                    },
-                    dashGridOptions={
-                        "rowSelection": "single",
-                        "animateRows": True,
-                        "floatingFilter": True,
-                        "groupDisplayType": "multipleColumns",
-                        "rowClassRules": {
-                            "ag-row-even": "params.node.rowIndex % 2 === 0",
-                            "ag-row-odd": "params.node.rowIndex % 2 !== 0"
-                        },
-                        "icons": {
-                            "filter": '''
-                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                  <path d="M2 3H14L9.5 8.5V13L6.5 11V8.5L2 3Z" stroke="#666" stroke-width="1.5" fill="none"/>
-                                </svg>
-                            '''
-                        }
-                    },
-                    style={"height": "calc(100vh - 300px)", "width": "100%"},
-                    className="ag-theme-alpine",
-                )
-            ], style={"display": "inline-block", "width": "calc(100% - 240px)"}),
-        ], style={"display": "flex", "flexDirection": "row"})
-    ])
+    return dmc.Container(
+        size="xl",
+        py="md",
+        children=[
+            dmc.Stack(
+                gap="md",
+                children=[
+                    dmc.Stack(
+                        gap=2,
+                        children=[
+                            dmc.Group(
+                                gap="xs",
+                                align="center",
+                                children=[
+                                    dmc.Title("Sample Overview", order=2),
+                                    dmc.ActionIcon(
+                                        DashIconify(icon="material-symbols:info-outline", width=20),
+                                        id="sample-usage-toggle",
+                                        variant="subtle",
+                                        color="blue",
+                                        size="md",
+                                        radius="xl",
+                                    ),
+                                ],
+                            ),
+                            dmc.Text("This page provides an overview of all samples.", c="dimmed"),
+                            dmc.Collapse(
+                                dmc.Blockquote(
+                                    dmc.List(
+                                        withPadding=False,
+                                        children=[
+                                            dmc.ListItem(item)
+                                            for item in USAGE_BLOCKQUOTE_TEXT
+                                        ],
+                                    ),
+                                    color="blue",
+                                ),
+                                opened=False,
+                                id="sample-usage-collapse",
+                            ),
+                        ],
+                    ),
+                    dcc.Store(id="sample-usage-open", data=False),
+                    dcc.Store(id="sample-data-store"),
+                    dmc.Paper(
+                        withBorder=True,
+                        p="md",
+                        radius="md",
+                        children=[
+                            dmc.Group(
+                                gap="md",
+                                align="flex-end",
+                                style={"flexWrap": "nowrap", "overflowX": "auto"},
+                                children=[
+                                    dmc.InputWrapper(
+                                        dcc.Dropdown(
+                                            id="sample-order-id-filter",
+                                            options=[],
+                                            value=[],
+                                            multi=True,
+                                            searchable=True,
+                                            clearable=True,
+                                            placeholder="Select order IDs",
+                                            style={"width": "100%"},
+                                        ),
+                                        label="Order ID",
+                                        htmlFor="sample-order-id-filter",
+                                        className="dmc",
+                                        styles={"label": {"marginBottom": "6px"}},
+                                        style={"flex": "0 0 220px", "minWidth": "220px"},
+                                    ),
+                                    dmc.InputWrapper(
+                                        dcc.Dropdown(
+                                            id="sample-sample-name-filter",
+                                            options=[],
+                                            value=[],
+                                            multi=True,
+                                            searchable=True,
+                                            clearable=True,
+                                            placeholder="Select sample names",
+                                            style={"width": "100%"},
+                                        ),
+                                        label="Sample Name",
+                                        htmlFor="sample-sample-name-filter",
+                                        className="dmc",
+                                        styles={"label": {"marginBottom": "6px"}},
+                                        style={"flex": "0 0 220px", "minWidth": "220px"},
+                                    ),
+                                    dmc.InputWrapper(
+                                        dcc.Dropdown(
+                                            id="sample-cell-name-filter",
+                                            options=[],
+                                            value=[],
+                                            multi=True,
+                                            searchable=True,
+                                            clearable=True,
+                                            placeholder="Select cell names",
+                                            style={"width": "100%"},
+                                        ),
+                                        label="Cell Name",
+                                        htmlFor="sample-cell-name-filter",
+                                        className="dmc",
+                                        styles={"label": {"marginBottom": "6px"}},
+                                        style={"flex": "1", "minWidth": "220px"},
+                                    ),
+                                    dmc.Button(
+                                        [
+                                            html.I(
+                                                className="bi bi-download",
+                                                style={
+                                                    "marginRight": "10px",
+                                                    "fontSize": "1.1em",
+                                                },
+                                            ),
+                                            "Download CSV",
+                                        ],
+                                        id="sample-download-btn",
+                                        n_clicks=0,
+                                        className="download-btn",
+                                        style={"flex": "0 0 auto", "whiteSpace": "nowrap"},
+                                    ),
+                                    dcc.Download(id="sample-download-csv"),
+                                ],
+                            )
+                        ],
+                    ),
+                    dmc.Paper(
+                        withBorder=True,
+                        p="md",
+                        radius="md",
+                        children=[
+                            dcc.Loading(
+                                id="sample-table-loading",
+                                type="default",
+                                children=[
+                                    dag.AgGrid(
+                                        id="sample-sample-table",
+                                        columnDefs=build_sample_column_defs(),
+                                        rowData=[],
+                                        defaultColDef={
+                                            "resizable": True,
+                                            "sortable": True,
+                                            "filter": True,
+                                            "minWidth": 110,
+                                        },
+                                        dashGridOptions={
+                                            "pagination": True,
+                                            "paginationPageSize": 20,
+                                            "animateRows": True,
+                                            "floatingFilter": True,
+                                            "theme": {
+                                                "function": (
+                                                    "themeQuartz.withParams({"
+                                                    "accentColor: 'var(--mantine-primary-color-filled)', "
+                                                    "fontFamily: 'var(--mantine-font-family)', "
+                                                    "headerFontWeight: 'bold'"
+                                                    "})"
+                                                )
+                                            },
+                                        },
+                                        style={"height": "calc(100vh - 330px)", "width": "100%"},
+                                    )
+                                ],
+                            )
+                        ],
+                    ),
+                    html.Div(id="sample-table-theme-dummy"),
+                ],
+            )
+        ],
+    )
 
 layout = sample_overview_layout
 
@@ -149,8 +236,8 @@ layout = sample_overview_layout
     Output("sample-data-store", "data"),
     Input("sample-sample-table", "id"),
 )
-def load_order_data(_):
-    df = get_table_as_df('sherlock', "sample_overview")
+def load_sample_data(_):
+    df = get_table_as_df("sherlock", "sample_overview")
     if df.empty:
         return []
     # Round active_area_per_cell column values to 3 decimals
@@ -158,6 +245,7 @@ def load_order_data(_):
         df["active_area_per_cell"] = df["active_area_per_cell"].round(3)
     return df.to_dict("records")
 
+# Update table and filter dropdowns
 @callback(
     Output("sample-sample-table", "rowData"),
     Output("sample-order-id-filter", "options"),
@@ -166,47 +254,53 @@ def load_order_data(_):
     Input("sample-order-id-filter", "value"),
     Input("sample-sample-name-filter", "value"),
     Input("sample-cell-name-filter", "value"),
-    Input("sample-data-store", "data"),                   # When data loads
-    prevent_initial_call=True,
+    Input("sample-data-store", "data"),
 )
-def update_table(sample_order_id, sample_sample_name, sample_cell_name, data):
+def update_table(order_id, sample_name, cell_name, data):
     if not data:
-            return [], [], [], []
-        
+        return [], [], [], []
+
+    def as_list(value):
+        if value is None:
+            return []
+        if isinstance(value, list):
+            return value
+        return [value]
+
     df = pd.DataFrame(data)
     dff = df.copy()
+    order_id_list = as_list(order_id)
+    sample_name_list = as_list(sample_name)
+    cell_name_list = as_list(cell_name)
 
-    # Apply filters
-    if sample_order_id:
-        if isinstance(sample_order_id, list):
-            dff = dff[dff["order_id"].isin(sample_order_id)]
-        else:
-            dff = dff[dff["order_id"] == sample_order_id]
-    if sample_sample_name:
-        if isinstance(sample_sample_name, list):
-            dff = dff[dff["name"].isin(sample_sample_name)]
-        else:
-            dff = dff[dff["name"] == sample_sample_name]
-    if sample_cell_name:
-        if isinstance(sample_cell_name, list):
-            dff = dff[dff["cellunit_name"].isin(sample_cell_name)]
-        else:
-            dff = dff[dff["cellunit_name"] == sample_cell_name]
+    # Filtering logic
+    if order_id_list:
+        dff = dff[dff["order_id"].isin(order_id_list)]
+    if sample_name_list:
+        dff = dff[dff["name"].isin(sample_name_list)]
+    if cell_name_list:
+        dff = dff[dff["cellunit_name"].isin(cell_name_list)]
+
     records = dff.to_dict("records")
-    if not records:
-        records = [{}]
 
     # Now, update options for all dropdowns based on the filtered df
     filtered_df = df.copy()
-    mask_order_id = filtered_df["order_id"].isin(sample_order_id) if sample_order_id else pd.Series([True] * len(filtered_df))
-    mask_sample_name = filtered_df["name"].isin(sample_sample_name) if sample_sample_name else pd.Series([True] * len(filtered_df))
-    mask_cell_name = filtered_df["cellunit_name"].isin(sample_cell_name) if sample_cell_name else pd.Series([True] * len(filtered_df))
+    true_mask = pd.Series([True] * len(filtered_df), index=filtered_df.index)
+    mask_order_id = (
+        filtered_df["order_id"].isin(order_id_list) if order_id_list else true_mask
+    )
+    mask_sample_name = (
+        filtered_df["name"].isin(sample_name_list) if sample_name_list else true_mask
+    )
+    mask_cell_name = (
+        filtered_df["cellunit_name"].isin(cell_name_list) if cell_name_list else true_mask
+    )
 
     # Order ID options (apply all except order_id)
     mask = mask_sample_name & mask_cell_name
     order_id_options = [
         {"label": str(oid), "value": oid}
-        for oid in sorted(filtered_df[mask]["order_id"].dropna().unique(), reverse=True)
+        for oid in sorted(filtered_df[mask]["order_id"].dropna().unique())
     ]
     # Sample Name options (apply all except sample_name)
     mask = mask_order_id & mask_cell_name
@@ -231,28 +325,60 @@ def update_table(sample_order_id, sample_sample_name, sample_cell_name, data):
 )
 def download_sample_table(n_clicks, table_data):
     if not table_data:
-        return dash.no_update
+        return no_update
     df_filtered = pd.DataFrame(table_data)
-    return dcc.send_data_frame(df_filtered.to_csv, "sample_table.csv", index=False)
+    return send_data_frame(df_filtered.to_csv, "sample_table.csv", index=False)
 
+
+# Clientside callback to update AG Grid theme based on Mantine color scheme
+clientside_callback(
+    """
+    (theme) => {
+       document.documentElement.setAttribute('data-ag-theme-mode', theme === 'dark' ? 'dark' : 'light');
+       return window.dash_clientside.no_update;
+    }
+    """,
+    Output("sample-table-theme-dummy", "children"),
+    Input("theme-store", "data"),
+)
+
+# Callback to update filter dropdowns when a cell is double-clicked
 @callback(
     Output("sample-order-id-filter", "value"),
     Output("sample-sample-name-filter", "value"),
     Output("sample-cell-name-filter", "value"),
     Input("sample-sample-table", "cellDoubleClicked"),
-    prevent_initial_call=True
+    prevent_initial_call=True,
 )
 def update_filter_on_cell_dblclick(cell):
-    if not cell or "colId" not in cell:
-        raise no_update
-    
+    if not cell or "colId" not in cell or "value" not in cell:
+        raise PreventUpdate
     col = cell["colId"]
     val = cell["value"]
     if col == "order_id":
-        return [val], None, None
-    elif col == "name":
-        return None, [val], None
-    elif col == "cellunit_name":
-        return None, None, [val]
-    else:
-        raise PreventUpdate
+        return [val], [], []
+    if col == "name":
+        return [], [val], []
+    if col == "cellunit_name":
+        return [], [], [val]
+    raise PreventUpdate
+
+
+@callback(
+    Output("sample-usage-open", "data"),
+    Input("sample-usage-toggle", "n_clicks"),
+    State("sample-usage-open", "data"),
+    prevent_initial_call=True,
+)
+def toggle_usage_blockquote(n_clicks, is_open):
+    if n_clicks is None:
+        return no_update
+    return not bool(is_open)
+
+
+@callback(
+    Output("sample-usage-collapse", "opened"),
+    Input("sample-usage-open", "data"),
+)
+def sync_usage_blockquote(is_open):
+    return bool(is_open)
