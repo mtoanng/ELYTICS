@@ -3,6 +3,7 @@ from dash import html, dcc, callback, Output, Input, State, register_page, no_up
 import pandas as pd
 import plotly.express as px
 import dash_mantine_components as dmc
+from dash_iconify import DashIconify
 
 from services.backend_service import get_table_as_df
 
@@ -40,6 +41,11 @@ SAMPLE_TYPE_COLORS = {
     "Other": "#9D755D",
 }
 
+USAGE_BLOCKQUOTE_TEXT = [
+    "Only electrochemical testing is shown.",
+    "Note: some testrigs do not show all data yet, as data is currently being ingested."
+]
+
 layout = dmc.Container(
     size="xl",
     py="md",
@@ -48,21 +54,36 @@ layout = dmc.Container(
             gap="md",
             children=[
                 dmc.Stack(
-                    gap=4,
+                    gap=2,
                     children=[
-                        dmc.Title("ELY Test rig Dashboard", order=2),
-                        dmc.Alert(
-                            id="teststat-info-box",
-                            title="Info",
-                            color="blue",
-                            variant="light",
+                        dmc.Group(
+                            gap="xs",
+                            align="center",
                             children=[
-                                dmc.Text("Only electrochemical testing is shown.", size="sm"),
-                                dmc.Text(
-                                    "Note: some testrigs do not show all data yet, as data is currently being ingested.",
-                                    size="sm",
+                                dmc.Title("ELY Test rig Dashboard", order=2),
+                                dmc.ActionIcon(
+                                    DashIconify(icon="material-symbols:info-outline", width=20),
+                                    id="statistics-usage-toggle",
+                                    variant="subtle",
+                                    color="blue",
+                                    size="md",
+                                    radius="xl",
                                 ),
                             ],
+                        ),
+                        dmc.Text("This page provides an overview of test rig statistics.", c="dimmed"),
+                        dmc.Collapse(
+                            dmc.Blockquote(
+                                dmc.List(
+                                    withPadding=False,
+                                    children=[
+                                        dmc.ListItem(item)
+                                        for item in USAGE_BLOCKQUOTE_TEXT
+                                    ],
+                                ),
+                                color="blue",
+                            ),
+                            id="statistics-usage-collapse",
                         ),
                     ],
                 ),
@@ -80,12 +101,6 @@ layout = dmc.Container(
                                 dmc.InputWrapper(
                                     dcc.Dropdown(
                                         id="year-selector",
-                                        options=[
-                                            {"label": "2024", "value": 2024},
-                                            {"label": "2025", "value": 2025},
-                                            {"label": "2026", "value": 2026},
-                                        ],
-                                        value=[2024, 2025, 2026],  # all initially selected
                                         multi=True,
                                         clearable=False,
                                         placeholder="Select year(s)",
@@ -95,7 +110,7 @@ layout = dmc.Container(
                                     htmlFor="year-selector",
                                     className="dmc",
                                     styles={"label": {"marginBottom": "6px"}},
-                                    style={"flex": "0 0 220px", "minWidth": "220px"},
+                                    style={"flex": 1, "minWidth": "180px"},
                                 ),
                                 dmc.InputWrapper(
                                     dcc.Dropdown(
@@ -108,7 +123,7 @@ layout = dmc.Container(
                                     htmlFor="location-filter",
                                     className="dmc",
                                     styles={"label": {"marginBottom": "6px"}},
-                                    style={"flex": "0 0 240px", "minWidth": "240px"},
+                                    style={"flex": 1, "minWidth": "180px"},
                                 ),
                                 dmc.InputWrapper(
                                     dcc.Dropdown(
@@ -121,7 +136,7 @@ layout = dmc.Container(
                                     htmlFor="sample-type-filter",
                                     className="dmc",
                                     styles={"label": {"marginBottom": "6px"}},
-                                    style={"flex": "0 0 260px", "minWidth": "260px"},
+                                    style={"flex": 1, "minWidth": "180px"},
                                 ),
                             ],
                         ),
@@ -144,7 +159,7 @@ layout = dmc.Container(
                                                 "borderRadius": "6px",
                                                 "background": "#eef4ff",
                                                 "fontSize": "13px",
-                                                "minHeight": "32px",
+                                                "minHeight": "44px",
                                                 "whiteSpace": "normal",
                                                 "display": "flex",
                                                 "flexDirection": "row",
@@ -162,7 +177,12 @@ layout = dmc.Container(
                                     variant="light",
                                     color="gray",
                                     radius="md",
-                                    style={"flex": "0 0 auto", "whiteSpace": "nowrap", "marginTop": "22px"},
+                                    style={
+                                        "flex": "0 0 auto",
+                                        "whiteSpace": "nowrap",
+                                        "height": "44px",
+                                        "alignSelf": "flex-end",
+                                    },
                                 ),
                             ],
                         ),
@@ -212,10 +232,32 @@ layout = dmc.Container(
                     },
                 ),
                 dcc.Store(id="teststat-raw-store"),
+                dcc.Store(id="statistics-usage-open", data=True)
             ],
         )
     ],
 )
+
+# =========================================================
+# INFO PANEL COLLAPSE
+# =========================================================
+@callback(
+    Output("statistics-usage-open", "data"),
+    Input("statistics-usage-toggle", "n_clicks"),
+    State("statistics-usage-open", "data"),
+    prevent_initial_call=True,
+)
+def toggle_usage_blockquote(n_clicks, is_open):
+    if n_clicks is None:
+        return no_update
+    return not bool(is_open)
+
+@callback(
+    Output("statistics-usage-collapse", "opened"),
+    Input("statistics-usage-open", "data"),
+)
+def sync_usage_blockquote(is_open):
+    return bool(is_open)
 
 # =========================================================
 # POPULATE RAW DATA STORE & YEAR SELECTOR
