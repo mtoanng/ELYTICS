@@ -19,6 +19,11 @@
       "pr": 662,
       "title": "feat(sherlock): Migrate Order overview page",
       "date": "2026-03-10"
+    },
+    {
+      "pr": 676,
+      "title": "fix(sherlock): ccm duplicate plot entries",
+      "date": "2026-03-11"
     }
   ],
   "releases": {}
