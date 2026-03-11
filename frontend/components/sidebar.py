@@ -59,23 +59,31 @@ def nav_label(page: dict):
     children: list[Any] = [dmc.Text(page["label"], size="sm")]
     if page.get("preview", False):
         children.append(
-            dmc.Badge(
-                "Preview",
-                size="xs",
-                radius="xl",
-                variant="filled",
-                color="blue",
-                styles={
-                    "root": {
-                        "marginLeft": "auto",
-                        "fontSize": "10px",
-                        "padding": "2px 6px",
-                        "fontWeight": 600,
-                        "textTransform": "none",
-                        "cursor": "inherit",
-                        "pointerEvents": "none",
-                    }
-                },
+            dmc.Tooltip(
+                multiline=True,
+                w=220,
+                label="This page is currently a proof of "
+                "concept, data should still be validated.",
+                position="right",
+                children=[
+                    dmc.Badge(
+                        "Preview",
+                        size="xs",
+                        radius="xl",
+                        variant="filled",
+                        color="blue",
+                        styles={
+                            "root": {
+                                "fontSize": "10px",
+                                "padding": "2px 6px",
+                                "fontWeight": 600,
+                                "textTransform": "none",
+                                "cursor": "inherit",
+                                "pointerEvents": "none",
+                            }
+                        },
+                    )
+                ],
             )
         )
 
@@ -83,6 +91,7 @@ def nav_label(page: dict):
         children=children,
         gap=6,
         wrap="nowrap",
+        justify="space-between",
         style={"width": "100%"},
     )
 
