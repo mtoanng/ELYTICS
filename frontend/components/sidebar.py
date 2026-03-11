@@ -11,7 +11,7 @@ SIDEBAR_STRUCTURE = {
         "Management": {
             "path": "management",
             "pages": [
-                {"path": "test-statistics", "label": "Test Statistics"},
+                {"path": "test-rig-statistics", "label": "Test Rig Statistics"},
                 {"path": "test-rig-activity", "label": "Test Rig Activity"},
             ],
         },

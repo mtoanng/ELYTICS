@@ -2,13 +2,14 @@ import dash
 from dash import html, dcc, callback, Output, Input, State, register_page, no_update, callback_context
 import pandas as pd
 import plotly.express as px
+import dash_mantine_components as dmc
 
 from services.backend_service import get_table_as_df
 
 register_page(
     __name__,
-    path="/sherlock/management/test-statistics",
-    name="HOLMES - Sherlock - Test Statistics"
+    path="/sherlock/management/test-rig-statistics",
+    name="HOLMES - Sherlock - Test Rig Statistics"
 )
 
 CELL_COLORS = {
@@ -39,123 +40,195 @@ SAMPLE_TYPE_COLORS = {
     "Other": "#9D755D",
 }
 
-layout = html.Div(
-    [
-        html.H2("ELY Test rig Dashboard", style={"textAlign": "left", "marginTop": "0.5rem"}),
-        html.H3("Only electrochemical testing is shown", style={"marginBottom": "12px"}),
-        html.Div(
-            [
-                html.Div(
-                    [
-                        html.Div("Year Range", style={"fontWeight": "600", "marginBottom": "6px"}),
-                        dcc.Checklist(
-                            id="year-selector",
-                            options=[
-                                {"label": "2024", "value": 2024},
-                                {"label": "2025", "value": 2025},
-                                {"label": "2026", "value": 2026},
+layout = dmc.Container(
+    size="xl",
+    py="md",
+    children=[
+        dmc.Stack(
+            gap="md",
+            children=[
+                dmc.Stack(
+                    gap=4,
+                    children=[
+                        dmc.Title("ELY Test rig Dashboard", order=2),
+                        dmc.Alert(
+                            id="teststat-info-box",
+                            title="Info",
+                            color="blue",
+                            variant="light",
+                            children=[
+                                dmc.Text("Only electrochemical testing is shown.", size="sm"),
+                                dmc.Text(
+                                    "Note: some testrigs do not show all data yet, as data is currently being ingested.",
+                                    size="sm",
+                                ),
                             ],
-                            value=[2024, 2025, 2026],
-                            labelStyle={"display": "block", "marginBottom": "4px"},
-                            inputStyle={"marginRight": "6px"},
-                        ),
-                        html.Hr(style={"margin": "12px 0"}),
-                        html.Div("Location", style={"fontWeight": "600", "marginBottom": "6px"}),
-                        dcc.Dropdown(
-                            id="location-filter",
-                            multi=True,
-                            placeholder="Select location(s)",
-                        ),
-                        html.Div(
-                            "Sample Type",
-                            style={"fontWeight": "600", "marginBottom": "6px", "marginTop": "8px"},
-                        ),
-                        dcc.Dropdown(
-                            id="sample-type-filter",
-                            multi=True,
-                            placeholder="Select sample type",
-                        ),
-                        html.Hr(style={"margin": "12px 0"}),
-                        html.Div("Selection(s) via plot", style={"fontWeight": "600", "marginBottom": "6px"}),
-                        html.Div(
-                            id="active-selection-display",
-                            style={
-                                "padding": "6px 10px",
-                                "border": "1px solid #c7d4f3",
-                                "borderRadius": "6px",
-                                "background": "#eef4ff",
-                                "fontSize": "13px",
-                                "minHeight": "32px",
-                                "marginBottom": "6px",
-                                "whiteSpace": "normal",
-                                "display": "flex",
-                                "flexDirection": "column",
-                                "gap": "4px",
-                            },
-                        ),
-                        html.Button(
-                            "Reset selection",
-                            id="reset-selection-btn",
-                            n_clicks=0,
-                            className="btn btn-secondary",
-                            style={
-                                "width": "100%",
-                                "borderRadius": "6px",
-                                "padding": "6px 12px",
-                                "fontWeight": "600",
-                                "fontSize": "14px",
-                            },
                         ),
                     ],
-                    style={
-                        "width": "260px",
-                        "padding": "12px",
-                        "flexShrink": "0",
-                    },
                 ),
-                html.Div(
-                    [
-                        dcc.Graph(id="plot-hours-per-testrig", config={"responsive": True}),
-                        dcc.Graph(id="plot-cumulative-location", config={"responsive": True}),
-                        dcc.Graph(id="plot-sampletype-by-cells", config={"responsive": True}),
-                        dcc.Graph(id="plot-cells-by-sampletype", config={"responsive": True}),
+
+                dmc.Paper(
+                    withBorder=True,
+                    p="md",
+                    radius="md",
+                    children=[
+                        dmc.Group(
+                            gap="md",
+                            align="flex-end",
+                            style={"flexWrap": "nowrap", "overflowX": "auto"},
+                            children=[
+                                dmc.InputWrapper(
+                                    dcc.Dropdown(
+                                        id="year-selector",
+                                        options=[
+                                            {"label": "2024", "value": 2024},
+                                            {"label": "2025", "value": 2025},
+                                            {"label": "2026", "value": 2026},
+                                        ],
+                                        value=[2024, 2025, 2026],  # all initially selected
+                                        multi=True,
+                                        clearable=False,
+                                        placeholder="Select year(s)",
+                                        style={"width": "100%"},
+                                    ),
+                                    label="Year",
+                                    htmlFor="year-selector",
+                                    className="dmc",
+                                    styles={"label": {"marginBottom": "6px"}},
+                                    style={"flex": "0 0 220px", "minWidth": "220px"},
+                                ),
+                                dmc.InputWrapper(
+                                    dcc.Dropdown(
+                                        id="location-filter",
+                                        multi=True,
+                                        placeholder="Select location(s)",
+                                        style={"width": "100%"},
+                                    ),
+                                    label="Location",
+                                    htmlFor="location-filter",
+                                    className="dmc",
+                                    styles={"label": {"marginBottom": "6px"}},
+                                    style={"flex": "0 0 240px", "minWidth": "240px"},
+                                ),
+                                dmc.InputWrapper(
+                                    dcc.Dropdown(
+                                        id="sample-type-filter",
+                                        multi=True,
+                                        placeholder="Select sample type",
+                                        style={"width": "100%"},
+                                    ),
+                                    label="Sample Type",
+                                    htmlFor="sample-type-filter",
+                                    className="dmc",
+                                    styles={"label": {"marginBottom": "6px"}},
+                                    style={"flex": "0 0 260px", "minWidth": "260px"},
+                                ),
+                            ],
+                        ),
+                        dmc.Space(h="sm"),
+                        dmc.Group(
+                            align="flex-start",
+                            justify="space-between",
+                            wrap="nowrap",
+                            children=[
+                                dmc.Stack(
+                                    gap=6,
+                                    style={"flex": 1},
+                                    children=[
+                                        dmc.Text("Selection(s) via plot", fw=600, size="sm"),
+                                        html.Div(
+                                            id="active-selection-display",
+                                            style={
+                                                "padding": "6px 10px",
+                                                "border": "1px solid #c7d4f3",
+                                                "borderRadius": "6px",
+                                                "background": "#eef4ff",
+                                                "fontSize": "13px",
+                                                "minHeight": "32px",
+                                                "whiteSpace": "normal",
+                                                "display": "flex",
+                                                "flexDirection": "row",
+                                                "gap": "6px",
+                                                "flexWrap": "wrap",
+                                                "alignItems": "center",
+                                            },
+                                        ),
+                                    ],
+                                ),
+                                dmc.Button(
+                                    "Reset selection",
+                                    id="reset-selection-btn",
+                                    n_clicks=0,
+                                    variant="light",
+                                    color="gray",
+                                    radius="md",
+                                    style={"flex": "0 0 auto", "whiteSpace": "nowrap", "marginTop": "22px"},
+                                ),
+                            ],
+                        ),
                     ],
-                    style={
-                        "display": "grid",
-                        "gridTemplateColumns": "1fr 1fr",
-                        "gap": "12px",
-                        "flexGrow": "1",
-                        "alignItems": "start",
+                ),
+
+                dmc.SimpleGrid(
+                    cols=2,
+                    spacing="md",
+                    verticalSpacing="md",
+                    children=[
+                        dmc.Paper(
+                            withBorder=True,
+                            p="xs",
+                            radius="md",
+                            children=dcc.Graph(id="plot-hours-per-testrig", config={"responsive": True}),
+                        ),
+                        dmc.Paper(
+                            withBorder=True,
+                            p="xs",
+                            radius="md",
+                            children=dcc.Graph(id="plot-cumulative-location", config={"responsive": True}),
+                        ),
+                        dmc.Paper(
+                            withBorder=True,
+                            p="xs",
+                            radius="md",
+                            children=dcc.Graph(id="plot-sampletype-by-cells", config={"responsive": True}),
+                        ),
+                        dmc.Paper(
+                            withBorder=True,
+                            p="xs",
+                            radius="md",
+                            children=dcc.Graph(id="plot-cells-by-sampletype", config={"responsive": True}),
+                        ),
+                    ],
+                ),
+
+                dcc.Store(id="testrig-store"),
+                dcc.Store(
+                    id="selected-bars-store",
+                    data={
+                        "testrig_id": [],
+                        "location": [],
+                        "sample_type_state": [],
+                        "number_of_cells": [],
                     },
                 ),
+                dcc.Store(id="teststat-raw-store"),
             ],
-            style={
-                "display": "flex",
-                "alignItems": "flex-start",
-                "gap": "12px",
-            },
-        ),
-        dcc.Store(id="testrig-store"),
-        dcc.Store(
-            id="selected-bars-store",
-            data={
-                "testrig_id": [],
-                "location": [],
-                "sample_type_state": [],
-                "number_of_cells": [],
-            },
-        ),
-    ]
+        )
+    ],
 )
 
+# =========================================================
+# POPULATE RAW DATA STORE & YEAR SELECTOR
+# =========================================================
 @callback(
-    Output("testrig-store", "data"),
-    Output("location-filter", "options"),
-    Output("sample-type-filter", "options"),
-    Input("year-selector", "value"),
+    Output("teststat-raw-store", "data"),
+    Output("year-selector", "options"),
+    Output("year-selector", "value"),
+    Input("year-selector", "id"),  # fires on initial render
+    prevent_initial_call=False,
 )
-def load_data(years):
-    df = get_table_as_df('sherlock', 'test_statistics')
+def init_teststat_data(_):
+    df = get_table_as_df("sherlock", "test_statistics")
     df["number_of_cells"] = (
         df["number_of_cells"]
         .fillna("Unknown")
@@ -163,11 +236,43 @@ def load_data(years):
         .str.replace(r"\.0$", "", regex=True)
     )
     df["sample_type_state"] = df["sample_type_state"].fillna("Unknown")
-    df = df[df["year"].isin(years)]
+
+    years = sorted(
+        pd.to_numeric(df["year"], errors="coerce")
+        .dropna()
+        .astype(int)
+        .unique()
+        .tolist()
+    )
+    options = [{"label": str(y), "value": y} for y in years]
+
+    return df.to_dict("records"), options, years
+
+# =========================================================
+# MULTI-SELECTION HANDLER
+# =========================================================
+@callback(
+    Output("testrig-store", "data"),
+    Output("location-filter", "options"),
+    Output("sample-type-filter", "options"),
+    Input("teststat-raw-store", "data"),
+    Input("year-selector", "value"),
+)
+def load_data(raw_data, years):
+    if not raw_data:
+        return [], [], []
+
+    df = pd.DataFrame(raw_data)
+
+    if years:
+        df = df[df["year"].isin(years)]
+
     locations = sorted(df["location"].dropna().unique())
     sample_types = sorted(df["sample_type_state"].dropna().unique())
+
     location_options = [{"label": l, "value": l} for l in locations]
     sample_type_options = [{"label": s, "value": s} for s in sample_types]
+
     return df.to_dict("records"), location_options, sample_type_options
 
 @callback(
@@ -210,6 +315,9 @@ def update_selected_bars(fig1, fig2, fig3, fig4, reset, selected):
         selected["number_of_cells"] = toggle(selected["number_of_cells"], str(point["x"]))
     return selected
 
+# =========================================================
+# RESET LOCATION DROPDOWN
+# =========================================================
 @callback(
     Output("location-filter", "value"),
     Output("sample-type-filter", "value"),
@@ -219,6 +327,9 @@ def update_selected_bars(fig1, fig2, fig3, fig4, reset, selected):
 def reset_filters(_):
     return [], []
 
+# =========================================================
+# ACTIVE SELECTION DISPLAY
+# =========================================================
 @callback(
     Output("active-selection-display", "children"),
     Input("selected-bars-store", "data")
@@ -233,10 +344,28 @@ def update_selection_display(selected):
         parts.append(f"🟣 Sample types: {', '.join(selected['sample_type_state'])}")
     if selected["number_of_cells"]:
         parts.append(f"🟠 Cells: {', '.join(selected['number_of_cells'])}")
-    if not parts:
-        return html.Div("No selections", style={"color": "#6c757d"})
-    return [html.Div(item) for item in parts]
 
+    if not parts:
+        return html.Span("No selections", style={"color": "#6c757d"})
+
+    return [
+        html.Span(
+            item,
+            style={
+                "display": "inline-flex",
+                "alignItems": "center",
+                "padding": "2px 8px",
+                "borderRadius": "999px",
+                "background": "#dfeaff",
+                "border": "1px solid #c7d4f3",
+            },
+        )
+        for item in parts
+    ]
+
+# =========================================================
+# BUILD CHARTS
+# =========================================================
 @callback(
     Output("plot-hours-per-testrig", "figure"),
     Output("plot-cumulative-location", "figure"),
@@ -289,13 +418,10 @@ def update_charts(data, selected, years, locations, sample_types, theme):
     # -------------------------
     # FIG 1 — Run hours per testrig
     # -------------------------
-
+   
     fig1_data = (
-        dff.groupby(
-            ["testrig_id", "location"],
-            as_index=False
-        )["run_hours"]
-        .sum()
+        dff.groupby(["testrig_id", "location"], as_index=False)
+        .agg(run_hours=("run_hours", "sum"))
     )
 
     # sort within each location
@@ -334,8 +460,8 @@ def update_charts(data, selected, years, locations, sample_types, theme):
     # -------------------------
 
     fig2_data = (
-        dff.groupby("location", as_index=False)["run_hours"]
-        .sum()
+        dff.groupby("location", as_index=False)
+        .agg(run_hours=("run_hours", "sum"))
         .sort_values("run_hours", ascending=False)
     )
 
