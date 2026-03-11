@@ -17,12 +17,12 @@ def get_api_headers():
         "Content-Type": "application/json",
     }
 
-def get_table_as_df(space, table_name):
+def get_table_as_df(space, table_name, data_kind="data"):
     """
     Request a table from the backend and return as a pandas DataFrame.
     """
     headers = get_api_headers()
-    url = f"{API_BASE}/{space}/tables/{table_name}"
+    url = f"{API_BASE}/api/{space}/tables/{data_kind}/{table_name}"
     response = requests.get(url, headers=headers)
     response.raise_for_status()
     data = response.json().get("data", [])
