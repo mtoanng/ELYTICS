@@ -72,6 +72,8 @@ def nav_label(page: dict):
                         "padding": "2px 6px",
                         "fontWeight": 600,
                         "textTransform": "none",
+                        "cursor": "inherit",
+                        "pointerEvents": "none",
                     }
                 },
             )
