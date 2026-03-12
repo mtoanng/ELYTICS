@@ -175,7 +175,6 @@ layout = dmc.Container(
                                     id="reset-selection-btn",
                                     n_clicks=0,
                                     variant="light",
-                                    color="gray",
                                     radius="md",
                                     style={
                                         "flex": "0 0 auto",
@@ -374,9 +373,10 @@ def reset_filters(_):
 # =========================================================
 @callback(
     Output("active-selection-display", "children"),
+    Output("reset-selection-btn", "style"),
     Input("selected-bars-store", "data")
 )
-def update_selection_display(selected):
+def update_selection_display_and_button_style(selected):
     parts = []
     if selected["testrig_id"]:
         parts.append(f"🔵 Test rigs: {', '.join(selected['testrig_id'])}")
@@ -387,8 +387,17 @@ def update_selection_display(selected):
     if selected["number_of_cells"]:
         parts.append(f"🟠 Cells: {', '.join(selected['number_of_cells'])}")
 
+    has_selection = bool(parts)
+    button_style = {
+        "flex": "0 0 auto",
+        "whiteSpace": "nowrap",
+        "height": "44px",
+        "alignSelf": "flex-end",
+        "color": "#343a40" if has_selection else "gray",  # dark if selected, light if not
+    }
+
     if not parts:
-        return html.Span("No selections", style={"color": "#6c757d"})
+        return html.Span("No selections", style={"color": "#6c757d"}), button_style
 
     return [
         html.Span(
@@ -403,7 +412,7 @@ def update_selection_display(selected):
             },
         )
         for item in parts
-    ]
+    ], button_style
 
 # =========================================================
 # BUILD CHARTS
