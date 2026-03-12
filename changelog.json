@@ -24,6 +24,11 @@
       "pr": 674,
       "title": "fix(core): Updated environment handling",
       "date": "2026-03-10"
+    },
+    {
+      "pr": 679,
+      "title": "feat(sherlock) Fix navigation bar and pages",
+      "date": "2026-03-11"
     }
   ],
   "releases": {}

@@ -24,6 +24,11 @@
       "pr": 676,
       "title": "fix(sherlock): ccm duplicate plot entries",
       "date": "2026-03-11"
+    },
+    {
+      "pr": 679,
+      "title": "feat(sherlock) Fix navigation bar and pages",
+      "date": "2026-03-11"
     }
   ],
   "releases": {}
