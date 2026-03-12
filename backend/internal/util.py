@@ -194,10 +194,19 @@ def get_query_result(
     return data
 
 
+# Map external data_kind labels to the actual segment used in Databricks view names.
+_DATA_KIND_VIEW_SEGMENT: dict[str, str] = {
+    "data": "data",
+    "metadata": "meta",
+}
+
+
 def fully_qualified_view(space: str, data_kind: str, table_name: str) -> str:
     safe_space = _validate_identifier(space)
-    safe_kind = _validate_identifier(data_kind)
     safe_table = _validate_identifier(table_name)
+    # Translate external kind label to the segment used in the actual view name.
+    view_segment = _DATA_KIND_VIEW_SEGMENT.get(data_kind, data_kind)
+    safe_kind = _validate_identifier(view_segment)
     return (
         f"{DEFAULT_DATABRICKS_CATALOG}.{DEFAULT_DATABRICKS_SCHEMA}."
         f"holmes_{safe_space}_{safe_kind}_{safe_table}_view"

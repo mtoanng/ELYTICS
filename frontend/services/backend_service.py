@@ -17,6 +17,15 @@ def get_api_headers():
         "Content-Type": "application/json",
     }
 
+def get_table_stats():
+    """Fetch system table statistics from the backend."""
+    headers = get_api_headers()
+    url = f"{API_BASE}/system/table-stats"
+    response = requests.get(url, headers=headers)
+    response.raise_for_status()
+    return response.json()
+
+
 def get_table_as_df(space, table_name, data_kind="data"):
     """
     Request a table from the backend and return as a pandas DataFrame.

@@ -78,7 +78,9 @@ def _register_table_route(space: str, data_kind: str, table_name: str) -> None:
     required_groups = DEFAULT_SPACE_GROUPS.get(space, ["IdM2BCD_holmes_pemely_user"])
     required_filters = REQUIRED_FILTERS.get(space, {}).get(data_kind, {}).get(table_name, [])
     route_tag = f"{space.title()} - {data_kind.title()}"
-    resolved_view = f"holmes_{space}_{data_kind}_{table_name}_view"
+    # Reflect the actual view segment (metadata -> meta) in the OpenAPI description.
+    view_segment = "meta" if data_kind == "metadata" else data_kind
+    resolved_view = f"holmes_{space}_{view_segment}_{table_name}_view"
 
     async def route_handler(
         request: Request,
