@@ -151,22 +151,12 @@ layout = dmc.Container(
                                     style={"flex": 1},
                                     children=[
                                         dmc.Text("Selection(s) via plot", fw=600, size="sm"),
-                                        html.Div(
+                                        dmc.Paper(
                                             id="active-selection-display",
-                                            style={
-                                                "padding": "6px 10px",
-                                                "border": "1px solid #c7d4f3",
-                                                "borderRadius": "6px",
-                                                "background": "#eef4ff",
-                                                "fontSize": "13px",
-                                                "minHeight": "44px",
-                                                "whiteSpace": "normal",
-                                                "display": "flex",
-                                                "flexDirection": "row",
-                                                "gap": "6px",
-                                                "flexWrap": "wrap",
-                                                "alignItems": "center",
-                                            },
+                                            withBorder=True,
+                                            p="xs",
+                                            radius="sm",
+                                            style={"minHeight": "44px"},
                                         ),
                                     ],
                                 ),
@@ -379,13 +369,13 @@ def reset_filters(_):
 def update_selection_display_and_button_style(selected):
     parts = []
     if selected["testrig_id"]:
-        parts.append(f"🔵 Test rigs: {', '.join(selected['testrig_id'])}")
+        parts.append(f"Test rigs: {', '.join(selected['testrig_id'])}")
     if selected["location"]:
-        parts.append(f"🟢 Locations: {', '.join(selected['location'])}")
+        parts.append(f"Locations: {', '.join(selected['location'])}")
     if selected["sample_type_state"]:
-        parts.append(f"🟣 Sample types: {', '.join(selected['sample_type_state'])}")
+        parts.append(f"Sample types: {', '.join(selected['sample_type_state'])}")
     if selected["number_of_cells"]:
-        parts.append(f"🟠 Cells: {', '.join(selected['number_of_cells'])}")
+        parts.append(f"Cells: {', '.join(selected['number_of_cells'])}")
 
     has_selection = bool(parts)
     button_style = {
@@ -393,26 +383,20 @@ def update_selection_display_and_button_style(selected):
         "whiteSpace": "nowrap",
         "height": "44px",
         "alignSelf": "flex-end",
-        "color": "#343a40" if has_selection else "gray",  # dark if selected, light if not
+        "opacity": 1 if has_selection else 0.7,
     }
 
     if not parts:
-        return html.Span("No selections", style={"color": "#6c757d"}), button_style
+        return dmc.Text("No selections", size="sm", c="dimmed"), button_style
 
-    return [
-        html.Span(
-            item,
-            style={
-                "display": "inline-flex",
-                "alignItems": "center",
-                "padding": "2px 8px",
-                "borderRadius": "999px",
-                "background": "#dfeaff",
-                "border": "1px solid #c7d4f3",
-            },
-        )
-        for item in parts
-    ], button_style
+    return dmc.Group(
+        gap="xs",
+        wrap="wrap",
+        children=[
+            dmc.Badge(item, variant="light", radius="xl", size="md")
+            for item in parts
+        ],
+    ), button_style
 
 # =========================================================
 # BUILD CHARTS
