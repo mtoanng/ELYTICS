@@ -14,6 +14,21 @@
       "pr": 658,
       "title": "feat(core): Added DEV banner to header & improved space selector",
       "date": "2026-03-10"
+    },
+    {
+      "pr": 673,
+      "title": "fix(core): Added docker ignore for env file",
+      "date": "2026-03-10"
+    },
+    {
+      "pr": 674,
+      "title": "fix(core): Updated environment handling",
+      "date": "2026-03-10"
+    },
+    {
+      "pr": 679,
+      "title": "feat(sherlock) Fix navigation bar and pages",
+      "date": "2026-03-11"
     }
   ],
   "releases": {}
