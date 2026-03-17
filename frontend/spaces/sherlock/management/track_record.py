@@ -34,10 +34,16 @@ project_root = here.parents[4]
 
 csv_path = project_root / "dummydata" / "Sherlock_track_record.csv"
 
-if not csv_path.exists():
-    raise FileNotFoundError(f"CSV not found at: {csv_path}")
-
-df_track = pd.read_csv(csv_path)
+if csv_path.exists():
+    df_track = pd.read_csv(csv_path)
+else:
+    # Define columns expected in the CSV to avoid downstream errors
+    df_track = pd.DataFrame(columns=[
+        "block", "sample_name", "run_hours", "sample_type_state", "number_of_cells",
+        "sample_type", "sample_state", "production_plant", "ccm_name", "ptl_name",
+        "gdl_name", "active_area_per_cell", "order_id", "leepa_number", "tAndeOut",
+        "pCtdeOut", "jStck", "runtime_hour", "uCell", "concO2H2", "concH2O2"
+    ])
 
 # ---------------------------------------------------
 
