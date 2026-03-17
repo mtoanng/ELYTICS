@@ -521,97 +521,97 @@ def track_record_layout():
                                             dmc.Group(
                                                         [
                                                             # Current Density filter
-                                                            dmc.Stack(
-                                                                [
-                                                                    dmc.Text("Current Density (jStck) [A/cm²]", size="sm"),
-                                                                    dmc.Group(
-                                                                        [
-                                                                            dmc.NumberInput(
-                                                                                id="filter-jstck-input",
-                                                                                step=0.1,
-                                                                                value=None,
-                                                                                placeholder="A/cm²",
-                                                                                min=JSTCK_MIN,
-                                                                                max=JSTCK_MAX,
-                                                                                styles={"input": {"height": 28, "width": 68}},
-                                                                            ),
-                                                                            dmc.Slider(
-                                                                                id="filter-jstck",
-                                                                                min=JSTCK_MIN,
-                                                                                max=JSTCK_MAX,
-                                                                                step=0.1,
-                                                                                value=None,
-                                                                                marks=[],
-                                                                                label=None,
-                                                                                style={"width": 120, "marginLeft": 4, "marginRight": 4},
-                                                                            ),
-                                                                        ],
-                                                                        gap="xs",
-                                                                    ),
-                                                                ],
-                                                                gap="xs",
+                                                            dmc.InputWrapper(
+                                                                label="Current Density",
+                                                                description="(jStck) [A/cm²]",
+                                                                children=dmc.Group(
+                                                                    [
+                                                                        dmc.NumberInput(
+                                                                            id="filter-jstck-input",
+                                                                            step=0.1,
+                                                                            value=None,
+                                                                            placeholder="0",
+                                                                            min=JSTCK_MIN,
+                                                                            max=JSTCK_MAX,
+                                                                            styles={"input": {"height": 28, "width": 68}},
+                                                                        ),
+                                                                        dmc.Slider(
+                                                                            id="filter-jstck",
+                                                                            min=JSTCK_MIN,
+                                                                            max=JSTCK_MAX,
+                                                                            step=0.1,
+                                                                            value=None,
+                                                                            marks=[],
+                                                                            label=None,
+                                                                            style={"width": 120, "marginLeft": 4, "marginRight": 4},
+                                                                        ),
+                                                                    ],
+                                                                    gap="xs",
+                                                                    style={"marginTop": 4},
+                                                                ),
+                                                                style={"minWidth": 260},
                                                             ),
                                                             # Temperature filter
-                                                            dmc.Stack(
-                                                                [
-                                                                    dmc.Text("Temp (tAndeOut) [°C]", size="sm"),
-                                                                    dmc.Group(
-                                                                        [
-                                                                            dmc.NumberInput(
-                                                                                id="filter-tandeout-input",
-                                                                                step=1,
-                                                                                value=None,
-                                                                                placeholder="°C",
-                                                                                min=tande_min,
-                                                                                max=tande_max,
-                                                                                styles={"input": {"height": 28, "width": 68}},
-                                                                            ),
-                                                                            dmc.Slider(
-                                                                                id="filter-tandeout",
-                                                                                min=tande_min,
-                                                                                max=tande_max,
-                                                                                step=1,
-                                                                                value=None,
-                                                                                marks=[],
-                                                                                label=None,
-                                                                                style={"width": 120, "marginLeft": 4, "marginRight": 4},
-                                                                            ),
-                                                                        ],
-                                                                        gap="xs",
-                                                                    ),
-                                                                ],
-                                                                gap="xs",
+                                                            dmc.InputWrapper(
+                                                                label="Temperature",
+                                                                description="(tAndeOut) [°C]",
+                                                                children=dmc.Group(
+                                                                    [
+                                                                        dmc.NumberInput(
+                                                                            id="filter-tandeout-input",
+                                                                            step=1,
+                                                                            value=None,
+                                                                            placeholder="0",
+                                                                            min=tande_min,
+                                                                            max=tande_max,
+                                                                            styles={"input": {"height": 28, "width": 68}},
+                                                                        ),
+                                                                        dmc.Slider(
+                                                                            id="filter-tandeout",
+                                                                            min=tande_min,
+                                                                            max=tande_max,
+                                                                            step=1,
+                                                                            value=None,
+                                                                            marks=[],
+                                                                            label=None,
+                                                                            style={"width": 120, "marginLeft": 4, "marginRight": 4},
+                                                                        ),
+                                                                    ],
+                                                                    gap="xs",
+                                                                    style={"marginTop": 4},
+                                                                ),
+                                                                style={"minWidth": 260},
                                                             ),
                                                             # Pressure filter
-                                                            dmc.Stack(
-                                                                [
-                                                                    dmc.Text("Pressure (pCtdeOut) [bar]", size="sm"),
-                                                                    dmc.Group(
-                                                                        [
-                                                                            dmc.NumberInput(
-                                                                                id="filter-pctdeout-input",
-                                                                                step=1,
-                                                                                value=None,
-                                                                                placeholder="bar",
-                                                                                min=pctde_min,
-                                                                                max=pctde_max,
-                                                                                styles={"input": {"height": 28, "width": 68}},
-                                                                            ),
-                                                                            dmc.Slider(
-                                                                                id="filter-pctdeout",
-                                                                                min=pctde_min,
-                                                                                max=pctde_max,
-                                                                                step=1,
-                                                                                value=None,
-                                                                                marks=[],
-                                                                                label=None,
-                                                                                style={"width": 120, "marginLeft": 4, "marginRight": 4},
-                                                                            ),
-                                                                        ],
-                                                                        gap="xs",
-                                                                    ),
-                                                                ],
-                                                                gap="xs",
+                                                            dmc.InputWrapper(
+                                                                label="Pressure",
+                                                                description="(pCtdeOut) [bar]",
+                                                                children=dmc.Group(
+                                                                    [
+                                                                        dmc.NumberInput(
+                                                                            id="filter-pctdeout-input",
+                                                                            step=1,
+                                                                            value=None,
+                                                                            placeholder="0",
+                                                                            min=pctde_min,
+                                                                            max=pctde_max,
+                                                                            styles={"input": {"height": 28, "width": 68}},
+                                                                        ),
+                                                                        dmc.Slider(
+                                                                            id="filter-pctdeout",
+                                                                            min=pctde_min,
+                                                                            max=pctde_max,
+                                                                            step=1,
+                                                                            value=None,
+                                                                            marks=[],
+                                                                            label=None,
+                                                                            style={"width": 120, "marginLeft": 4, "marginRight": 4},
+                                                                        ),
+                                                                    ],
+                                                                    gap="xs",
+                                                                    style={"marginTop": 4},
+                                                                ),
+                                                                style={"minWidth": 260},  # optional: to keep consistent width
                                                             ),
                                                             dmc.Group(
                                                                 [
