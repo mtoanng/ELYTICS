@@ -522,8 +522,7 @@ def track_record_layout():
                                                         [
                                                             # Current Density filter
                                                             dmc.InputWrapper(
-                                                                label="Current Density",
-                                                                description="(jStck) [A/cm²]",
+                                                                label="Current Density (jStck) [A/cm²]",
                                                                 children=dmc.Group(
                                                                     [
                                                                         dmc.NumberInput(
@@ -533,7 +532,7 @@ def track_record_layout():
                                                                             placeholder="0",
                                                                             min=JSTCK_MIN,
                                                                             max=JSTCK_MAX,
-                                                                            styles={"input": {"height": 28, "width": 68}},
+                                                                            w=75
                                                                         ),
                                                                         dmc.Slider(
                                                                             id="filter-jstck",
@@ -543,18 +542,17 @@ def track_record_layout():
                                                                             value=None,
                                                                             marks=[],
                                                                             label=None,
-                                                                            style={"width": 120, "marginLeft": 4, "marginRight": 4},
+                                                                            style={"flex": 1, "minWidth": 120, "marginLeft": 4, "marginRight": 4},
                                                                         ),
                                                                     ],
                                                                     gap="xs",
                                                                     style={"marginTop": 4},
                                                                 ),
-                                                                style={"minWidth": 260},
+                                                                style={"flex": 1, "minWidth": 260},
                                                             ),
                                                             # Temperature filter
                                                             dmc.InputWrapper(
-                                                                label="Temperature",
-                                                                description="(tAndeOut) [°C]",
+                                                                label="Temperature (tAndeOut) [°C]",
                                                                 children=dmc.Group(
                                                                     [
                                                                         dmc.NumberInput(
@@ -564,7 +562,7 @@ def track_record_layout():
                                                                             placeholder="0",
                                                                             min=tande_min,
                                                                             max=tande_max,
-                                                                            styles={"input": {"height": 28, "width": 68}},
+                                                                            w=75
                                                                         ),
                                                                         dmc.Slider(
                                                                             id="filter-tandeout",
@@ -574,18 +572,17 @@ def track_record_layout():
                                                                             value=None,
                                                                             marks=[],
                                                                             label=None,
-                                                                            style={"width": 120, "marginLeft": 4, "marginRight": 4},
+                                                                            style={"flex": 1, "minWidth": 120, "marginLeft": 4, "marginRight": 4},
                                                                         ),
                                                                     ],
                                                                     gap="xs",
                                                                     style={"marginTop": 4},
                                                                 ),
-                                                                style={"minWidth": 260},
+                                                                style={"flex": 1, "minWidth": 260},
                                                             ),
                                                             # Pressure filter
                                                             dmc.InputWrapper(
-                                                                label="Pressure",
-                                                                description="(pCtdeOut) [bar]",
+                                                                label="Pressure (pCtdeOut) [bar]",
                                                                 children=dmc.Group(
                                                                     [
                                                                         dmc.NumberInput(
@@ -595,7 +592,7 @@ def track_record_layout():
                                                                             placeholder="0",
                                                                             min=pctde_min,
                                                                             max=pctde_max,
-                                                                            styles={"input": {"height": 28, "width": 68}},
+                                                                            w=75
                                                                         ),
                                                                         dmc.Slider(
                                                                             id="filter-pctdeout",
@@ -605,13 +602,13 @@ def track_record_layout():
                                                                             value=None,
                                                                             marks=[],
                                                                             label=None,
-                                                                            style={"width": 120, "marginLeft": 4, "marginRight": 4},
+                                                                            style={"flex": 1, "minWidth": 120, "marginLeft": 4, "marginRight": 4},
                                                                         ),
                                                                     ],
                                                                     gap="xs",
                                                                     style={"marginTop": 4},
                                                                 ),
-                                                                style={"minWidth": 260},  # optional: to keep consistent width
+                                                                style={"flex": 1, "minWidth": 260},
                                                             ),
                                                             dmc.Group(
                                                                 [
@@ -638,7 +635,7 @@ def track_record_layout():
                                                         ],
                                                         align="end",
                                                         gap="xs",
-                                                        style={"marginBottom": 16, "flexWrap": "wrap"},
+                                                        style={"marginBottom": 16, "flexWrap": "wrap","width": "100%"},
                                                     ),
                                             # Graphs below
                                             dmc.Stack(
