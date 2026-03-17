@@ -1,7 +1,8 @@
 from datetime import datetime, timezone
 
+import dash_ag_grid as dag
 import dash_mantine_components as dmc
-from dash import Input, Output, callback, dcc, html, register_page
+from dash import Input, Output, callback, clientside_callback, dcc, html, register_page
 from dash_iconify import DashIconify
 
 from services.backend_service import get_table_stats
@@ -49,6 +50,7 @@ def layout():
                             style={"minHeight": "200px"},
                         ),
                     ),
+                    html.Div(id="system-stats-grid-theme-dummy"),
                 ],
             ),
         ],
@@ -152,27 +154,47 @@ def render_stats(data):
         status = r.get("status", "?")
         is_ok = status == "ok"
         table_rows.append(
-            [
-                r.get("space", "—"),
-                r.get("data_kind", "—"),
-                r.get("table", "—"),
-                f"{r['row_count']:,}" if is_ok else "—",
-                str(r.get("column_count", "—")) if is_ok else "—",
-                f"{r.get('avg_row_bytes', 0):.0f} B" if is_ok else "—",
-                r.get("estimated_total_size", "—") if is_ok else "—",
-                status.upper(),
-            ]
+            {
+                "space": r.get("space", "—"),
+                "kind": r.get("data_kind", "—"),
+                "table": r.get("table", "—"),
+                "rows": f"{r['row_count']:,}" if is_ok else "—",
+                "columns": str(r.get("column_count", "—")) if is_ok else "—",
+                "avg_row": f"{r.get('avg_row_bytes', 0):.0f} B" if is_ok else "—",
+                "est_size": r.get("estimated_total_size", "—") if is_ok else "—",
+                "status": status.upper(),
+            }
         )
 
-    results_table = dmc.Table(
-        data={
-            "head": ["Space", "Kind", "Table", "Rows", "Columns", "Avg Row", "Est. Size", "Status"],
-            "body": table_rows,
+    column_defs = [
+        {"headerName": "Space", "field": "space"},
+        {"headerName": "Kind", "field": "kind"},
+        {"headerName": "Table", "field": "table"},
+        {"headerName": "Rows", "field": "rows"},
+        {"headerName": "Columns", "field": "columns"},
+        {"headerName": "Avg Row", "field": "avg_row"},
+        {"headerName": "Est. Size", "field": "est_size"},
+        {"headerName": "Status", "field": "status"},
+    ]
+
+    results_table = dag.AgGrid(
+        id="system-stats-grid",
+        columnDefs=column_defs,
+        rowData=table_rows,
+        defaultColDef={
+            "resizable": True,
+            "sortable": True,
+            "filter": True,
         },
-        striped=True,
-        highlightOnHover=True,
-        withTableBorder=True,
-        withColumnBorders=True,
+        columnSize="autoSize",
+        columnSizeOptions={"skipHeader": False},
+        dashGridOptions={
+            "pagination": True,
+            "paginationPageSize": 20,
+            "animateRows": False,
+        },
+        className="ag-theme-quartz",
+        style={"height": "560px", "width": "100%"},
     )
 
     return dmc.Stack(
@@ -206,3 +228,16 @@ def _stat_card(label: str, value: str, icon: str, color: str = "blue"):
             ],
         ),
     )
+
+
+# Keep AG Grid light/dark mode in sync with the app theme toggle.
+clientside_callback(
+    """
+    (theme) => {
+       document.documentElement.setAttribute('data-ag-theme-mode', theme === 'dark' ? 'dark' : 'light');
+       return window.dash_clientside.no_update;
+    }
+    """,
+    Output("system-stats-grid-theme-dummy", "children"),
+    Input("theme-store", "data"),
+)

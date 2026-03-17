@@ -1,9 +1,12 @@
+import logging
 import os
+
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jwt import PyJWKClient
 
+logger = logging.getLogger(__name__)
 security = HTTPBearer()
 _jwks_client: PyJWKClient | None = None
 
@@ -33,42 +36,32 @@ def verify_oidc_token(credentials: HTTPAuthorizationCredentials = Depends(securi
         )
         return decoded
     except jwt.ExpiredSignatureError:
-        print("Token has expired")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token has expired",
-        )
+        logger.warning("Token has expired")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token has expired")
     except jwt.InvalidAudienceError:
-        print("Token audience mismatch")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token audience mismatch",
-        )
+        logger.warning("Token audience mismatch")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token audience mismatch")
     except jwt.InvalidIssuerError:
-        print("Token issuer mismatch")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token issuer mismatch",
-        )
+        logger.warning("Token issuer mismatch")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token issuer mismatch")
     except jwt.InvalidTokenError as e:
-        print(f"Invalid token: {str(e)}")
+        logger.warning("Invalid token: %s", e)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Invalid token: {str(e)}",
+            detail=f"Invalid token: {e}",
             headers={"WWW-Authenticate": "Bearer"},
         )
     except Exception as e:
-        print(f"Unexpected error during token verification: {str(e)}")
+        logger.exception("Unexpected error during token verification")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Unexpected error: {str(e)}",
+            detail=f"Unexpected error: {e}",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
 def require_groups(required_groups):
     def dependency(token: dict = Depends(verify_oidc_token)):
         user_groups = token.get("groups", [])
-        print(user_groups)
         if not any(g in user_groups for g in required_groups):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,

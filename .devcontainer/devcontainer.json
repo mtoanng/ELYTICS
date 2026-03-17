@@ -6,8 +6,9 @@
   },
   "postStartCommand": "redis-server --daemonize yes",
   "forwardPorts": [
-    8501,
-    8000
+    8501, // Dash frontend
+    8000, // FastAPI backend
+    8089  // Locust load testing UI
   ],
   "portsAttributes": {
     "8501": {
@@ -15,8 +16,11 @@
       "onAutoForward": "openBrowser"
     },
     "8000": {
-      "label": "FastAPI Backend",
-      "onAutoForward": "notify"
+      "label": "FastAPI Backend"
+    },
+    "8089": {
+      "label": "Locust Load Testing UI",
+      "onAutoForward": "openBrowser"
     }
   },
   "customizations": {

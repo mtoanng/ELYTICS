@@ -64,6 +64,45 @@ Required environment variables:
 The command below assumes you are adhering to the suggested development environment from the parent README.md, whereby you are running a devcontainer.
 
 ```bash
-cd backend
-python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
+python -m uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 ```
+
+## Timeseries Bucketing API
+
+Timeseries tables now have a dedicated endpoint that returns resolution-appropriate aggregates instead of `limit`/`offset` row pagination.
+
+### Endpoint
+
+`GET /api/{space}/timeseries/{table_name}`
+
+### Required Query Parameters
+
+- `start`: ISO-8601 timestamp
+- `end`: ISO-8601 timestamp
+- `time_column`: timestamp column name in the view
+- `columns`: one or more metric columns (repeat query key)
+
+### Optional Query Parameters
+
+- `data_kind`: `data` or `metadata` (default `data`)
+- `target_points`: desired horizontal resolution (default `1200`, clamped by backend)
+- Any additional filter query params (for example `order_id=...`)
+
+### Behavior
+
+- The backend computes a dynamic bucket size from `(end - start) / target_points`.
+- Query results are grouped by bucket and return `min`, `max`, and `avg` for each requested metric column.
+- Response includes metadata: `bucket_seconds`, `requested_points`, and `returned_points`.
+
+### Required Filters
+
+- `timeseries_exp` requires `order_id`.
+
+### Migration Note
+
+Timeseries tables no longer support the generic table endpoint:
+
+- Legacy: `GET /api/{space}/tables/{data_kind}/{table_name}`
+- New: `GET /api/{space}/timeseries/{table_name}`
+
+Legacy calls for timeseries tables now return `400` with a migration hint.
