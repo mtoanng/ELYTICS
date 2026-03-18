@@ -14,7 +14,7 @@ services:
       - frontend
       - redis
     networks:
-      - holmes_net
+      - holmes
     cpus: 2
     mem_limit: 4g
 
@@ -30,13 +30,15 @@ services:
       REDIS_PORT: "6379"
       REDIS_DB: "0"
       ENVIRONMENT: development
+      no_proxy: backend,redis,localhost,127.0.0.1,host.docker.internal,.bosch.com
+      NO_PROXY: backend,redis,localhost,127.0.0.1,host.docker.internal,.bosch.com
       PYTHONPATH: /workspace
     depends_on:
       - redis
     ports:
       - "8000:8000"
     networks:
-      - holmes_net
+      - holmes
     cpus: 0.50
     mem_limit: 2g
 
@@ -52,7 +54,8 @@ services:
       REDIS_PORT: "6379"
       REDIS_DB: "0"
       BACKEND_API_URL: http://backend:8000
-      USE_DASH_DEBUG_SERVER: "false"
+      no_proxy: backend,redis,localhost,127.0.0.1,host.docker.internal,.bosch.com
+      NO_PROXY: backend,redis,localhost,127.0.0.1,host.docker.internal,.bosch.com
       PYTHONPATH: /workspace
     depends_on:
       - backend
@@ -60,7 +63,7 @@ services:
     ports:
       - "8501:8501"
     networks:
-      - holmes_net
+      - holmes
     cpus: 0.30
     mem_limit: 1200m
 
@@ -70,10 +73,10 @@ services:
     ports:
       - "6379:6379"
     networks:
-      - holmes_net
+      - holmes
     cpus: 0.20
     mem_limit: 800m
 
 networks:
-  holmes_net:
+  holmes:
     driver: bridge
