@@ -266,7 +266,7 @@ try {
     }
     
     # Add REQUESTS_CA_BUNDLE to both .env files
-    $caBundlePath = "/workspaces/TBP-HOLMES/root_ca.pem"
+    $caBundlePath = "/workspace/root_ca.pem"
     Add-Content $frontendEnvFile "REQUESTS_CA_BUNDLE=$caBundlePath"
     Add-Content $backendEnvFile "REQUESTS_CA_BUNDLE=$caBundlePath"
     

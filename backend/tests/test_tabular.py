@@ -17,10 +17,10 @@ def client():
     app.dependency_overrides.clear()
 
 
-def test_tabular_route_with_limit_offset(client, monkeypatch):
+def test_tabular_route_ignores_limit_offset_params(client, monkeypatch):
     def fake_get_query_result(**kwargs):
-        assert kwargs["limit"] == 10
-        assert kwargs["offset"] == 5
+        assert "limit" not in kwargs
+        assert "offset" not in kwargs
         return [{"row_id": 1}]
 
     monkeypatch.setattr(tabular_router, "get_query_result", fake_get_query_result)
@@ -30,7 +30,7 @@ def test_tabular_route_with_limit_offset(client, monkeypatch):
 
 
 def test_tabular_route_missing_required_filter(client):
-    response = client.get("/api/sherlock/tabular/track_record", params={"limit": 10})
+    response = client.get("/api/sherlock/tabular/track_record")
     assert response.status_code == 400
     assert "order_id" in response.json()["detail"]
 

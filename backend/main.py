@@ -13,7 +13,7 @@ load_dotenv(Path(__file__).resolve().parent / ".env")
 
 from backend.internal.auth import verify_oidc_token
 from backend.internal.config_types import validate_space_configs
-from backend.internal.util import configure_redis_cache_policy, execute_sql_query, fully_qualified_view, get_redis_client, invalidate_view_cache
+from backend.internal.util import close_all_databricks_connections, configure_redis_cache_policy, execute_sql_query, fully_qualified_view, get_redis_client, invalidate_view_cache
 
 from backend.routers.tabular import router as tabular_router
 from backend.routers.metadata import router as metadata_router
@@ -29,41 +29,10 @@ import backend.config.mycroft as mycroft
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 
-CACHE_POLL_INTERVAL_SECONDS = int(os.getenv("CACHE_POLL_INTERVAL_SECONDS", "600"))
+for _noisy in ("databricks.sql", "databricks.sql.auth", "databricks.sql.auth.retry", "databricks.sql.auth.thrift_http_client"):
+    logging.getLogger(_noisy).setLevel(logging.WARNING)
 
 _SPACE_MODULES = [("sherlock", sherlock), ("watson", watson), ("enola", enola), ("mycroft", mycroft)]
-
-
-def _all_views() -> list[str]:
-    views: list[str] = []
-    for space, mod in _SPACE_MODULES:
-        for cfg in mod.TABULAR_CONFIG:
-            views.append(fully_qualified_view(space, "data", cfg.table_name))
-        for cfg in mod.TIMESERIES_CONFIG:
-            views.append(fully_qualified_view(space, "data", cfg.table_name))
-        for cfg in mod.METADATA_CONFIG:
-            views.append(fully_qualified_view(space, "metadata", cfg.table_name))
-    return list(dict.fromkeys(views))
-
-
-async def _poll_table_versions() -> None:
-    r = get_redis_client()
-    while True:
-        await asyncio.sleep(CACHE_POLL_INTERVAL_SECONDS)
-        for view_name in _all_views():
-            try:
-                rows = execute_sql_query(f"DESCRIBE HISTORY {view_name} LIMIT 1")
-                if not rows:
-                    continue
-                new_version = str(rows[0].get("version", ""))
-                version_key = f"holmes:meta:version:{view_name}"
-                stored = r.get(version_key)
-                if stored != new_version:
-                    invalidate_view_cache(view_name)
-                    r.set(version_key, new_version)
-                    logger.info("cache invalidated view=%s new_version=%s", view_name, new_version)
-            except Exception:
-                logger.exception("Failed to poll version for view=%s", view_name)
 
 
 @asynccontextmanager
@@ -72,13 +41,10 @@ async def lifespan(app: FastAPI):
         validate_space_configs(space, mod.TABULAR_CONFIG, mod.TIMESERIES_CONFIG, mod.METADATA_CONFIG)
     logger.info("config validation passed for all spaces")
     configure_redis_cache_policy()
-    task = asyncio.create_task(_poll_table_versions())
-    yield
-    task.cancel()
     try:
-        await task
-    except asyncio.CancelledError:
-        pass
+        yield
+    finally:
+        close_all_databricks_connections()
 
 
 app = FastAPI(lifespan=lifespan)

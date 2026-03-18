@@ -1,6 +1,6 @@
 uvicorn
+gunicorn
 fastapi
-locust
 pyjwt
 python-dotenv
 redis
@@ -8,9 +8,8 @@ pandas
 databricks
 databricks-sql-connector
 cryptography
-pytest
-httpx
 prometheus-fastapi-instrumentator
 prometheus_client
 azure-storage-blob
-locust
+pyarrow
+httpx

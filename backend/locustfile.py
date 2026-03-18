@@ -5,6 +5,19 @@ from typing import Iterable
 
 from locust import HttpUser, between, task
 
+import backend.config.enola as enola
+import backend.config.mycroft as mycroft
+import backend.config.sherlock as sherlock
+import backend.config.watson as watson
+
+
+SPACE_CONFIG_MAP = {
+    "sherlock": sherlock,
+    "watson": watson,
+    "enola": enola,
+    "mycroft": mycroft,
+}
+
 
 def _csv_env(name: str, default: str) -> list[str]:
     value = os.getenv(name, default)
@@ -29,7 +42,7 @@ class HolmesApiUser(HttpUser):
     wait_time = between(0.5, 2.0)
 
     def on_start(self) -> None:
-        token = os.getenv("HOLMES_BEARER_TOKEN", "").strip()
+        token = os.getenv("HOLMES_BEARER_TOKEN", "<token>").strip()
         self.headers = {"Authorization": f"Bearer {token}"} if token else {}
         self.auth_enabled = bool(token)
 
@@ -40,19 +53,19 @@ class HolmesApiUser(HttpUser):
         self.include_system_stats = os.getenv("HOLMES_INCLUDE_SYSTEM_STATS", "0") == "1"
         self.enable_download = os.getenv("HOLMES_ENABLE_DOWNLOAD", "0") == "1"
 
-        self.limit_min = int(os.getenv("HOLMES_LIMIT_MIN", "50"))
-        self.limit_max = int(os.getenv("HOLMES_LIMIT_MAX", "250"))
-        self.offset_max = int(os.getenv("HOLMES_OFFSET_MAX", "1000"))
-
         self.target_points_min = int(os.getenv("HOLMES_TARGET_POINTS_MIN", "600"))
         self.target_points_max = int(os.getenv("HOLMES_TARGET_POINTS_MAX", "1800"))
 
-        self.ts_range_start = _parse_utc_ts(os.getenv("HOLMES_TS_RANGE_START", "2024-01-01T00:00:00Z"))
-        self.ts_range_end = _parse_utc_ts(os.getenv("HOLMES_TS_RANGE_END", "2026-01-01T00:00:00Z"))
+        default_ts_end = datetime.now(UTC)
+        default_ts_start = default_ts_end - timedelta(days=365)
+        self.ts_range_start = _parse_utc_ts(os.getenv("HOLMES_TS_RANGE_START", _to_utc_z(default_ts_start)))
+        self.ts_range_end = _parse_utc_ts(os.getenv("HOLMES_TS_RANGE_END", _to_utc_z(default_ts_end)))
         self.ts_window_min_minutes = int(os.getenv("HOLMES_TS_WINDOW_MIN_MINUTES", "30"))
         self.ts_window_max_minutes = int(os.getenv("HOLMES_TS_WINDOW_MAX_MINUTES", "240"))
 
         self.order_ids: list[str] = _csv_env("HOLMES_ORDER_IDS", self.fallback_order_id)
+        self.filter_pools: dict[str, list[str]] = {"order_id": list(self.order_ids)}
+        self.required_filters_by_route = self._build_required_filters_by_route()
         if self.auth_enabled and os.getenv("HOLMES_WARMUP_FILTERS_ON_START", "1") == "1":
             self._warmup_filter_pools()
 
@@ -62,49 +75,84 @@ class HolmesApiUser(HttpUser):
     def _post(self, path: str, *, params: dict | None = None, name: str | None = None) -> None:
         self.client.post(path, params=params, headers=self.headers, name=name or path)
 
-    def _extract_order_ids(self, body: dict) -> list[str]:
-        values: list[str] = []
+    def _build_required_filters_by_route(self) -> dict[tuple[str, str], list[str]]:
+        module = SPACE_CONFIG_MAP.get(self.space)
+        if module is None:
+            return {}
+
+        route_filters: dict[tuple[str, str], list[str]] = {}
+        for cfg in getattr(module, "TABULAR_CONFIG", []):
+            route_filters[("tabular", cfg.route_name)] = list(cfg.required_filters)
+        for cfg in getattr(module, "TIMESERIES_CONFIG", []):
+            route_filters[("timeseries", cfg.route_name)] = list(cfg.required_filters)
+        return route_filters
+
+    def _extract_filter_values(self, body: dict, required_keys: set[str]) -> dict[str, set[str]]:
+        extracted: dict[str, set[str]] = {key: set() for key in required_keys}
         for row in body.get("data", []):
             if not isinstance(row, dict):
                 continue
-            candidate = row.get("order_id")
-            if candidate is not None and str(candidate).strip():
-                values.append(str(candidate).strip())
-        return values
+            for key in required_keys:
+                candidate = row.get(key)
+                if candidate is None:
+                    continue
+                normalized = str(candidate).strip()
+                if normalized:
+                    extracted[key].add(normalized)
+        return extracted
 
     def _warmup_filter_pools(self) -> None:
-        candidates: set[str] = set(self.order_ids)
+        module = SPACE_CONFIG_MAP.get(self.space)
+        if module is None:
+            return
 
-        for path in (
-            f"/api/{self.space}/metadata/timeseries_exp",
-            f"/api/{self.space}/metadata/polcurve",
-            f"/api/{self.space}/tabular/order",
-        ):
-            response = self.client.get(path, headers=self.headers, params={"limit": 500, "offset": 0})
+        required_keys = {
+            key
+            for keys in self.required_filters_by_route.values()
+            for key in keys
+        }
+        if not required_keys:
+            return
+
+        discovered: dict[str, set[str]] = {key: set(self.filter_pools.get(key, [])) for key in required_keys}
+        metadata_routes = [cfg.route_name for cfg in getattr(module, "METADATA_CONFIG", [])]
+
+        for route_name in metadata_routes:
+            path = f"/api/{self.space}/metadata/{route_name}"
+            response = self.client.get(path, headers=self.headers)
             if response.status_code != 200:
                 continue
             try:
                 body = response.json()
             except ValueError:
                 continue
-            candidates.update(self._extract_order_ids(body))
 
-        self.order_ids = [v for v in sorted(candidates) if v]
+            extracted = self._extract_filter_values(body, required_keys)
+            for key, values in extracted.items():
+                discovered[key].update(values)
+            
+            print(f"Warmup: route={route_name} extracted={ {k: len(v) for k, v in extracted.items()} }")
+            
+        self.filter_pools = {
+            key: [value for value in sorted(values) if value]
+            for key, values in discovered.items()
+        }
+
+        self.order_ids = list(self.filter_pools.get("order_id", []))
         if not self.order_ids:
             self.order_ids = [self.fallback_order_id]
-
+            self.filter_pools["order_id"] = list(self.order_ids)
+        
     def _random_order_id(self) -> str:
         if not self.order_ids:
             return self.fallback_order_id
         return random.choice(self.order_ids)
 
-    def _random_limit(self) -> int:
-        if self.limit_max <= self.limit_min:
-            return self.limit_min
-        return random.randint(self.limit_min, self.limit_max)
-
-    def _random_offset(self) -> int:
-        return random.randint(0, max(0, self.offset_max))
+    def _random_filter_value(self, name: str, fallback: str = "") -> str:
+        values = self.filter_pools.get(name, [])
+        if values:
+            return random.choice(values)
+        return fallback
 
     def _random_timeseries_window(self) -> tuple[str, str]:
         start = self.ts_range_start
@@ -166,8 +214,6 @@ class HolmesApiUser(HttpUser):
         self._get(
             f"/api/{self.space}/tabular/order",
             params={
-                "limit": self._random_limit(),
-                "offset": self._random_offset(),
                 "sort_dir": random.choice(["asc", "desc"]),
             },
             name="/api/[space]/tabular/order",
@@ -177,10 +223,10 @@ class HolmesApiUser(HttpUser):
     def tabular_track_record(self) -> None:
         if not self.auth_enabled:
             return
-        order_id = self._random_order_id()
+        order_id = self._random_filter_value("order_id", self.fallback_order_id)
         self._get(
             f"/api/{self.space}/tabular/track_record",
-            params={"order_id": order_id, "limit": self._random_limit(), "offset": self._random_offset()},
+            params={"order_id": order_id},
             name="/api/[space]/tabular/track_record",
         )
 
@@ -188,10 +234,10 @@ class HolmesApiUser(HttpUser):
     def tabular_polcurve(self) -> None:
         if not self.auth_enabled:
             return
-        order_id = self._random_order_id()
+        order_id = self._random_filter_value("order_id", self.fallback_order_id)
         self._get(
             f"/api/{self.space}/tabular/polcurve",
-            params={"order_id": order_id, "limit": self._random_limit(), "offset": self._random_offset()},
+            params={"order_id": order_id},
             name="/api/[space]/tabular/polcurve",
         )
 
@@ -204,7 +250,7 @@ class HolmesApiUser(HttpUser):
             ("start", start),
             ("end", end),
             ("time_column", self.ts_time_column),
-            ("order_id", self._random_order_id()),
+            ("order_id", self._random_filter_value("order_id", self.fallback_order_id)),
             ("target_points", self._random_target_points()),
         ]
         params.extend(("columns", col) for col in self.ts_columns)
@@ -230,10 +276,10 @@ class HolmesApiUser(HttpUser):
     def tabular_polcurve_vlite(self) -> None:
         if not self.auth_enabled:
             return
-        order_id = self._random_order_id()
+        order_id = self._random_filter_value("order_id", self.fallback_order_id)
         self._get(
             f"/api/{self.space}/tabular/polcurve_vlite",
-            params={"order_id": order_id, "limit": self._random_limit(), "offset": self._random_offset()},
+            params={"order_id": order_id},
             name="/api/[space]/tabular/polcurve_vlite",
         )
 
@@ -243,7 +289,6 @@ class HolmesApiUser(HttpUser):
             return
         self._get(
             f"/api/{self.space}/tabular/sample",
-            params={"limit": self._random_limit(), "offset": self._random_offset()},
             name="/api/[space]/tabular/sample",
         )
 
@@ -253,7 +298,6 @@ class HolmesApiUser(HttpUser):
             return
         self._get(
             f"/api/{self.space}/tabular/ccm",
-            params={"limit": self._random_limit(), "offset": self._random_offset()},
             name="/api/[space]/tabular/ccm",
         )
 
@@ -261,9 +305,12 @@ class HolmesApiUser(HttpUser):
     def tabular_testrig_activity(self) -> None:
         if not self.auth_enabled:
             return
+        testrig_id = self._random_filter_value("testrig_id")
+        if not testrig_id:
+            return
         self._get(
             f"/api/{self.space}/tabular/testrig_activity",
-            params={"limit": self._random_limit(), "offset": self._random_offset()},
+            params={"testrig_id": testrig_id},
             name="/api/[space]/tabular/testrig_activity",
         )
 
@@ -273,7 +320,6 @@ class HolmesApiUser(HttpUser):
             return
         self._get(
             f"/api/{self.space}/tabular/testrig_statistics",
-            params={"limit": self._random_limit(), "offset": self._random_offset()},
             name="/api/[space]/tabular/testrig_statistics",
         )
 
@@ -281,8 +327,11 @@ class HolmesApiUser(HttpUser):
     def tabular_soh(self) -> None:
         if not self.auth_enabled:
             return
+        sample_name = self._random_filter_value("sample_name")
+        if not sample_name:
+            return
         self._get(
             f"/api/{self.space}/tabular/soh",
-            params={"limit": self._random_limit(), "offset": self._random_offset()},
+            params={"sample_name": sample_name},
             name="/api/[space]/tabular/soh",
         )

@@ -1,8 +1,10 @@
 import hashlib
 import json
+import logging
 import math
 import os
 import re
+import threading
 import time
 from datetime import datetime, timezone
 from typing import Any
@@ -11,6 +13,8 @@ from databricks import sql as databricks_sql
 import redis
 
 from backend.internal.metrics import record_query
+
+logger = logging.getLogger(__name__)
 
 DATABRICKS_SERVER_HOSTNAME = os.environ["DATABRICKS_SERVER_HOSTNAME"]
 DATABRICKS_HTTP_PATH = os.environ["DATABRICKS_HTTP_PATH"]
@@ -25,14 +29,23 @@ REDIS_DB = int(os.getenv("REDIS_DB", "0"))
 _TARGET_POINTS_DEFAULT = 1200
 _TARGET_POINTS_MIN = 100
 _TARGET_POINTS_MAX = 5000
+_TARGET_POINTS_ROUND = 100
 _BUCKET_SECONDS_MIN = 1
 _BUCKET_SECONDS_MAX = 30 * 24 * 60 * 60
 
 _IDENTIFIER_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_CONNECTION_LOCK = threading.Lock()
+_THREAD_CONNECTIONS: dict[int, Any] = {}
+
+
+_redis_pool = redis.ConnectionPool(
+    host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB,
+    decode_responses=True, max_connections=20,
+)
 
 
 def get_redis_client() -> redis.Redis:
-    return redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, decode_responses=True)
+    return redis.Redis(connection_pool=_redis_pool)
 
 
 def configure_redis_cache_policy(max_memory_bytes: int = 2 * 1024 * 1024 * 1024) -> None:
@@ -114,16 +127,85 @@ def fully_qualified_view(space: str, data_kind: str, table_name: str) -> str:
     return f"{DATABRICKS_CATALOG}.{DATABRICKS_SCHEMA}.holmes_{safe_space}_{safe_kind}_{safe_table}_view"
 
 
-def execute_sql_query(query: str) -> list[dict[str, Any]]:
-    with databricks_sql.connect(
+def _connect_databricks() -> Any:
+    return databricks_sql.connect(
         server_hostname=DATABRICKS_SERVER_HOSTNAME,
         http_path=DATABRICKS_HTTP_PATH,
         access_token=DATABRICKS_TOKEN,
-    ) as conn:
-        with conn.cursor() as cursor:
-            cursor.execute(query)
-            columns = [desc[0] for desc in cursor.description]
-            return [dict(zip(columns, row)) for row in cursor.fetchall()]
+    )
+
+
+def _close_connection(connection: Any) -> None:
+    try:
+        connection.close()
+    except Exception:
+        logger.debug("Failed to close Databricks connection cleanly", exc_info=True)
+
+
+def _thread_connection_id() -> int:
+    return threading.get_ident()
+
+
+def _get_or_create_connection() -> Any:
+    thread_id = _thread_connection_id()
+    with _CONNECTION_LOCK:
+        connection = _THREAD_CONNECTIONS.get(thread_id)
+        if connection is None:
+            connection = _connect_databricks()
+            _THREAD_CONNECTIONS[thread_id] = connection
+        return connection
+
+
+def _reset_thread_connection() -> Any:
+    thread_id = _thread_connection_id()
+    with _CONNECTION_LOCK:
+        existing = _THREAD_CONNECTIONS.pop(thread_id, None)
+        if existing is not None:
+            _close_connection(existing)
+        connection = _connect_databricks()
+        _THREAD_CONNECTIONS[thread_id] = connection
+        return connection
+
+
+def close_all_databricks_connections() -> None:
+    with _CONNECTION_LOCK:
+        connections = list(_THREAD_CONNECTIONS.values())
+        _THREAD_CONNECTIONS.clear()
+    for connection in connections:
+        _close_connection(connection)
+
+
+def _should_reconnect(exc: Exception) -> bool:
+    message = str(exc).lower()
+    reconnect_markers = (
+        "closed",
+        "broken pipe",
+        "connection reset",
+        "connection aborted",
+        "socket",
+        "session",
+        "transport",
+        "eof",
+        "timed out",
+    )
+    return any(marker in message for marker in reconnect_markers)
+
+
+def execute_sql_query(query: str) -> list[dict[str, Any]]:
+    connection = _get_or_create_connection()
+    for attempt in range(2):
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(query)
+                columns = [desc[0] for desc in cursor.description]
+                return [dict(zip(columns, row)) for row in cursor.fetchall()]
+        except Exception as exc:
+            if attempt == 0 and _should_reconnect(exc):
+                logger.warning("Databricks connection became unusable, reconnecting once")
+                connection = _reset_thread_connection()
+                continue
+            raise
+    raise RuntimeError("Databricks query execution failed after retry")
 
 
 def build_view_query(
@@ -131,8 +213,6 @@ def build_view_query(
     filters: dict[str, list[str]],
     sort_by: str | None,
     sort_dir: str,
-    limit: int,
-    offset: int,
 ) -> str:
     query = f"SELECT * FROM {view}"
     conditions = _build_filter_conditions(filters)
@@ -141,7 +221,6 @@ def build_view_query(
     if sort_by:
         direction = "DESC" if sort_dir.lower() == "desc" else "ASC"
         query += f" ORDER BY {_validate_identifier(sort_by)} {direction}"
-    query += f" LIMIT {limit} OFFSET {offset}"
     return query
 
 
@@ -152,8 +231,6 @@ def get_query_result(
     filters: dict[str, list[str]] | None = None,
     sort_by: str | None = None,
     sort_dir: str = "asc",
-    limit: int = 100,
-    offset: int = 0,
     ttl: int = 3600,
 ) -> list[dict[str, Any]]:
     filters = filters or {}
@@ -163,16 +240,15 @@ def get_query_result(
         filters={k: sorted(v) for k, v in sorted(filters.items())},
         sort_by=sort_by,
         sort_dir=sort_dir.lower(),
-        limit=limit,
-        offset=offset,
     )
     r = get_redis_client()
     cached = r.get(key)
     if cached:
-        record_query("tabular", space, table, cache_hit=True, duration_s=0, payload_bytes=len(cached), rows=0)
-        return json.loads(cached)
+        data: list[dict[str, Any]] = json.loads(cached)
+        record_query("tabular", space, table, cache_hit=True, duration_s=0, payload_bytes=len(cached), rows=len(data))
+        return data
 
-    query = build_view_query(view=view_name, filters=filters, sort_by=sort_by, sort_dir=sort_dir, limit=limit, offset=offset)
+    query = build_view_query(view=view_name, filters=filters, sort_by=sort_by, sort_dir=sort_dir)
     t0 = time.monotonic()
     data = execute_sql_query(query)
     duration = time.monotonic() - t0
@@ -235,7 +311,11 @@ def get_timeseries_result(
     ttl: int = 3600,
 ) -> dict[str, Any]:
     filters = filters or {}
-    bucket_seconds = compute_bucket_seconds(start_time, end_time, target_points)
+    # Round target_points to the nearest bucket so requests with similar point
+    # counts (e.g. 1150 vs 1200 vs 1250) share the same cache entry.
+    rounded_points = round(target_points / _TARGET_POINTS_ROUND) * _TARGET_POINTS_ROUND
+    rounded_points = max(_TARGET_POINTS_MIN, min(rounded_points, _TARGET_POINTS_MAX))
+    bucket_seconds = compute_bucket_seconds(start_time, end_time, rounded_points)
     key = _cache_key(
         "timeseries",
         view=view_name,
@@ -244,7 +324,7 @@ def get_timeseries_result(
         filters={k: sorted(v) for k, v in sorted(filters.items())},
         start=start_time.isoformat(),
         end=end_time.isoformat(),
-        target_points=target_points,
+        target_points=rounded_points,
         bucket_seconds=bucket_seconds,
     )
     r = get_redis_client()
@@ -269,7 +349,7 @@ def get_timeseries_result(
         "data": data,
         "meta": {
             "bucket_seconds": bucket_seconds,
-            "requested_points": target_points,
+            "requested_points": rounded_points,
             "returned_points": len(data),
         },
     }

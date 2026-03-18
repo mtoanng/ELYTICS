@@ -22,7 +22,7 @@ SPACE_TABULAR_MAP: dict[str, list[TabularConfig]] = {
 
 
 def _parse_filters(request: Request) -> dict[str, list[str]]:
-    excluded = {"limit", "offset", "sort_by", "sort_dir"}
+    excluded = {"sort_by", "sort_dir"}
     parsed: dict[str, list[str]] = defaultdict(list)
     for key, value in request.query_params.multi_items():
         if key not in excluded:
@@ -38,8 +38,6 @@ def _register_tabular_routes(space: str, configs: list[TabularConfig]) -> None:
 def _bind_route(space: str, cfg: TabularConfig) -> None:
     def route_handler(
         request: Request,
-        limit: int = Query(100, ge=1, le=cfg.max_limit),
-        offset: int = Query(0, ge=0),
         sort_by: str | None = Query(None),
         sort_dir: str = Query("asc"),
         token: dict = Depends(require_groups(cfg.auth_groups)),
@@ -59,8 +57,6 @@ def _bind_route(space: str, cfg: TabularConfig) -> None:
             filters=filters,
             sort_by=sort_by,
             sort_dir=sort_dir.lower(),
-            limit=limit,
-            offset=offset,
             ttl=cfg.ttl,
         )
         return {"data": data}
