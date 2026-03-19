@@ -29,6 +29,11 @@
       "pr": 679,
       "title": "feat(sherlock) Fix navigation bar and pages",
       "date": "2026-03-11"
+    },
+    {
+      "pr": 668,
+      "title": "feat(sherlock): Migrate test statistics overview",
+      "date": "2026-03-12"
     }
   ],
   "releases": {}
