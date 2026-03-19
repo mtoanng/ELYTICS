@@ -26,7 +26,7 @@ register_page(
 )
 
 USAGE_BLOCKQUOTE_TEXT = [
-    "Use the filters on the left or double-click a cell to quickly filter by that value.",
+    "Use the filters on the top or double-click a cell to quickly filter by that value.",
     "Double clicking a cell resets all previous filters.",
     "By clicking on the column headers you can sort the data.",
     "Next to the column headers there are filter options for that column.",
