@@ -58,6 +58,7 @@ services:
       no_proxy: backend,redis,localhost,127.0.0.1,host.docker.internal,.bosch.com
       NO_PROXY: backend,redis,localhost,127.0.0.1,host.docker.internal,.bosch.com
       PYTHONPATH: /workspace
+      USE_DASH_DEBUG_SERVER: "true"
     depends_on:
       - backend
       - redis
