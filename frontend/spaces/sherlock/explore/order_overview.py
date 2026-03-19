@@ -17,7 +17,7 @@ from dash.exceptions import PreventUpdate
 from typing import Any
 from dash_iconify import DashIconify
 
-from services.backend_service import get_table_as_df
+from services.backend_service import get_tabular
 
 register_page(
     __name__,
@@ -287,7 +287,7 @@ layout = order_overview_layout
     Input("order-order-table", "id"),
 )
 def load_order_data(_):
-    df = get_table_as_df('sherlock', "order_overview")
+    df = get_tabular('sherlock', "order")
     if df.empty:
         return []
     # Round all _max columns and maxh2out to 2 decimals

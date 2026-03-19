@@ -6,7 +6,7 @@ import dash_ag_grid as dag
 import pandas as pd
 import plotly.express as px
 
-from services.backend_service import get_table_as_df
+from services.backend_service import get_tabular
 
 register_page(
     __name__,
@@ -166,17 +166,37 @@ def ccm_overview_layout():
     Output("testrig-location-filter", "value"),
     Output("ccm-filter", "value"),
     Input("ccm-runtime-plot", "id"),  # Dummy input to trigger on page load
+    prevent_initial_call=False,
 )
 def load_ccm_data(_):
-    df = get_table_as_df("sherlock", "ccm_overview")
+    df = get_tabular("sherlock", "ccm")
     if df.empty:
         return [], [], [], [], [], []
+
     for col in ["start_time", "end_time"]:
-        # Convert only if value is not null and is numeric
-        df[col] = pd.to_numeric(df[col], errors="coerce")
-        df[col] = pd.to_datetime(df[col], errors="coerce", unit="ms")
-    df = df[df["sample_id"].notna() & (df["sample_id"] != "null")]
-    df["ccm_name"] = df["ccm_name"].fillna("Unknown")
+        if col not in df.columns:
+            continue
+        # Support both epoch milliseconds and ISO timestamp strings.
+        numeric_ts = pd.to_numeric(df[col], errors="coerce")
+        parsed_epoch = pd.to_datetime(numeric_ts, errors="coerce", unit="ms", utc=True)
+        parsed_string = pd.to_datetime(df[col], errors="coerce", utc=True)
+        df[col] = parsed_string.where(parsed_string.notna(), parsed_epoch)
+
+    if "sample_id" in df.columns:
+        # Only drop missing sample IDs when there are valid IDs to keep.
+        valid_sample_mask = df["sample_id"].notna() & (df["sample_id"].astype(str).str.lower() != "null")
+        if valid_sample_mask.any():
+            df = df[valid_sample_mask]
+
+    if "ccm_name" in df.columns:
+        df["ccm_name"] = df["ccm_name"].fillna("Unknown")
+
+    if "testrig_label" not in df.columns:
+        df["testrig_label"] = "Unknown"
+
+    if "ccm_name" not in df.columns:
+        df["ccm_name"] = "Unknown"
+
     testrig_options = [
         {"label": x, "value": x}
         for x in sorted(df["testrig_label"].dropna().unique())
@@ -218,8 +238,13 @@ def update_ccm_plot(ccm_filter, testrig_location_filter, days_selected, theme_st
 
     # Time filter
     days = days_selected if days_selected and days_selected > 0 else 30
-    cutoff = dff["end_time"].max() - pd.Timedelta(days=days)
-    dff = dff[dff["end_time"] >= cutoff]
+    if "end_time" in dff.columns:
+        cutoff = pd.Timestamp.now(tz="UTC") - pd.Timedelta(days=days)
+        effective_end_time = dff["end_time"].fillna(pd.Timestamp.now(tz="UTC"))
+        dff = dff[effective_end_time >= cutoff]
+
+    if dff.empty:
+        return px.scatter(title=f"CCM Test Timelines (Last {days} Days)"), []
 
     # CCM filter
     if ccm_filter:
