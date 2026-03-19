@@ -8,6 +8,9 @@
     "frontend",
     "redis"
   ],
+  "containerUser": "root",
+  "remoteUser": "root",
+  "updateRemoteUserUID": false,
   "workspaceFolder": "/workspace",
   "forwardPorts": [
     8000,

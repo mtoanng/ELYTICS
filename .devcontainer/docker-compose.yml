@@ -4,6 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile
     working_dir: /workspace
+    user: root
     volumes:
       - ..:/workspace:cached
     environment:
