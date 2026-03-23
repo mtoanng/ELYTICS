@@ -265,11 +265,6 @@ try {
         }
     }
     
-    # Add REQUESTS_CA_BUNDLE to both .env files
-    $caBundlePath = "/workspace/root_ca.pem"
-    Add-Content $frontendEnvFile "REQUESTS_CA_BUNDLE=$caBundlePath"
-    Add-Content $backendEnvFile "REQUESTS_CA_BUNDLE=$caBundlePath"
-    
     Write-Host "Secrets exported successfully!"
     Write-Host "  - Frontend: $frontendEnvFile"
     Write-Host "  - Backend: $backendEnvFile"

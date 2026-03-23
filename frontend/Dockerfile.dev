@@ -1,0 +1,23 @@
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Add custom root CA certificate for local development
+COPY root_ca.pem /usr/local/share/ca-certificates/root_ca.crt
+RUN update-ca-certificates
+
+COPY frontend/requirements.txt ./requirements.txt
+RUN pip install --upgrade pip && pip install -r requirements.txt
+
+COPY frontend .
+
+EXPOSE 8501
+
+CMD ["python", "app.py"]
