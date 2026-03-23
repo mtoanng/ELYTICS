@@ -69,27 +69,102 @@ def polarization_curves_layout():
                         p="md",
                         radius="md",
                         children=[
-                            dmc.Group(
+                            dmc.Stack(
                                 gap="md",
-                                align="flex-end",
-                                style={"flexWrap": "nowrap", "overflowX": "auto"},
                                 children=[
-                                    dmc.InputWrapper(
-                                        dcc.Dropdown(
-                                            id="polcurve-order-id-filter",
-                                            options=[],
-                                            value=[],
-                                            multi=True,
-                                            searchable=True,
-                                            clearable=True,
-                                            placeholder="Select order IDs",
-                                            style={"width": "100%"},
-                                        ),
-                                        label="Order ID",
-                                        htmlFor="polcurve-order-id-filter",
-                                        className="dmc",
-                                        styles={"label": {"marginBottom": "6px"}},
-                                        style={"flex": "0 0 220px", "minWidth": "220px"},
+                                    dmc.Group(
+                                        gap="md",
+                                        align="flex-start",
+                                        style={"flexWrap": "wrap"},
+                                        children=[
+                                            dmc.InputWrapper(
+                                                dcc.Dropdown(
+                                                    id="polcurve-order-id-filter",
+                                                    options=[],
+                                                    value=[],
+                                                    multi=True,
+                                                    searchable=True,
+                                                    clearable=True,
+                                                    placeholder="Select order IDs",
+                                                    style={"width": "100%"},
+                                                ),
+                                                label="Order ID",
+                                                htmlFor="polcurve-order-id-filter",
+                                                className="dmc",
+                                                styles={"label": {"marginBottom": "6px"}},
+                                                style={"flex": "0 0 220px", "minWidth": "220px"},
+                                            ),
+                                            dmc.InputWrapper(
+                                                dcc.Dropdown(
+                                                    id="polcurve-sample-id-filter",
+                                                    options=[],
+                                                    value=[],
+                                                    multi=True,
+                                                    searchable=True,
+                                                    clearable=True,
+                                                    placeholder="Select order IDs",
+                                                    style={"width": "100%"},
+                                                ),
+                                                label="Sample Name",
+                                                htmlFor="polcurve-sample-id-filter",
+                                                className="dmc",
+                                                styles={"label": {"marginBottom": "6px"}},
+                                                style={"flex": "0 0 220px", "minWidth": "220px"},
+                                            ),
+                                            dmc.Button(
+                                                [
+                                                    html.I(
+                                                        className="bi bi-download",
+                                                        style={
+                                                            "marginRight": "10px",
+                                                            "fontSize": "1.1em",
+                                                        },
+                                                    ),
+                                                    "Download CSV",
+                                                ],
+                                                id="sample-download-btn",
+                                                n_clicks=0,
+                                                className="download-btn",
+                                                style={"flex": "0 0 auto", "whiteSpace": "nowrap"},
+                                            ),
+                                        ],
+                                    ),
+                                    dmc.Group(
+                                        gap="md",
+                                        align="flex-end",
+                                        style={"flexWrap": "nowrap", "overflowX": "auto"},
+                                        children=[ 
+                                            dmc.InputWrapper(
+                                                # No 'label' prop here anymore
+                                                style={"flex": "1", "minWidth": "300px"}, # Give it more space
+                                                mb="xl",
+                                                children=[
+                                                    dmc.Group(
+                                                        align="center",
+                                                        gap="sm",
+                                                        preventGrowOverflow=False, # Important for the slider to grow
+                                                        children=[
+                                                            # 1. The Label as a dmc.Text component
+                                                            dmc.Text("Temperature (°C):", size="sm", style={"width": "120px"}),
+
+                                                            # 2. The RangeSlider, taking up the remaining space
+                                                            dmc.RangeSlider(
+                                                                id="polcurve-temperature-filter",
+                                                                min=0,
+                                                                max=100,
+                                                                value=[20, 80],
+                                                                marks=[
+                                                                    {"value": 0, "label": "0°"},
+                                                                    {"value": 50, "label": "50°"},
+                                                                    {"value": 100, "label": "100°"},
+                                                                ],
+                                                                style={"width": "200px"},
+                                                            ),
+                                                        ],
+                                                    )
+                                                ],
+                                            ),
+                                        ],
                                     ),
                                 ],
                             ),
