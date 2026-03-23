@@ -1,0 +1,84 @@
+services:
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    working_dir: /workspace
+    user: root
+    volumes:
+      - ..:/workspace:cached
+    environment:
+      PYTHONPATH: /workspace
+    command: ["sleep", "infinity"]
+    depends_on:
+      - backend
+      - frontend
+      - redis
+    networks:
+      - holmes
+    cpus: 2
+    mem_limit: 4g
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    working_dir: /workspace/backend
+    volumes:
+      - ..:/workspace:cached
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_DB: "0"
+      ENVIRONMENT: development
+      no_proxy: backend,redis,localhost,127.0.0.1,host.docker.internal,.bosch.com
+      NO_PROXY: backend,redis,localhost,127.0.0.1,host.docker.internal,.bosch.com
+      PYTHONPATH: /workspace
+    depends_on:
+      - redis
+    ports:
+      - "8000:8000"
+    networks:
+      - holmes
+    cpus: 0.50
+    mem_limit: 2g
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    working_dir: /workspace/frontend
+    volumes:
+      - ..:/workspace:cached
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_DB: "0"
+      BACKEND_API_URL: http://backend:8000
+      no_proxy: backend,redis,localhost,127.0.0.1,host.docker.internal,.bosch.com
+      NO_PROXY: backend,redis,localhost,127.0.0.1,host.docker.internal,.bosch.com
+      PYTHONPATH: /workspace
+      USE_DASH_DEBUG_SERVER: "true"
+    depends_on:
+      - backend
+      - redis
+    ports:
+      - "8501:8501"
+    networks:
+      - holmes
+    cpus: 0.30
+    mem_limit: 1200m
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "700mb", "--maxmemory-policy", "allkeys-lru"]
+    ports:
+      - "6379:6379"
+    networks:
+      - holmes
+    cpus: 0.20
+    mem_limit: 800m
+
+networks:
+  holmes:
+    driver: bridge

@@ -68,7 +68,7 @@ Once Docker is installed and running, you need to add these proxies to the docke
 	- In separate terminals inside the dev container, run the following:
 	```sh
 	cd backend
-	python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
+	python -m uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 	```
 
 	```sh

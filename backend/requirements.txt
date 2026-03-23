@@ -1,11 +1,15 @@
 uvicorn
+gunicorn
 fastapi
-apscheduler
 pyjwt
-cachetools
 python-dotenv
 redis
 pandas
 databricks
 databricks-sql-connector
 cryptography
+prometheus-fastapi-instrumentator
+prometheus_client
+azure-storage-blob
+pyarrow
+httpx

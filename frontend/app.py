@@ -21,8 +21,12 @@ app = dash.Dash(
     update_title=None
 )
 
+redis_host = os.getenv("REDIS_HOST", "localhost")
+redis_port = int(os.getenv("REDIS_PORT", "6379"))
+redis_db = int(os.getenv("REDIS_DB", "0"))
+
 app.server.config["SESSION_TYPE"] = "redis"
-app.server.config["SESSION_REDIS"] = redis.StrictRedis()
+app.server.config["SESSION_REDIS"] = redis.StrictRedis(host=redis_host, port=redis_port, db=redis_db)
 app.server.config["SESSION_PERMANENT"] = False
 app.server.config["PREFERRED_URL_SCHEME"] = "https"
 Session(app.server)
