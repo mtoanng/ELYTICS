@@ -259,7 +259,7 @@ def sync_usage_blockquote(is_open):
     prevent_initial_call=False,
 )
 def init_teststat_data(_):
-    df = get_table_as_df("sherlock", "test_statistics")
+    df = get_table_as_df("sherlock", "testrig_statistics")
     df["number_of_cells"] = (
         df["number_of_cells"]
         .fillna("Unknown")
