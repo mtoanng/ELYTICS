@@ -9,16 +9,21 @@ WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
+# Add custom root CA certificate for local development
+COPY root_ca.pem /usr/local/share/ca-certificates/root_ca.crt
+RUN update-ca-certificates
+
 # Copy requirements if exists, else fallback to install in one step
-COPY requirements.txt .
+COPY backend/requirements.txt ./requirements.txt
 RUN pip install --upgrade pip && \
     if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
 # Copy application code
-COPY . .
+COPY backend ./backend
 
 # Expose FastAPI port
 EXPOSE 8000

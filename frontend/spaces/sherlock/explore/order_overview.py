@@ -17,7 +17,7 @@ from dash.exceptions import PreventUpdate
 from typing import Any
 from dash_iconify import DashIconify
 
-from services.backend_service import get_table_as_df
+from services.backend_service import get_tabular
 
 register_page(
     __name__,
@@ -26,7 +26,7 @@ register_page(
 )
 
 USAGE_BLOCKQUOTE_TEXT = [
-    "Use the filters on the left or double-click a cell to quickly filter by that value.",
+    "Use the filters on the top or double-click a cell to quickly filter by that value.",
     "Double clicking a cell resets all previous filters.",
     "By clicking on the column headers you can sort the data.",
     "Next to the column headers there are filter options for that column.",
@@ -287,7 +287,7 @@ layout = order_overview_layout
     Input("order-order-table", "id"),
 )
 def load_order_data(_):
-    df = get_table_as_df('sherlock', "order_overview")
+    df = get_tabular('sherlock', "order")
     if df.empty:
         return []
     # Round all _max columns and maxh2out to 2 decimals

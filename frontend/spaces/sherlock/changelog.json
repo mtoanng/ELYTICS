@@ -34,6 +34,11 @@
       "pr": 668,
       "title": "feat(sherlock): Migrate test statistics overview",
       "date": "2026-03-12"
+    },
+    {
+      "pr": 712,
+      "title": "feat(core): Backend refactor for big data support",
+      "date": "2026-03-23"
     }
   ],
   "releases": {}

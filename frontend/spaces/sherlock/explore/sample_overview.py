@@ -16,7 +16,7 @@ import pandas as pd
 from dash.exceptions import PreventUpdate
 from dash_iconify import DashIconify
 
-from services.backend_service import get_table_as_df
+from services.backend_service import get_tabular
 
 register_page(
     __name__, 
@@ -237,7 +237,7 @@ layout = sample_overview_layout
     Input("sample-sample-table", "id"),
 )
 def load_sample_data(_):
-    df = get_table_as_df("sherlock", "sample_overview")
+    df = get_tabular("sherlock", "sample")
     if df.empty:
         return []
     # Round active_area_per_cell column values to 3 decimals

@@ -9,6 +9,11 @@
       "pr": 655,
       "title": "feat(core): Updated logic of changelog usage within landing pages and sidebar",
       "date": "2026-03-05"
+    },
+    {
+      "pr": 712,
+      "title": "feat(core): Backend refactor for big data support",
+      "date": "2026-03-23"
     }
   ],
   "releases": {}
