@@ -44,6 +44,11 @@
       "pr": 722,
       "title": "feat(sherlock): Migrated test rig activity page",
       "date": "2026-03-24"
+    },
+    {
+      "pr": 725,
+      "title": "feat(sherlock): Migrated timeseries overview page",
+      "date": "2026-03-24"
     }
   ],
   "releases": {}
