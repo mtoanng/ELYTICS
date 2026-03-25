@@ -254,11 +254,13 @@ def load_polcurve_metadata(_):
     Output("polcurve-sample-name-filter", "options"),
     Output("polcurve-testrig-id-filter", "options"),
     Input("polcurve-metadata-store", "data"),
+    Input("polcurve-order-id-filter", "value"),
 )
-def populate_filter_options(meta):
+def populate_cascading_filter_options(meta, order_id):
     if not meta:
         return [], [], []
     df = pd.DataFrame(meta)
+    # Order ID options (always all)
     order_id_options = (
         [
             {"label": str(oid), "value": oid}
@@ -267,20 +269,24 @@ def populate_filter_options(meta):
         if "order_id" in df
         else []
     )
+    # Filter sample names and testrig ids by selected order_id(s)
+    dff = df.copy()
+    if order_id:
+        dff = dff[dff["order_id"].isin(order_id)]
     sample_name_options = (
         [
             {"label": str(s), "value": s}
-            for s in sorted(df["sample_name"].dropna().unique())
+            for s in sorted(dff["sample_name"].dropna().unique())
         ]
-        if "sample_name" in df
+        if "sample_name" in dff
         else []
     )
     testrig_id_options = (
         [
             {"label": str(t), "value": t}
-            for t in sorted(df["testrig_id"].dropna().unique())
+            for t in sorted(dff["testrig_id"].dropna().unique())
         ]
-        if "testrig_id" in df
+        if "testrig_id" in dff
         else []
     )
     return (
