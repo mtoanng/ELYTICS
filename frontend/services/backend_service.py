@@ -143,7 +143,7 @@ def get_table_as_df(space: str, route_name: str, data_kind: str = "data") -> pd.
 def get_table_stats():
     """Fetch system table statistics from the backend."""
     headers = get_api_headers()
-    url = f"{API_BASE}/system/table-stats"
+    url = f"{API_BASE}/api/system/table-stats"
     response = requests.get(url, headers=headers)
     response.raise_for_status()
     return response.json()

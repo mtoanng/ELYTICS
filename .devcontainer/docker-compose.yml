@@ -59,6 +59,8 @@ services:
       NO_PROXY: backend,redis,localhost,127.0.0.1,host.docker.internal,.bosch.com
       PYTHONPATH: /workspace
       USE_DASH_DEBUG_SERVER: "true"
+      REQUESTS_CA_BUNDLE: /etc/ssl/certs/ca-certificates.crt
+      SSL_CERT_FILE: /etc/ssl/certs/ca-certificates.crt
     depends_on:
       - backend
       - redis
