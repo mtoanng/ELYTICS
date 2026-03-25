@@ -21,8 +21,12 @@ app = dash.Dash(
     update_title=None
 )
 
+redis_host = os.getenv("REDIS_HOST", "localhost")
+redis_port = int(os.getenv("REDIS_PORT", "6379"))
+redis_db = int(os.getenv("REDIS_DB", "0"))
+
 app.server.config["SESSION_TYPE"] = "redis"
-app.server.config["SESSION_REDIS"] = redis.StrictRedis()
+app.server.config["SESSION_REDIS"] = redis.StrictRedis(host=redis_host, port=redis_port, db=redis_db)
 app.server.config["SESSION_PERMANENT"] = False
 app.server.config["PREFERRED_URL_SCHEME"] = "https"
 Session(app.server)
@@ -40,8 +44,8 @@ auth.register_provider(
 app.layout = create_appshell()
 
 if __name__ == "__main__":
-    debug_mode = os.getenv("ENVIRONMENT", "development") == "development"
-    if debug_mode:
+    use_dash_debug_server = os.getenv("USE_DASH_DEBUG_SERVER", "false").lower() == "true"
+    if use_dash_debug_server:
         app.run(debug=True, host="0.0.0.0", port=8501, use_reloader=True)
     else:
         serve(app.server, host="0.0.0.0", port=8501, 

@@ -1,5 +1,7 @@
 import dash_mantine_components as dmc
-from services.changelog_service import get_latest_released_version
+from pathlib import Path
+import json
+from typing import Any
 
 SIDEBAR_STRUCTURE = {
     "mycroft": {
@@ -10,8 +12,9 @@ SIDEBAR_STRUCTURE = {
         "Management": {
             "path": "management",
             "pages": [
-                {"path": "test-statistics", "label": "Test Statistics"},
+                {"path": "test-rig-statistics", "label": "Test Rig Statistics"},
                 {"path": "test-rig-activity", "label": "Test Rig Activity"},
+                {"path": "track-record", "label": "Track Record", "preview": True},
             ],
         },
         "Data Exploration": {
@@ -27,15 +30,13 @@ SIDEBAR_STRUCTURE = {
         "Data Analysis": {
             "path": "data-analysis",
             "pages": [
-                {"path": "summary-stats", "label": "Summary Stats"},
-                {"path": "charts", "label": "Charts"},
+                {"path": "vlite", "label": "Polarization Curves - V-lite", "preview": True},
             ],
         },
         "AI/ML": {
             "path": "ai-ml",
             "pages": [
-                {"path": "model-overview", "label": "Model Overview"},
-                {"path": "predictions", "label": "Predictions"},
+                {"path": "soh", "label": "State of Health", "preview": True},
             ],
         },
     },
@@ -52,6 +53,47 @@ def get_space_from_path(pathname: str | None) -> str | None:
         return None
     parts = [p for p in pathname.split("/") if p]
     return parts[0] if parts else None
+
+# definition to include a "preview" badge next to nav links that are marked as preview ("preview":True ) in the structure
+def nav_label(page: dict):
+    children: list[Any] = [dmc.Text(page["label"], size="sm")]
+    if page.get("preview", False):
+        children.append(
+            dmc.Tooltip(
+                multiline=True,
+                w=220,
+                label="This page is currently a proof of "
+                "concept, data should still be validated.",
+                position="right",
+                children=[
+                    dmc.Badge(
+                        "Preview",
+                        size="xs",
+                        radius="xl",
+                        variant="filled",
+                        color="blue",
+                        styles={
+                            "root": {
+                                "fontSize": "10px",
+                                "padding": "2px 6px",
+                                "fontWeight": 600,
+                                "textTransform": "none",
+                                "cursor": "inherit",
+                                "pointerEvents": "none",
+                            }
+                        },
+                    )
+                ],
+            )
+        )
+
+    return dmc.Group(
+        children=children,
+        gap=6,
+        wrap="nowrap",
+        justify="space-between",
+        style={"width": "100%"},
+    )
 
 def create_content(space: str, groups: dict, latest_version: str):
     body = []
@@ -75,7 +117,7 @@ def create_content(space: str, groups: dict, latest_version: str):
         for page in groups[None][1:]:
             body.append(
                 dmc.NavLink(
-                    label=page["label"],
+                    label=nav_label(page),
                     href=f"/{space}/{page['path']}",
                     active="exact",
                     className="navbar-link",
@@ -95,11 +137,7 @@ def create_content(space: str, groups: dict, latest_version: str):
 
         body.append(
             dmc.Divider(
-                label=dmc.Anchor(
-                    dmc.Text(group, size="sm", fw=700),
-                    href=f"/{space}/{group_path}",
-                    underline=False,
-                ),
+                label=dmc.Text(group, size="sm", fw=700),
                 labelPosition="left",
                 mt=24,
                 mb=8,
@@ -109,7 +147,7 @@ def create_content(space: str, groups: dict, latest_version: str):
         for page in pages:
             body.append(
                 dmc.NavLink(
-                    label=page["label"],
+                    label=nav_label(page),
                     href=f"/{space}/{group_path}/{page['path']}",
                     active="exact",
                     className="navbar-link",
@@ -122,7 +160,7 @@ def create_content(space: str, groups: dict, latest_version: str):
         gap=0,
         children=[
             dmc.ScrollArea(
-                offsetScrollbars=True,
+                offsetScrollbars=False,
                 type="scroll",
                 style={"height": "100%", "flex": 1},
                 children=dmc.Stack(
@@ -136,7 +174,8 @@ def create_content(space: str, groups: dict, latest_version: str):
             dmc.Divider(m=0),
             dmc.NavLink(
                 label="Submit Feedback",
-                href="#",
+                href="https://apps-p-p3-outsystems.de.bosch.com/pemely/Main?inp_Screen=Feedback&inp_Id=0",
+                target="_blank",
                 active=False,
                 className="navbar-link",
                 h=50,
@@ -147,9 +186,28 @@ def create_content(space: str, groups: dict, latest_version: str):
         style={"height": "100%"},
     )
 
+def get_latest_version_from_changelog(changelog_path: Path) -> str:
+    """Read the latest released version from a JSON changelog file."""
+    try:
+        if changelog_path.exists():
+            with changelog_path.open(encoding="utf-8") as f:
+                changelog = json.load(f)
+            releases = changelog.get("releases", {})
+            if releases:
+                # Get the first key (latest version)
+                return next(iter(releases.keys()))
+    except (json.JSONDecodeError, OSError):
+        pass
+    return "0.0.0"
+
 def sidebar_layout(pathname: str | None = None):
-    latest_version = get_latest_released_version() or "Unknown"
     space = get_space_from_path(pathname)
+    
+    # Get the changelog path for the space
+    latest_version = "0.0.0"
+    if space:
+        changelog_path = Path(__file__).resolve().parents[1] / "spaces" / space / "changelog.json"
+        latest_version = get_latest_version_from_changelog(changelog_path)
 
     if space and space in SIDEBAR_STRUCTURE:
         groups = SIDEBAR_STRUCTURE[space]

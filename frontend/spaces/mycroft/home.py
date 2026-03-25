@@ -1,8 +1,37 @@
-from dash import html, register_page
+from dash import register_page
+import dash_mantine_components as dmc
+from components.changelog import build_update_cards, load_changelog_json
+from pathlib import Path
 
 register_page(__name__, path="/mycroft/home", title="HOLMES - Mycroft")
 
 def mycroft_layout():
-    return html.Div(f"welcome to mycroft home, latest data:")
+    changelog_path = Path(__file__).resolve().parent / "changelog.json"
+    changelog = load_changelog_json(changelog_path)
+    
+    return dmc.Container(
+        size="md",
+        children=[
+            dmc.Title("Welcome to Mycroft Home", order=1, mt="lg"),
+            dmc.Text(
+                "Mycroft provides comprehensive data visualization and reporting tools "
+                "for business intelligence and insights.",
+                size="md",
+                c="dimmed",
+            ),
+            dmc.Stack(
+                [
+                    dmc.Title("Latest Updates & Features", order=2),
+                    dmc.Stack(
+                        build_update_cards(changelog, "Mycroft", "grape"),
+                        gap="md",
+                    ),
+                ],
+                gap="lg",
+                mt="xl",
+            ),
+        ],
+        py="xl",
+    )
 
 layout = mycroft_layout
