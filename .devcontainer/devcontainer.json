@@ -57,5 +57,6 @@
       }
     }
   },
-  "shutdownAction": "stopCompose"
+  "shutdownAction": "stopCompose",
+  "postCreateCommand": "pip install -r /workspace/backend/requirements.txt -r /workspace/frontend/requirements.txt"
 }
