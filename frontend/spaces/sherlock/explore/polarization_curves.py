@@ -115,27 +115,6 @@ layout = dmc.Container(
                                     styles={"label": {"marginBottom": "6px"}},
                                     style={"flex": 1, "minWidth": "180px"},
                                 ),
-                                dmc.Button(
-                                    [
-                                        html.I(
-                                            className="bi bi-download",
-                                            style={
-                                                "marginRight": "10px",
-                                                "fontSize": "1.1em",
-                                            },
-                                        ),
-                                        "Download CSV",
-                                    ],
-                                    id="polcurve-download-btn",
-                                    n_clicks=0,
-                                    className="download-btn",
-                                    style={
-                                        "flex": "0 0 auto",
-                                        "whiteSpace": "nowrap",
-                                        "alignSelf": "flex-end",
-                                    },
-                                ),
-                                dcc.Download(id="polcurve-download-csv"),
                             ],
                         ),
                         dmc.Group(
@@ -171,11 +150,17 @@ layout = dmc.Container(
                                     style={"flex": 1, "minWidth": "180px"},
                                 ),
                                 dmc.InputWrapper(
-                                    dcc.Dropdown(
+                                    dmc.SegmentedControl(
                                         id="polcurve-is-rising-filter",
-                                        multi=True,
-                                        placeholder="Rising / Falling",
-                                        style={"width": "100%"},
+                                        data=[
+                                            {"label": "Both", "value": "both"},
+                                            {"label": "Rising", "value": "rising"},
+                                            {"label": "Falling", "value": "falling"},
+                                        ],
+                                        value="both",
+                                        size="sm",
+                                        radius="md",
+                                        style={"width": "100%", "minWidth": "220px"},
                                     ),
                                     label="is_rising",
                                     htmlFor="polcurve-is-rising-filter",
@@ -183,6 +168,27 @@ layout = dmc.Container(
                                     styles={"label": {"marginBottom": "6px"}},
                                     style={"flex": 1, "minWidth": "180px"},
                                 ),
+                                dmc.Button(
+                                    [
+                                        html.I(
+                                            className="bi bi-download",
+                                            style={
+                                                "marginRight": "10px",
+                                                "fontSize": "1.1em",
+                                            },
+                                        ),
+                                        "Download CSV",
+                                    ],
+                                    id="polcurve-download-btn",
+                                    n_clicks=0,
+                                    className="download-btn",
+                                    style={
+                                        "flex": "0 0 auto",
+                                        "whiteSpace": "nowrap",
+                                        "alignSelf": "flex-end",
+                                    },
+                                ),
+                                dcc.Download(id="polcurve-download-csv"),
                             ],
                         ),
                         dmc.Space(h="sm"),
@@ -379,12 +385,11 @@ def fetch_polcurve_data(order_id, sample_name, testrig_id):
 @callback(
     Output("polcurve-temp-set-filter", "options"),
     Output("polcurve-pressure-set-filter", "options"),
-    Output("polcurve-is-rising-filter", "options"),
     Input("polcurve-data-store", "data"),
 )
 def populate_data_driven_filter_options(data):
     if not data:
-        return [], [], []
+        return [], []
     df = pd.DataFrame(data)
     tSp_options = (
         [
@@ -402,15 +407,7 @@ def populate_data_driven_filter_options(data):
         if "pCtSp" in df.columns
         else []
     )
-    is_rising_options = (
-        [
-            {"label": "Rising" if r else "Falling", "value": r}
-            for r in sorted(df["is_rising"].dropna().unique(), reverse=True)
-        ]
-        if "is_rising" in df.columns
-        else []
-    )
-    return tSp_options, pCtSp_options, is_rising_options
+    return tSp_options, pCtSp_options
 
 
 # ========== TABLE RENDERING ==========
@@ -432,8 +429,11 @@ def render_polcurve_table(data, tSp, pCtSp, is_rising):
         df = df[df["tSp"].isin(tSp)]
     if pCtSp:
         df = df[df["pCtSp"].isin(pCtSp)]
-    if is_rising is not None and is_rising:
-        df = df[df["is_rising"].isin(is_rising)]
+    if "is_rising" in df.columns:
+        if is_rising == "rising":
+            df = df[df["is_rising"] == True]
+        elif is_rising == "falling":
+            df = df[df["is_rising"] == False]
     columns = df.columns.tolist()
     columnDefs = []
     for col in columns:
@@ -486,8 +486,11 @@ def update_polcurve_plot(data, theme, tSp, pCtSp, is_rising):
         df = df[df["tSp"].isin(tSp)]
     if pCtSp:
         df = df[df["pCtSp"].isin(pCtSp)]
-    if is_rising is not None and is_rising:
-        df = df[df["is_rising"].isin(is_rising)]
+    if "is_rising" in df.columns:
+        if is_rising == "rising":
+            df = df[df["is_rising"] == True]
+        elif is_rising == "falling":
+            df = df[df["is_rising"] == False]
     # Plot uCell vs jStck for each event_id if present
     if "uCell" in df and "jStck" in df:
         color_col = "event_id" if "event_id" in df else None
