@@ -138,6 +138,53 @@ layout = dmc.Container(
                                 dcc.Download(id="polcurve-download-csv"),
                             ],
                         ),
+                        dmc.Group(
+                            gap="md",
+                            align="flex-end",
+                            mt="xs",
+                            style={"flexWrap": "nowrap", "overflowX": "auto"},
+                            children=[
+                                dmc.InputWrapper(
+                                    dcc.Dropdown(
+                                        id="polcurve-temp-set-filter",
+                                        multi=True,
+                                        placeholder="Temperature Setpoint",
+                                        style={"width": "100%"},
+                                    ),
+                                    label="Temperature Setpoint",
+                                    htmlFor="polcurve-temp-set-filter",
+                                    className="dmc",
+                                    styles={"label": {"marginBottom": "6px"}},
+                                    style={"flex": 1, "minWidth": "180px"},
+                                ),
+                                dmc.InputWrapper(
+                                    dcc.Dropdown(
+                                        id="polcurve-pressure-set-filter",
+                                        multi=True,
+                                        placeholder="Pressure Setpoint",
+                                        style={"width": "100%"},
+                                    ),
+                                    label="Pressure Setpoint",
+                                    htmlFor="polcurve-pressure-set-filter",
+                                    className="dmc",
+                                    styles={"label": {"marginBottom": "6px"}},
+                                    style={"flex": 1, "minWidth": "180px"},
+                                ),
+                                dmc.InputWrapper(
+                                    dcc.Dropdown(
+                                        id="polcurve-is-rising-filter",
+                                        multi=True,
+                                        placeholder="Rising / Falling",
+                                        style={"width": "100%"},
+                                    ),
+                                    label="is_rising",
+                                    htmlFor="polcurve-is-rising-filter",
+                                    className="dmc",
+                                    styles={"label": {"marginBottom": "6px"}},
+                                    style={"flex": 1, "minWidth": "180px"},
+                                ),
+                            ],
+                        ),
                         dmc.Space(h="sm"),
                         dmc.Text(
                             id="polcurve-empty-message",
@@ -326,17 +373,68 @@ def fetch_polcurve_data(order_id, sample_name, testrig_id):
 # ========== TABLE RENDERING ==========
 
 
+# ========== DATA-DRIVEN FILTER OPTIONS (tSp, is_rising) ==========
+
+
+@callback(
+    Output("polcurve-temp-set-filter", "options"),
+    Output("polcurve-pressure-set-filter", "options"),
+    Output("polcurve-is-rising-filter", "options"),
+    Input("polcurve-data-store", "data"),
+)
+def populate_data_driven_filter_options(data):
+    if not data:
+        return [], [], []
+    df = pd.DataFrame(data)
+    tSp_options = (
+        [
+            {"label": str(int(t)) if float(t).is_integer() else str(t), "value": t}
+            for t in sorted(df["tSp"].dropna().unique())
+        ]
+        if "tSp" in df.columns
+        else []
+    )
+    pCtSp_options = (
+        [
+            {"label": str(int(p)) if float(p).is_integer() else str(p), "value": p}
+            for p in sorted(df["pCtSp"].dropna().unique())
+        ]
+        if "pCtSp" in df.columns
+        else []
+    )
+    is_rising_options = (
+        [
+            {"label": "Rising" if r else "Falling", "value": r}
+            for r in sorted(df["is_rising"].dropna().unique(), reverse=True)
+        ]
+        if "is_rising" in df.columns
+        else []
+    )
+    return tSp_options, pCtSp_options, is_rising_options
+
+
+# ========== TABLE RENDERING ==========
+
+
 @callback(
     Output("polcurve-table", "columnDefs"),
     Output("polcurve-table", "rowData"),
     Input("polcurve-data-store", "data"),
+    Input("polcurve-temp-set-filter", "value"),
+    Input("polcurve-pressure-set-filter", "value"),
+    Input("polcurve-is-rising-filter", "value"),
 )
-def render_polcurve_table(data):
+def render_polcurve_table(data, tSp, pCtSp, is_rising):
     if not data:
         return [], []
     df = pd.DataFrame(data)
+    if tSp:
+        df = df[df["tSp"].isin(tSp)]
+    if pCtSp:
+        df = df[df["pCtSp"].isin(pCtSp)]
+    if is_rising is not None and is_rising:
+        df = df[df["is_rising"].isin(is_rising)]
     columns = df.columns.tolist()
-    # Simple columnDefs: show all columns as text, numeric if possible
     columnDefs = []
     for col in columns:
         col_type = "numeric" if pd.api.types.is_numeric_dtype(df[col]) else "text"
@@ -374,13 +472,22 @@ def sync_theme_store(theme):
     Output("polcurve-view-label", "children"),
     Input("polcurve-data-store", "data"),
     Input("polcurve-theme-store", "data"),
+    Input("polcurve-temp-set-filter", "value"),
+    Input("polcurve-pressure-set-filter", "value"),
+    Input("polcurve-is-rising-filter", "value"),
 )
-def update_polcurve_plot(data, theme):
+def update_polcurve_plot(data, theme, tSp, pCtSp, is_rising):
     import plotly.express as px
 
     if not data:
         return {}, ""
     df = pd.DataFrame(data)
+    if tSp:
+        df = df[df["tSp"].isin(tSp)]
+    if pCtSp:
+        df = df[df["pCtSp"].isin(pCtSp)]
+    if is_rising is not None and is_rising:
+        df = df[df["is_rising"].isin(is_rising)]
     # Plot uCell vs jStck for each event_id if present
     if "uCell" in df and "jStck" in df:
         color_col = "event_id" if "event_id" in df else None
