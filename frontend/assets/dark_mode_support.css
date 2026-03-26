@@ -16,3 +16,7 @@
     --Dash-Fill-Primary-Active: rgba(255, 255, 255, 0.12);
     --Dash-Fill-Disabled: rgba(255, 255, 255, 0.15);
 }
+
+:root[data-mantine-color-scheme="dark"] .js-plotly-plot .modebar {
+    background: transparent !important;
+}

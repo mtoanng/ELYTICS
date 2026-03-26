@@ -1,5 +1,6 @@
 import os
 import dash
+import plotly.io as pio
 
 from components.appshell import create_appshell
 from services.auth import OIDCAuthWithToken
@@ -11,6 +12,9 @@ from dotenv import load_dotenv
 from waitress import serve
 
 load_dotenv()
+
+pio.templates["plotly_dark"].layout.paper_bgcolor = "rgba(0,0,0,0)"
+pio.templates["plotly_dark"].layout.plot_bgcolor = "#1f1f1f"
 
 app = dash.Dash(
     __name__,
