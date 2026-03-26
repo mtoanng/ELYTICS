@@ -218,7 +218,7 @@ layout = dmc.Container(
                                                 marks=None,
                                                 allowCross=False,
                                                 tooltip={
-                                                    "placement": "bottom",
+                                                    "placement": "top",
                                                     "always_visible": False,
                                                 },
                                             ),
@@ -237,7 +237,7 @@ layout = dmc.Container(
                                                 marks=None,
                                                 allowCross=False,
                                                 tooltip={
-                                                    "placement": "bottom",
+                                                    "placement": "top",
                                                     "always_visible": False,
                                                 },
                                             ),
@@ -264,6 +264,12 @@ layout = dmc.Container(
                                             },
                                         ),
                                     ],
+                                ),
+                                dmc.Text(
+                                    id="polcurve-plot-message",
+                                    c="red",
+                                    fw=600,
+                                    style={"textAlign": "center"},
                                 ),
                                 dcc.Graph(
                                     id="polcurve-plot",
@@ -531,6 +537,7 @@ def sync_theme_store(theme):
 
 @callback(
     Output("polcurve-plot", "figure"),
+    Output("polcurve-plot-message", "children"),
     Input("polcurve-data-store", "data"),
     Input("polcurve-theme-store", "data"),
     Input("polcurve-temp-set-filter", "value"),
@@ -541,13 +548,11 @@ def update_polcurve_plot(data, theme, tSp, pCtSp, is_rising):
     import plotly.express as px
 
     if not data:
-        return {}, ""
+        return {}, "No plot available for selected data."
     df = pd.DataFrame(data)
     df = _apply_local_polcurve_filters(df, tSp, pCtSp, (is_rising or "both").lower())
-    # Plot uCell vs jStck for each event_id if present
     if "uCell" in df and "jStck" in df:
         color_col = "event_id" if "event_id" in df else None
-        # Remove rows with missing values in either column
         plot_df = df.dropna(subset=["uCell", "jStck"])
         if plot_df.empty:
             return {}, "No plot available for selected data."
@@ -563,7 +568,7 @@ def update_polcurve_plot(data, theme, tSp, pCtSp, is_rising):
             color=color_col,
             template=plotly_template,
         )
-        return fig
+        return fig, ""
     return {}, "No plot available for selected data."
 
 
