@@ -215,7 +215,7 @@ layout = dmc.Container(
                                                 min=0,
                                                 max=1,
                                                 value=[0, 1],
-                                                marks=None,
+                                                marks={},
                                                 allowCross=False,
                                                 tooltip={
                                                     "placement": "top",
@@ -234,7 +234,7 @@ layout = dmc.Container(
                                                 min=0,
                                                 max=1,
                                                 value=[0, 1],
-                                                marks=None,
+                                                marks={},
                                                 allowCross=False,
                                                 tooltip={
                                                     "placement": "top",
@@ -469,18 +469,43 @@ def fetch_polcurve_data(order_id, sample_name, testrig_id):
     Output("polcurve-temp-set-filter", "min"),
     Output("polcurve-temp-set-filter", "max"),
     Output("polcurve-temp-set-filter", "value"),
+    Output("polcurve-temp-set-filter", "marks"),
     Output("polcurve-pressure-set-filter", "min"),
     Output("polcurve-pressure-set-filter", "max"),
     Output("polcurve-pressure-set-filter", "value"),
+    Output("polcurve-pressure-set-filter", "marks"),
     Input("polcurve-data-store", "data"),
+    Input("polcurve-is-rising-filter", "value"),  # <-- add this
 )
 def populate_data_driven_filter_options(data):
+    import numpy as np
+
     if not data:
-        return 0, 1, [0, 1], 0, 1, [0, 1]
+        return 0, 1, [0, 1], {}, 0, 1, [0, 1], {}
     df = pd.DataFrame(data)
+    # Apply direction filter
+    df = _apply_local_polcurve_filters(df, None, None, (is_rising or "both").lower())
+    # Temperature marks
     t_min, t_max, t_value, _ = _get_slider_config(df, "tSp")
+    t_marks = {}
+    if "tSp" in df and not df["tSp"].dropna().empty:
+        counts, bin_edges = np.histogram(df["tSp"].dropna(), bins=10)
+        for i, edge in enumerate(bin_edges[:-1]):
+            if counts[i] > 0:
+                center = (edge + bin_edges[i + 1]) / 2
+                bar = "|" * max(1, int(counts[i] / counts.max() * 5))
+                t_marks[round(center, 2)] = bar
+    # Pressure marks
     p_min, p_max, p_value, _ = _get_slider_config(df, "pCtSp")
-    return t_min, t_max, t_value, p_min, p_max, p_value
+    p_marks = {}
+    if "pCtSp" in df and not df["pCtSp"].dropna().empty:
+        counts, bin_edges = np.histogram(df["pCtSp"].dropna(), bins=10)
+        for i, edge in enumerate(bin_edges[:-1]):
+            if counts[i] > 0:
+                center = (edge + bin_edges[i + 1]) / 2
+                bar = "|" * max(1, int(counts[i] / counts.max() * 5))
+                p_marks[round(center, 2)] = bar
+    return t_min, t_max, t_value, t_marks, p_min, p_max, p_value, p_marks
 
 
 # ========== TABLE RENDERING ==========
