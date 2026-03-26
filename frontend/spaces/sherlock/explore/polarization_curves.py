@@ -477,7 +477,7 @@ def fetch_polcurve_data(order_id, sample_name, testrig_id):
     Input("polcurve-data-store", "data"),
     Input("polcurve-is-rising-filter", "value"),  # <-- add this
 )
-def populate_data_driven_filter_options(data):
+def populate_data_driven_filter_options(data, is_rising):
     import numpy as np
 
     if not data:
