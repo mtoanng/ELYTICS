@@ -59,6 +59,11 @@
       "pr": 731,
       "title": "fix(core): added certificates to docker container",
       "date": "2026-03-25"
+    },
+    {
+      "pr": 734,
+      "title": "feat(sherlock): Migrate polcurve viewer to holmes",
+      "date": "2026-03-26"
     }
   ],
   "releases": {}
