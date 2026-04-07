@@ -19,8 +19,8 @@ logger = logging.getLogger(__name__)
 DATABRICKS_SERVER_HOSTNAME = os.environ["DATABRICKS_SERVER_HOSTNAME"]
 DATABRICKS_HTTP_PATH = os.environ["DATABRICKS_HTTP_PATH"]
 DATABRICKS_TOKEN = os.environ["DATABRICKS_TOKEN"]
-DATABRICKS_CATALOG = os.getenv("DATABRICKS_CATALOG", "ps_xplatform_prod")
-DATABRICKS_SCHEMA = os.getenv("DATABRICKS_SCHEMA", "pemely_ops")
+DATABRICKS_CATALOG = os.getenv("DATABRICKS_CATALOG", "ps_xplatform_dev")
+DATABRICKS_SCHEMA = os.getenv("DATABRICKS_SCHEMA", "pemely_dev")
 
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
@@ -124,7 +124,7 @@ def fully_qualified_view(space: str, data_kind: str, table_name: str) -> str:
     safe_table = _validate_identifier(table_name)
     segment = "meta" if data_kind == "metadata" else data_kind
     safe_kind = _validate_identifier(segment)
-    return f"{DATABRICKS_CATALOG}.{DATABRICKS_SCHEMA}.holmes_{safe_space}_{safe_kind}_{safe_table}_view"
+    return f"{DATABRICKS_CATALOG}.{DATABRICKS_SCHEMA}.holmes_{safe_space}_{safe_table}_{safe_kind}_view"
 
 
 def _connect_databricks() -> Any:
