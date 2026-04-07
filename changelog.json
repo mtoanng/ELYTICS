@@ -49,6 +49,11 @@
       "pr": 736,
       "title": "fix(core): Fixed plotly default dark mode graph styling",
       "date": "2026-03-26"
+    },
+    {
+      "pr": 763,
+      "title": "core(fix): Updated view name + databricks env",
+      "date": "2026-04-07"
     }
   ],
   "releases": {}
