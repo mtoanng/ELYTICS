@@ -11,7 +11,7 @@ import dash_mantine_components as dmc
 from dash_iconify import DashIconify
 import plotly.graph_objects as go
 import pandas as pd
-from typing import Optional, List
+from typing import List
 
 from services.backend_service import get_metadata
 
@@ -22,24 +22,7 @@ register_page(
     title="HOLMES - Sherlock - Track Record",
 )
 
-
-# Expected columns from split views.
-META_COLS = [
-    "sample_name",
-    "sample_type",
-    "sample_state",
-    "sample_type_state",
-    "run_hours",
-    "number_of_cells",
-    "leepa_number",
-    "production_plant",
-    "description",
-    "cellunit_name",
-    "ccm_name",
-    "ptl_name",
-    "gdl_name",
-    "active_area_per_cell",
-]
+PLOT_COLS = ["sample_name", "run_hours"]
 
 PLOT_HOVER_COLS = [
     "sample_type",
@@ -52,7 +35,6 @@ PLOT_HOVER_COLS = [
     "leepa_number",
 ]
 
-
 def _ensure_columns(df: pd.DataFrame, required_cols: List[str]) -> pd.DataFrame:
     if df.empty:
         return pd.DataFrame(columns=required_cols)
@@ -63,153 +45,20 @@ def _ensure_columns(df: pd.DataFrame, required_cols: List[str]) -> pd.DataFrame:
     return out
 
 
-def _build_runtime_agg(df_meta: pd.DataFrame) -> pd.DataFrame:
-    df = _ensure_columns(df_meta, META_COLS)
-    if df.empty:
-        return pd.DataFrame(columns=META_COLS + ["total_run_hours"])
-
-    df["sample_name"] = df["sample_name"].fillna("").astype(str).str.strip()
-    df["run_hours"] = pd.to_numeric(df["run_hours"], errors="coerce").fillna(0.0)
-
-    agg_map = {
-        "sample_type": "first",
-        "sample_state": "first",
-        "sample_type_state": "first",
-        "run_hours": "sum",
-        "number_of_cells": "max",
-        "leepa_number": "first",
-        "production_plant": "first",
-        "description": "first",
-        "cellunit_name": "first",
-        "ccm_name": "first",
-        "ptl_name": "first",
-        "gdl_name": "first",
-        "active_area_per_cell": "first",
-    }
-
-    available_agg_map = {
-        key: value for key, value in agg_map.items() if key in df.columns
-    }
-    df_runtime_agg = df.groupby("sample_name", as_index=False).agg(available_agg_map)
-    df_runtime_agg["total_run_hours"] = df_runtime_agg["run_hours"]
-    df_runtime_agg = df_runtime_agg.sort_values(
-        ["total_run_hours", "sample_name"],
-        ascending=[False, True],
-    )
-    return df_runtime_agg
-
-
-def _build_kpi_grouped(df_runtime_agg: pd.DataFrame) -> pd.DataFrame:
-    if df_runtime_agg.empty:
-        return pd.DataFrame(
-            columns=["sample_type_state", "number_of_cells", "run_hours"]
-        )
-
-    df_kpi = df_runtime_agg.copy()
-    df_kpi = df_kpi[
-        df_kpi["sample_type_state"].isin(["Gen 1 - Proto 1", "Gen 1 - Proto 2"])
-    ]
-    df_kpi = df_kpi[df_kpi["run_hours"] > 0]
-    if df_kpi.empty:
-        return pd.DataFrame(
-            columns=["sample_type_state", "number_of_cells", "run_hours"]
-        )
-
-    df_kpi["number_of_cells"] = df_kpi["number_of_cells"].fillna("Unknown").astype(str)
-    return df_kpi.groupby(["sample_type_state", "number_of_cells"], as_index=False)[
-        "run_hours"
-    ].sum()
-
-
-def _build_runtime_figure(df_runtime_agg: pd.DataFrame) -> go.Figure:
-    df = _ensure_columns(df_runtime_agg, META_COLS + ["total_run_hours"])
-    palette = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd"]
-    color_map = {
-        name: palette[i % len(palette)]
-        for i, name in enumerate(df["sample_name"].dropna().tolist())
-    }
-    marker_colors = [color_map.get(name, palette[0]) for name in df["sample_name"]]
-
-    fig = go.Figure(
-        go.Bar(
-            x=df["sample_name"],
-            y=df["total_run_hours"],
-            marker_color=marker_colors,
-            customdata=df[PLOT_HOVER_COLS],
-            hovertemplate=(
-                "<b>%{x}</b><br>"
-                "Total runtime: %{y:.0f} h<br><br>"
-                "Type / State: %{customdata[0]} - %{customdata[1]}<br>"
-                "Plant: %{customdata[2]}<br>"
-                "CCM: %{customdata[3]}<br>"
-                "PTL: %{customdata[4]}<br>"
-                "GDL: %{customdata[5]}<br>"
-                "Active area / cell: %{customdata[6]}<br>"
-                "Leepa number: %{customdata[7]}"
-                "<extra></extra>"
-            ),
-        )
-    )
-
-    fig.update_layout(
-        title="Top Gen 1 Stacks by Total Operational Runtime",
-        xaxis_title="Stack (Sample name)",
-        yaxis_title="Operational runtime [h]",
-        margin=dict(l=40, r=20, t=40, b=40),
-    )
-    fig.update_xaxes(categoryorder="array", categoryarray=df["sample_name"])
-    return fig
-
-
-def _build_kpi_figure(df_kpi_grouped: pd.DataFrame) -> go.Figure:
-    df = _ensure_columns(
-        df_kpi_grouped, ["sample_type_state", "number_of_cells", "run_hours"]
-    )
-    fig = go.Figure()
-
-    if not df.empty:
-        cell_values = sorted(
-            df["number_of_cells"].fillna("Unknown").astype(str).unique()
-        )
-        for cell in cell_values:
-            df_cell = df[df["number_of_cells"].astype(str) == cell]
-            fig.add_trace(
-                go.Bar(
-                    x=df_cell["sample_type_state"],
-                    y=df_cell["run_hours"],
-                    name=str(cell),
-                )
-            )
-
-    fig.update_layout(
-        title="Run Hours per Sample Type grouped by Number of Cells",
-        xaxis_title="Sample Type",
-        yaxis_title="Run Hours",
-        barmode="stack",
-        legend_title_text="Number of Cells",
-        margin=dict(l=40, r=20, t=40, b=40),
-    )
-    return fig
-
-
-def _prepare_meta_payload(meta_rows: Optional[List[dict]]):
-    df_meta = pd.DataFrame(meta_rows or [])
-    df_runtime_agg = _build_runtime_agg(df_meta)
-    df_kpi_grouped = _build_kpi_grouped(df_runtime_agg)
-    return df_runtime_agg, df_kpi_grouped
-
-
 USAGE_BLOCKQUOTE_TEXT = [
-    "The top bar charts show total operational runtime per Gen 1 stack and sample types.",
-    "Hover on a bar to see detailed stack information.",
-    "The left chart aggregates run hours by sample type and number of cells.",
+    "The chart shows run hours directly from column run_hours.",
+    "Each bar corresponds to one sample_name.",
+    "Hover on a bar to inspect runtime and stack metadata.",
 ]
 
-fig_runtime = _build_runtime_figure(
-    pd.DataFrame(columns=META_COLS + ["total_run_hours"])
+fig_runtime = go.Figure(
+    go.Bar(x=[], y=[], marker_color="#1f77b4")
 )
-fig_kpi = _build_kpi_figure(
-    pd.DataFrame(columns=["sample_type_state", "number_of_cells", "run_hours"])
+fig_runtime.update_layout(
+    title="Run Hours per Sample Name",
+    xaxis_title="Sample Name",
+    yaxis_title="Run Hours [h]",
+    margin=dict(l=40, r=20, t=40, b=40),
 )
 
 
@@ -244,7 +93,7 @@ def track_record_layout():
                                 ],
                             ),
                             dmc.Text(
-                                "Top performing Gen 1 stacks based on total operational runtime (based on cloud data)",
+                                "Run hours by sample name (based on cloud data)",
                                 c="dimmed",
                             ),
                             # Use in_ instead of opened for dmc.Collapse v2.6.0
@@ -275,18 +124,9 @@ def track_record_layout():
                                 radius="md",
                                 children=[
                                     dmc.SimpleGrid(
-                                        cols=2,
+                                        cols=1,
                                         spacing="md",
                                         children=[
-                                            dcc.Graph(
-                                                id="runtime-kpi",
-                                                figure=fig_kpi,
-                                                config={"responsive": True},
-                                                style={
-                                                    "width": "100%",
-                                                    "height": "420px",
-                                                },
-                                            ),
                                             dcc.Graph(
                                                 id="runtime-bar",
                                                 figure=fig_runtime,
@@ -355,14 +195,62 @@ def apply_theme(fig, theme):
 
 
 @callback(
-    Output("runtime-kpi", "figure"),
     Output("runtime-bar", "figure"),
     Input("track-meta-data", "data"),
     Input("theme-store", "data"),
 )
 def update_top_charts(meta_rows, theme):
+    df = pd.DataFrame(meta_rows or [])
+    df = _ensure_columns(df, PLOT_COLS + PLOT_HOVER_COLS)
 
-    df_runtime_agg, df_kpi_grouped = _prepare_meta_payload(meta_rows)
-    runtime_fig = apply_theme(_build_runtime_figure(df_runtime_agg), theme)
-    kpi_fig = apply_theme(_build_kpi_figure(df_kpi_grouped), theme)
-    return kpi_fig, runtime_fig
+    df["sample_name"] = df["sample_name"].fillna("Unknown").astype(str)
+    df["run_hours"] = pd.to_numeric(df["run_hours"], errors="coerce").fillna(0.0)
+    df = df.sort_values(["run_hours", "sample_name"], ascending=[False, True])
+
+    # Keep hover values readable and avoid NaN in tooltip.
+    hover_df = df[PLOT_HOVER_COLS].fillna("N/A").astype(str)
+
+    palette = [
+        "#1f77b4",
+        "#ff7f0e",
+        "#2ca02c",
+        "#d62728",
+        "#9467bd",
+        "#8c564b",
+        "#e377c2",
+        "#7f7f7f",
+        "#bcbd22",
+        "#17becf",
+    ]
+    marker_colors = [palette[i % len(palette)] for i in range(len(df))]
+
+    runtime_fig = go.Figure(
+        go.Bar(
+            x=df["sample_name"],
+            y=df["run_hours"],
+            customdata=hover_df,
+            hovertemplate=(
+                "<b>%{x}</b><br>"
+                "Run hours: %{y:.0f} h<br><br>"
+                "Sample type: %{customdata[0]}<br>"
+                "Sample state: %{customdata[1]}<br>"
+                "Plant: %{customdata[2]}<br>"
+                "CCM: %{customdata[3]}<br>"
+                "PTL: %{customdata[4]}<br>"
+                "GDL: %{customdata[5]}<br>"
+                "Active area / cell: %{customdata[6]}<br>"
+                "Leepa number: %{customdata[7]}"
+                "<extra></extra>"
+            ),
+            marker_color=marker_colors,
+        )
+    )
+    runtime_fig.update_layout(
+        title="Run Hours per Sample Name",
+        xaxis_title="Sample Name",
+        yaxis_title="Run Hours [h]",
+        margin=dict(l=40, r=20, t=40, b=40),
+    )
+    runtime_fig.update_xaxes(categoryorder="array", categoryarray=df["sample_name"])
+    runtime_fig = apply_theme(runtime_fig, theme)
+    return runtime_fig
