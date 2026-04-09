@@ -1,0 +1,26 @@
+SELECT
+  sample_name AS sample_name,
+  runtime_hours AS runtime_hours,
+  sensor_type AS sensor_type,
+  number_of_cells AS number_of_cells,
+  IVnumber AS IVnumber,
+  ccm_type AS ccm_type,
+  tAndeIn AS tAndeIn,
+  pAndeOut AS pAndeOut,
+  pCtdeOut AS pCtdeOut,
+  jStck AS jStck,
+  uCellAvg AS uCellAvg,
+  uStck AS uStck,
+  uCells_array AS uCells_array,
+  soh_lin_stack AS soh_lin_stack,
+  soh_kin_stack AS soh_kin_stack,
+  soh_lin_cells AS soh_lin_cells,
+  soh_kin_cells AS soh_kin_cells,
+  model_min_obj_stack AS model_min_obj_stack,
+  model_min_obj_cells AS model_min_obj_cells,
+  model_uCell_pred_stack AS model_uCell_pred_stack,
+  is_rising AS is_rising,
+  `model_uCellAvg_ref_pCtdeOut-34tAndeOut-70_stack` AS `model_uCellAvg_ref_pCtdeOut-34tAndeOut-70_stack`,
+  `model_uCellAvg_ref_pCtdeOut-40tAndeAvg-70_stack` AS `model_uCellAvg_ref_pCtdeOut-40tAndeAvg-70_stack`
+FROM
+  ps_xplatform_dev.pemely_dev.gold_virtual_sensor_soh_cr_sherlock

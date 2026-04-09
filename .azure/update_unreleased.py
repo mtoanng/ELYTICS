@@ -12,8 +12,7 @@ from pathlib import Path
 SPACES = ("enola", "mycroft", "sherlock", "watson")
 SPACE_WATCH_PATHS = (
 	"frontend/spaces/{space}/",
-	"backend/queries/{space}/",
-	"backend/routers/{space}/",
+	"views/spaces/{space}/",
 )
 
 
@@ -154,7 +153,11 @@ def _determine_areas(changed_files: list[str]) -> set[str]:
 		normalized = _normalize(changed)
 		if normalized in matched_space_paths:
 			continue
-		if normalized.startswith("frontend/") or normalized.startswith("backend/"):
+		if (
+			normalized.startswith("frontend/")
+			or normalized.startswith("backend/")
+			or normalized.startswith("views/")
+		):
 			areas.add("root")
 			break
 
