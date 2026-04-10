@@ -22,7 +22,7 @@ SIDEBAR_STRUCTURE = {
             "pages": [
                 {"path": "order-overview", "label": "Order Overview"},
                 {"path": "sample-overview", "label": "Sample Overview"},
-                {"path": "ccm-overview", "label": "CCM Overview"},
+                {"path": "runtime-overview", "label": "Runtime Overview"},
                 {"path": "polarization-curves", "label": "Polarization Curves"},
                 {"path": "timeseries-overview", "label": "Timeseries Overview"},
             ],
