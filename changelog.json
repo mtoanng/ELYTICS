@@ -54,6 +54,11 @@
       "pr": 763,
       "title": "core(fix): Updated view name + databricks env",
       "date": "2026-04-07"
+    },
+    {
+      "pr": 773,
+      "title": "feat(sherlock): Cleaned CCM overview page",
+      "date": "2026-04-13"
     }
   ],
   "releases": {}
