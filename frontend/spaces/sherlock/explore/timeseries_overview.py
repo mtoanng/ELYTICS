@@ -197,7 +197,83 @@ def _read_viewport(relayout_data: dict | None) -> tuple[str | None, str | None]:
     return None, None
 
 
-def _build_figure(df: pd.DataFrame, signals: list[str], theme: str) -> go.Figure:
+_PLOT_COLORS = [
+    "#1f77b4",
+    "#ff7f0e",
+    "#2ca02c",
+    "#d62728",
+    "#9467bd",
+    "#8c564b",
+    "#e377c2",
+    "#7f7f7f",
+    "#bcbd22",
+    "#17becf",
+]
+
+
+def _hex_to_rgba(hex_color: str, alpha: float) -> str:
+    clean = hex_color.lstrip("#")
+    if len(clean) != 6:
+        return f"rgba(31,119,180,{alpha})"
+    red = int(clean[0:2], 16)
+    green = int(clean[2:4], 16)
+    blue = int(clean[4:6], 16)
+    return f"rgba({red},{green},{blue},{alpha})"
+
+
+def _resolve_metric_column(df: pd.DataFrame, signal: str, metric: str) -> str | None:
+    preferred = f"{signal}_{metric}"
+    if preferred in df.columns:
+        return preferred
+    if metric == "avg" and signal in df.columns:
+        return signal
+    return None
+
+
+def _series_has_data(df: pd.DataFrame, column: str | None) -> bool:
+    if not column or column not in df.columns:
+        return False
+    return df[column].notna().any()
+
+
+def _signal_has_data(df: pd.DataFrame, signal: str, metric: str) -> bool:
+    if metric == "all":
+        has_avg = _series_has_data(df, _resolve_metric_column(df, signal, "avg"))
+        has_min = _series_has_data(df, _resolve_metric_column(df, signal, "min"))
+        has_max = _series_has_data(df, _resolve_metric_column(df, signal, "max"))
+        return has_avg or (has_min and has_max)
+    return _series_has_data(df, _resolve_metric_column(df, signal, metric))
+
+
+def _build_plot_groups(signals: list[str], plot_mode: str) -> list[tuple[str, str, list[str]]]:
+    if plot_mode != "stacked":
+        return [
+            (SENSOR_TITLES.get(signal, signal), SENSOR_UNITS.get(signal, ""), [signal])
+            for signal in signals
+        ]
+
+    grouped: dict[str, list[str]] = {}
+    for signal in signals:
+        unit = SENSOR_UNITS.get(signal, "value")
+        grouped.setdefault(unit, []).append(signal)
+
+    return [
+        (f"{unit} signals", unit, grouped[unit])
+        for unit in grouped
+    ]
+
+
+def _legend_ref(row_index: int) -> str:
+    return "legend" if row_index == 1 else f"legend{row_index}"
+
+
+def _build_figure(
+    df: pd.DataFrame,
+    signals: list[str],
+    theme: str,
+    metric: str = "avg",
+    plot_mode: str = "isolated",
+) -> go.Figure:
     if df.empty:
         return _empty_figure(theme, "No data for selected filters")
 
@@ -207,70 +283,187 @@ def _build_figure(df: pd.DataFrame, signals: list[str], theme: str) -> go.Figure
     is_dark = theme == "dark"
     template = "plotly_dark" if is_dark else "plotly"
 
-    safe_signals = [s for s in signals if s in df.columns]
-    if not safe_signals:
-        return _empty_figure(theme, "No selected signal columns were returned")
-
     df = df.copy()
     df[PLOT_TIME_COLUMN] = pd.to_datetime(df[PLOT_TIME_COLUMN], errors="coerce")
-    df = df.dropna(subset=[PLOT_TIME_COLUMN])
+    df = df.dropna(subset=[PLOT_TIME_COLUMN]).sort_values(PLOT_TIME_COLUMN)
+    if df.empty:
+        return _empty_figure(theme, "No data for selected filters")
+
+    safe_signals = [signal for signal in signals if _signal_has_data(df, signal, metric)]
+    if not safe_signals:
+        return _empty_figure(theme, "No plottable data for selected signals")
+
+    groups = _build_plot_groups(safe_signals, plot_mode)
+    if not groups:
+        return _empty_figure(theme, "No plottable data for selected signals")
+
+    n_groups = len(groups)
+    is_stacked = plot_mode == "stacked"
+    vertical_spacing = 0.09 if is_stacked else 0.04
+    total_height = max(360, 270 * n_groups + (56 * n_groups if is_stacked else 0))
 
     fig = make_subplots(
-        rows=len(safe_signals),
+        rows=n_groups,
         cols=1,
         shared_xaxes=True,
-        vertical_spacing=0.04,
-        subplot_titles=[SENSOR_TITLES.get(s, s) for s in safe_signals],
+        vertical_spacing=vertical_spacing,
+        subplot_titles=[title for title, _unit, _signals in groups],
     )
 
-    for idx, signal in enumerate(safe_signals, start=1):
-        fig.add_trace(
-            go.Scatter(
-                x=df[PLOT_TIME_COLUMN],
-                y=df[signal],
-                mode="lines",
-                name=SENSOR_TITLES.get(signal, signal),
-                line=dict(width=1.6),
-            ),
-            row=idx,
-            col=1,
-        )
+    color_index = 0
+    for row_index, (_title, unit, group_signals) in enumerate(groups, start=1):
+        leg_ref = _legend_ref(row_index)
+        show_legend = plot_mode == "stacked"
+        legend_kwargs = {"legend": leg_ref} if show_legend else {}
+
+        for signal in group_signals:
+            color = _PLOT_COLORS[color_index % len(_PLOT_COLORS)]
+            color_index += 1
+            signal_title = SENSOR_TITLES.get(signal, signal)
+            signal_group = f"row{row_index}:{signal}"
+
+            if metric == "all":
+                min_col = _resolve_metric_column(df, signal, "min")
+                max_col = _resolve_metric_column(df, signal, "max")
+                avg_col = _resolve_metric_column(df, signal, "avg")
+
+                has_min = _series_has_data(df, min_col)
+                has_max = _series_has_data(df, max_col)
+                has_avg = _series_has_data(df, avg_col)
+
+                if has_min and has_max:
+                    fig.add_trace(
+                        go.Scatter(
+                            x=df[PLOT_TIME_COLUMN],
+                            y=df[min_col],
+                            mode="lines",
+                            line=dict(width=0, color=color),
+                            showlegend=False,
+                            hoverinfo="skip",
+                            legendgroup=signal_group,
+                            name=f"{signal_title} min",
+                            **legend_kwargs,
+                        ),
+                        row=row_index,
+                        col=1,
+                    )
+                    fig.add_trace(
+                        go.Scatter(
+                            x=df[PLOT_TIME_COLUMN],
+                            y=df[max_col],
+                            mode="lines",
+                            line=dict(width=0, color=color),
+                            fill="tonexty",
+                            fillcolor=_hex_to_rgba(color, 0.18),
+                            showlegend=False,
+                            hoverinfo="skip",
+                            legendgroup=signal_group,
+                            name=f"{signal_title} max",
+                            **legend_kwargs,
+                        ),
+                        row=row_index,
+                        col=1,
+                    )
+
+                if has_avg:
+                    fig.add_trace(
+                        go.Scatter(
+                            x=df[PLOT_TIME_COLUMN],
+                            y=df[avg_col],
+                            mode="lines",
+                            name=signal_title,
+                            line=dict(width=2.8, color=color),
+                            showlegend=show_legend,
+                            legendgroup=signal_group,
+                            **legend_kwargs,
+                        ),
+                        row=row_index,
+                        col=1,
+                    )
+                continue
+
+            value_col = _resolve_metric_column(df, signal, metric)
+            if not _series_has_data(df, value_col):
+                continue
+
+            fig.add_trace(
+                go.Scatter(
+                    x=df[PLOT_TIME_COLUMN],
+                    y=df[value_col],
+                    mode="lines",
+                    name=signal_title,
+                    line=dict(width=1.8, color=color),
+                    showlegend=show_legend,
+                    legendgroup=signal_group,
+                    **legend_kwargs,
+                ),
+                row=row_index,
+                col=1,
+            )
+
         fig.update_yaxes(
-            title_text=SENSOR_UNITS.get(signal, ""),
-            row=idx,
+            title_text=unit,
+            row=row_index,
             col=1,
             gridcolor="rgba(255,255,255,0.15)" if is_dark else "rgba(0,0,0,0.08)",
         )
 
     fig.update_xaxes(
         title_text="Time",
-        row=len(safe_signals),
+        title_standoff=42,
+        row=n_groups,
         col=1,
         gridcolor="rgba(255,255,255,0.15)" if is_dark else "rgba(0,0,0,0.08)",
     )
 
-    fig.update_layout(
+    layout_updates: dict = dict(
         template=template,
-        height=max(360, 270 * len(safe_signals)),
-        margin=dict(t=48, l=80, r=30, b=60),
-        showlegend=False,
+        height=total_height,
+        margin=dict(t=48, l=80, r=30, b=520 if is_stacked else 60),
+        showlegend=is_stacked,
     )
-    return fig
 
+    # Per-subplot legends: position each legend in the gap below its subplot.
+    if is_stacked:
+        legend_bg = "rgba(255,255,255,0.06)" if is_dark else "rgba(0,0,0,0.03)"
+        row_domains = [
+            getattr(fig.layout, "yaxis" if idx == 1 else f"yaxis{idx}").domain
+            for idx in range(1, n_groups + 1)
+        ]
+        for row_index in range(1, n_groups + 1):
+            domain = row_domains[row_index - 1]
+            if row_index < n_groups:
+                # Keep legend close to the current subplot bottom, away from the
+                # next subplot title at the top of the following domain.
+                legend_y = max(0.02, domain[0] - 0.008)
+                legend_yanchor = "top"
+            else:
+                # Keep last legend directly below the plot area (like other rows).
+                # The increased x-axis title standoff and bottom margin prevent
+                # collisions with the shared x-axis title.
+                legend_y = max(0.01, domain[0] - 0.06)
+                legend_yanchor = "top"
+
+            layout_updates[_legend_ref(row_index)] = dict(
+                x=0.5,
+                xanchor="center",
+                y=legend_y,
+                yanchor=legend_yanchor,
+                orientation="h",
+                tracegroupgap=6,
+                font=dict(size=10),
+                bgcolor=legend_bg,
+                borderwidth=0,
+                groupclick="togglegroup",
+            )
+
+    fig.update_layout(**layout_updates)
+    return fig
 
 def _resolve_time_column(df: pd.DataFrame) -> str | None:
     for candidate in ("bucket_start", "time", "ts"):
         if candidate in df.columns:
             return candidate
-    return None
-
-
-def _resolve_value_column(df: pd.DataFrame, signal: str, metric: str) -> str | None:
-    preferred = f"{signal}_{metric}"
-    if preferred in df.columns:
-        return preferred
-    if signal in df.columns:
-        return signal
     return None
 
 
@@ -281,6 +474,36 @@ def _humanize_timestamp(value: str | None) -> str:
     if pd.isna(ts):
         return str(value)
     return ts.strftime("%Y-%m-%d %H:%M:%S UTC")
+
+
+def _humanize_bucket(bucket_seconds: int | None, bucket_label: str | None = None) -> str | None:
+    if bucket_label:
+        return bucket_label
+    if bucket_seconds is None:
+        return None
+    if bucket_seconds <= 0:
+        return f"{bucket_seconds}s"
+    days, rem = divmod(bucket_seconds, 24 * 60 * 60)
+    hours, rem = divmod(rem, 60 * 60)
+    minutes, seconds = divmod(rem, 60)
+    if days and not (hours or minutes or seconds):
+        return f"{days}d"
+    if hours and not (minutes or seconds):
+        return f"{hours}h"
+    if minutes and not seconds:
+        return f"{minutes}m"
+    if minutes or seconds:
+        parts: list[str] = []
+        if days:
+            parts.append(f"{days}d")
+        if hours:
+            parts.append(f"{hours}h")
+        if minutes:
+            parts.append(f"{minutes}m")
+        if seconds:
+            parts.append(f"{seconds}s")
+        return " ".join(parts)
+    return f"{bucket_seconds}s"
 
 
 def timeseries_overview_layout():
@@ -449,16 +672,29 @@ def timeseries_overview_layout():
                                             dmc.Badge(id="timeseries-meta-badge", variant="light", color="blue"),
                                             dmc.Text("Value", size="sm", c="dimmed", fw=600),
                                             dmc.SegmentedControl(
-                                                    id="timeseries-metric-selector",
-                                                    data=[
-                                                        {"label": "Avg", "value": "avg"},
-                                                        {"label": "Min", "value": "min"},
-                                                        {"label": "Max", "value": "max"},
-                                                    ],
-                                                    value="avg",
-                                                    size="xs",
-                                                    radius="md",
-                                                    style={"minWidth": "170px"},
+                                                id="timeseries-metric-selector",
+                                                data=[
+                                                    {"label": "All", "value": "all"},
+                                                    {"label": "Avg", "value": "avg"},
+                                                    {"label": "Min", "value": "min"},
+                                                    {"label": "Max", "value": "max"},
+                                                ],
+                                                value="all",
+                                                size="xs",
+                                                radius="md",
+                                                style={"minWidth": "220px"},
+                                            ),
+                                            dmc.Text("Layout", size="sm", c="dimmed", fw=600),
+                                            dmc.SegmentedControl(
+                                                id="timeseries-plot-mode-selector",
+                                                data=[
+                                                    {"label": "Isolated", "value": "isolated"},
+                                                    {"label": "Stacked", "value": "stacked"},
+                                                ],
+                                                value="isolated",
+                                                size="xs",
+                                                radius="md",
+                                                style={"minWidth": "190px"},
                                             ),
                                         ],
                                     ),
@@ -581,6 +817,7 @@ def update_viewport_store(relayout_data, current):
     Input("timeseries-number-of-cells-filter", "value"),
     Input("timeseries-extra-signals", "value"),
     Input("timeseries-metric-selector", "value"),
+    Input("timeseries-plot-mode-selector", "value"),
     Input("timeseries-viewport-store", "data"),
     Input("theme-store", "data"),
     prevent_initial_call=False,
@@ -592,11 +829,13 @@ def refresh_timeseries(
     number_of_cells,
     extra_signals,
     metric,
+    plot_mode,
     viewport,
     theme,
 ):
     theme = theme or "light"
-    metric = metric or "avg"
+    metric = metric or "all"
+    plot_mode = plot_mode or "isolated"
 
     if order_id in (None, ""):
         fig = _empty_figure(theme, "No order ID available")
@@ -636,31 +875,32 @@ def refresh_timeseries(
         fig = _empty_figure(theme, "No supported time column was returned")
         return fig, "No time axis available", "Request error"
 
-    plot_df = pd.DataFrame({time_col: df[time_col]})
-    resolved_signals: list[str] = []
-    for signal in signals:
-        value_col = _resolve_value_column(df, signal, metric)
-        if value_col:
-            plot_df[signal] = df[value_col]
-            resolved_signals.append(signal)
+    plot_df = df.rename(columns={time_col: PLOT_TIME_COLUMN}).copy()
+    resolved_signals = [signal for signal in signals if _signal_has_data(plot_df, signal, metric)]
 
-    fig = _build_figure(plot_df.rename(columns={time_col: PLOT_TIME_COLUMN}), resolved_signals, theme)
+    fig = _build_figure(
+        plot_df,
+        resolved_signals,
+        theme,
+        metric=metric,
+        plot_mode=plot_mode,
+    )
 
     meta = df.attrs.get("meta", {}) if hasattr(df, "attrs") else {}
     returned_points = meta.get("returned_points", len(df))
     bucket_seconds = meta.get("bucket_seconds")
+    bucket_label = meta.get("bucket_label")
+    bucket_display = _humanize_bucket(bucket_seconds, bucket_label)
     effective_start = meta.get("effective_start", start_value)
     effective_end = meta.get("effective_end", end_value)
     readable_start = _humanize_timestamp(effective_start)
     readable_end = _humanize_timestamp(effective_end)
 
     status_text = (
-        f"Viewport: {readable_start} to {readable_end} | "
-        f"Metric: {metric.upper()} | Signals: {len(resolved_signals)} | Rows: {len(df)}"
+        f"Viewport: {readable_start} to {readable_end}"
     )
     badge = (
-        f"Points: {returned_points}"
-        + (f" | Bucket: {bucket_seconds}s" if bucket_seconds is not None else "")
+        (f" | Bucket: {bucket_display}" if bucket_display else "")
     )
 
     return fig, status_text, badge

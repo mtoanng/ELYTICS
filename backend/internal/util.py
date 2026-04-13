@@ -1,7 +1,6 @@
 import hashlib
 import json
 import logging
-import math
 import os
 import re
 import threading
@@ -29,9 +28,27 @@ REDIS_DB = int(os.getenv("REDIS_DB", "0"))
 _TARGET_POINTS_DEFAULT = 1200
 _TARGET_POINTS_MIN = 100
 _TARGET_POINTS_MAX = 5000
-_TARGET_POINTS_ROUND = 100
 _BUCKET_SECONDS_MIN = 1
 _BUCKET_SECONDS_MAX = 30 * 24 * 60 * 60
+_BUCKET_SECONDS_CHOICES = (
+    1,
+    5,
+    10,
+    15,
+    30,
+    60,
+    5 * 60,
+    10 * 60,
+    15 * 60,
+    30 * 60,
+    60 * 60,
+    2 * 60 * 60,
+    6 * 60 * 60,
+    12 * 60 * 60,
+    24 * 60 * 60,
+    7 * 24 * 60 * 60,
+    30 * 24 * 60 * 60,
+)
 
 _IDENTIFIER_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _CONNECTION_LOCK = threading.Lock()
@@ -264,8 +281,29 @@ def compute_bucket_seconds(start_time: datetime, end_time: datetime, target_poin
     if start_time >= end_time:
         raise ValueError("start must be before end")
     range_seconds = max((end_time - start_time).total_seconds(), 1.0)
-    raw = math.ceil(range_seconds / target_points)
-    return max(_BUCKET_SECONDS_MIN, min(raw, _BUCKET_SECONDS_MAX))
+    raw = range_seconds / target_points
+    candidates = [
+        bucket for bucket in _BUCKET_SECONDS_CHOICES
+        if _BUCKET_SECONDS_MIN <= bucket <= _BUCKET_SECONDS_MAX
+    ]
+    if not candidates:
+        raise ValueError("No valid bucket choices configured")
+
+    # Choose the nearest fixed bucket; on ties prefer the larger bucket to keep
+    # response sizes bounded.
+    return min(candidates, key=lambda bucket: (abs(bucket - raw), -bucket))
+
+
+def format_bucket_label(bucket_seconds: int) -> str:
+    if bucket_seconds <= 0:
+        return f"{bucket_seconds}s"
+    if bucket_seconds % (24 * 60 * 60) == 0:
+        return f"{bucket_seconds // (24 * 60 * 60)}d"
+    if bucket_seconds % (60 * 60) == 0:
+        return f"{bucket_seconds // (60 * 60)}h"
+    if bucket_seconds % 60 == 0:
+        return f"{bucket_seconds // 60}m"
+    return f"{bucket_seconds}s"
 
 
 def build_timeseries_query(
@@ -311,11 +349,7 @@ def get_timeseries_result(
     ttl: int = 3600,
 ) -> dict[str, Any]:
     filters = filters or {}
-    # Round target_points to the nearest bucket so requests with similar point
-    # counts (e.g. 1150 vs 1200 vs 1250) share the same cache entry.
-    rounded_points = round(target_points / _TARGET_POINTS_ROUND) * _TARGET_POINTS_ROUND
-    rounded_points = max(_TARGET_POINTS_MIN, min(rounded_points, _TARGET_POINTS_MAX))
-    bucket_seconds = compute_bucket_seconds(start_time, end_time, rounded_points)
+    bucket_seconds = compute_bucket_seconds(start_time, end_time, target_points)
     key = _cache_key(
         "timeseries",
         view=view_name,
@@ -324,7 +358,6 @@ def get_timeseries_result(
         filters={k: sorted(v) for k, v in sorted(filters.items())},
         start=start_time.isoformat(),
         end=end_time.isoformat(),
-        target_points=rounded_points,
         bucket_seconds=bucket_seconds,
     )
     r = get_redis_client()
@@ -349,7 +382,8 @@ def get_timeseries_result(
         "data": data,
         "meta": {
             "bucket_seconds": bucket_seconds,
-            "requested_points": rounded_points,
+            "bucket_label": format_bucket_label(bucket_seconds),
+            "requested_points": target_points,
             "returned_points": len(data),
         },
     }
