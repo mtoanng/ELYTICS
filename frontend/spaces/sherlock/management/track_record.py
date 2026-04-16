@@ -244,7 +244,9 @@ def track_record_layout():
                                                     gap=4,
                                                     style={"width": "220px"},
                                                     children=[
-                                                        dmc.Text("X axis", size="sm", fw=500),
+                                                        dmc.Text(
+                                                            "X axis", size="sm", fw=500
+                                                        ),
                                                         dmc.SegmentedControl(
                                                             id="trackrecord-x-axis-mode",
                                                             data=X_AXIS_OPTIONS,
@@ -405,14 +407,14 @@ def build_detail_plot(
         plot_df = plot_df.dropna(subset=[x_col, value_col]).sort_values(x_col)
 
     fig = go.Figure()
-    
+
     if not plot_df.empty and "order_id" in plot_df.columns:
         # Get unique order_ids in sorted order for consistent coloring
         unique_order_ids = sorted(plot_df["order_id"].dropna().unique())
-        
+
         x_hover = "%{x|%Y-%m-%d %H:%M}" if x_axis_mode == "time" else "%{x:.0f} h"
         scatter_mode = "markers" if x_axis_mode == "time" else "lines+markers"
-        
+
         # Create one trace per order_id
         for order_id in unique_order_ids:
             order_df = plot_df[plot_df["order_id"] == order_id].copy()
@@ -441,12 +443,25 @@ def build_detail_plot(
             showarrow=False,
         )
 
+    is_dark = theme == "dark"
+
     layout_dict = dict(
         xaxis_title=x_title,
         yaxis_title=yaxis_title,
         margin=dict(l=40, r=20, t=12, b=margin_bottom),
         showlegend=True,
-        legend=dict(x=0.98, y=0.98, xanchor="right", yanchor="top", bgcolor="rgba(255, 255, 255, 0.9)"),
+        legend=dict(
+            x=0.98,
+            y=0.98,
+            xanchor="right",
+            yanchor="top",
+            bgcolor="rgba(20, 24, 28, 0.85)" if is_dark else "rgba(255, 255, 255, 0.9)",
+            bordercolor=(
+                "rgba(255, 255, 255, 0.20)" if is_dark else "rgba(0, 0, 0, 0.15)"
+            ),
+            borderwidth=1,
+            font=dict(color="#f1f3f5" if is_dark else "#1f2937"),
+        ),
     )
     if yaxis_range is not None:
         layout_dict["yaxis"] = dict(range=yaxis_range)
