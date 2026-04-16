@@ -608,7 +608,6 @@ def update_detail_plots(sample_name, x_axis_mode, theme):
         x_axis_mode=x_axis_mode,
         theme=theme,
         margin_bottom=0,
-        yaxis_range=[0, 1],
     )
     concH2O2_fig = build_detail_plot(
         df=df,
@@ -618,6 +617,5 @@ def update_detail_plots(sample_name, x_axis_mode, theme):
         x_axis_mode=x_axis_mode,
         theme=theme,
         margin_bottom=20,
-        yaxis_range=[0, 1],
     )
     return uCell_fig, concO2H2_fig, concH2O2_fig
