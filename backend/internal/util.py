@@ -5,7 +5,7 @@ import os
 import re
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from databricks import sql as databricks_sql
@@ -336,28 +336,80 @@ def build_timeseries_query(
     return f"SELECT {select} FROM {view}{where} GROUP BY bucket_start ORDER BY bucket_start ASC"
 
 
+def _resolve_timeseries_bounds(
+    view_name: str,
+    time_column: str,
+    filters: dict[str, list[str]],
+    start_time: datetime | None,
+    end_time: datetime | None,
+) -> tuple[datetime, datetime]:
+    safe_time = _validate_identifier(time_column)
+
+    query_start = start_time
+    query_end = end_time
+    if query_start is not None and query_end is not None:
+        return query_start, query_end
+
+    conditions = _build_filter_conditions(filters)
+    conditions.append(f"{safe_time} IS NOT NULL")
+    where = " WHERE " + " AND ".join(conditions) if conditions else ""
+    bounds_query = (
+        f"SELECT MIN({safe_time}) AS min_time, MAX({safe_time}) AS max_time "
+        f"FROM {view_name}{where}"
+    )
+    bounds_rows = execute_sql_query(bounds_query)
+    min_time = bounds_rows[0].get("min_time") if bounds_rows else None
+    max_time = bounds_rows[0].get("max_time") if bounds_rows else None
+    if min_time is None or max_time is None:
+        raise ValueError("No time bounds available for selected filters")
+
+    query_start = query_start or min_time
+    query_end = query_end or max_time
+
+    if not isinstance(query_start, datetime):
+        query_start = datetime.fromisoformat(str(query_start).replace("Z", "+00:00"))
+    if not isinstance(query_end, datetime):
+        query_end = datetime.fromisoformat(str(query_end).replace("Z", "+00:00"))
+
+    if query_start >= query_end:
+        # Include at least one full second when datasource min=max.
+        query_end = query_end.replace(microsecond=0)
+        query_start = query_start.replace(microsecond=0)
+        if query_start >= query_end:
+            query_end = query_start + timedelta(seconds=1)
+
+    return query_start, query_end
+
+
 def get_timeseries_result(
     view_name: str,
     space: str,
     table: str,
     time_column: str,
     value_columns: list[str],
-    start_time: datetime,
-    end_time: datetime,
+    start_time: datetime | None,
+    end_time: datetime | None,
     filters: dict[str, list[str]] | None = None,
     target_points: int = _TARGET_POINTS_DEFAULT,
     ttl: int = 3600,
 ) -> dict[str, Any]:
     filters = filters or {}
-    bucket_seconds = compute_bucket_seconds(start_time, end_time, target_points)
+    effective_start, effective_end = _resolve_timeseries_bounds(
+        view_name=view_name,
+        time_column=time_column,
+        filters=filters,
+        start_time=start_time,
+        end_time=end_time,
+    )
+    bucket_seconds = compute_bucket_seconds(effective_start, effective_end, target_points)
     key = _cache_key(
         "timeseries",
         view=view_name,
         time_column=time_column,
         value_columns=sorted(value_columns),
         filters={k: sorted(v) for k, v in sorted(filters.items())},
-        start=start_time.isoformat(),
-        end=end_time.isoformat(),
+        start=effective_start.isoformat(),
+        end=effective_end.isoformat(),
         bucket_seconds=bucket_seconds,
     )
     r = get_redis_client()
@@ -370,8 +422,8 @@ def get_timeseries_result(
         view=view_name,
         time_column=time_column,
         value_columns=value_columns,
-        start_time=start_time,
-        end_time=end_time,
+        start_time=effective_start,
+        end_time=effective_end,
         filters=filters,
         bucket_seconds=bucket_seconds,
     )
@@ -385,6 +437,8 @@ def get_timeseries_result(
             "bucket_label": format_bucket_label(bucket_seconds),
             "requested_points": target_points,
             "returned_points": len(data),
+            "effective_start": effective_start,
+            "effective_end": effective_end,
         },
     }
     serialized = json.dumps(payload, default=str)

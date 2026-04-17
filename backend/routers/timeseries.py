@@ -39,8 +39,8 @@ def _register_timeseries_routes(space: str, configs: list[TimeseriesConfig]) -> 
 def _bind_route(space: str, cfg: TimeseriesConfig) -> None:
     async def route_handler(
         request: Request,
-        start: datetime = Query(...),
-        end: datetime = Query(...),
+        start: datetime | None = Query(None),
+        end: datetime | None = Query(None),
         columns: list[str] = Query(...),
         time_column: str = Query(...),
         target_points: int = Query(_TARGET_POINTS_DEFAULT),
