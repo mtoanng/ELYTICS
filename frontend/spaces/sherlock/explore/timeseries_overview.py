@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+import re
 
 from dash import (
     callback,
@@ -24,11 +24,10 @@ register_page(
     title="HOLMES - Sherlock - Timeseries Overview",
 )
 
-DEFAULT_START = datetime.utcnow() - timedelta(days=30)
-DEFAULT_END = datetime.utcnow()
 REQUEST_TIME_COLUMN = "time"
 PLOT_TIME_COLUMN = "bucket_start"
 TARGET_POINTS = 1200
+EMPTY_FIGURE_HEIGHT = 320
 
 CORE_SIGNALS = [
     "jStck",
@@ -146,8 +145,7 @@ SENSOR_UNITS = {
 }
 
 DEFAULT_SENSOR_NAMES = [
-    f"{label} ({key})"
-    for key, (label, _unit) in SIGNAL_META.items()
+    f"{label} ({key})" for key, (label, _unit) in SIGNAL_META.items()
 ]
 
 USAGE_BLOCKQUOTE_TEXT = [
@@ -158,11 +156,15 @@ USAGE_BLOCKQUOTE_TEXT = [
 ]
 
 
-def _empty_figure(theme: str, message: str = "Select filters to view timeseries data") -> go.Figure:
+def _empty_figure(
+    theme: str, message: str = "Select filters to view timeseries data"
+) -> go.Figure:
     is_dark = theme == "dark"
     fig = go.Figure()
     fig.update_layout(
         template="plotly_dark" if is_dark else "plotly",
+        autosize=True,
+        height=EMPTY_FIGURE_HEIGHT,
         margin=dict(t=40, l=80, r=30, b=60),
         annotations=[
             dict(
@@ -186,14 +188,31 @@ def _to_options(values: list) -> list[dict]:
 def _read_viewport(relayout_data: dict | None) -> tuple[str | None, str | None]:
     if not isinstance(relayout_data, dict):
         return None, None
-    if "xaxis.range[0]" in relayout_data and "xaxis.range[1]" in relayout_data:
-        return relayout_data.get("xaxis.range[0]"), relayout_data.get("xaxis.range[1]")
-    if "xaxis.range" in relayout_data and isinstance(relayout_data["xaxis.range"], list):
-        rng = relayout_data["xaxis.range"]
-        if len(rng) == 2:
-            return rng[0], rng[1]
-    if relayout_data.get("xaxis.autorange"):
+
+    # Capture viewport updates from any subplot axis (xaxis, xaxis2, ...).
+    for key, value in relayout_data.items():
+        if re.match(r"^xaxis\d*\.range$", key) and isinstance(value, list):
+            if len(value) == 2:
+                return value[0], value[1]
+
+    axes = {
+        match.group(1)
+        for key in relayout_data.keys()
+        if (match := re.match(r"^(xaxis\d*)\.range\[[01]\]$", key))
+    }
+    for axis in sorted(axes):
+        left = relayout_data.get(f"{axis}.range[0]")
+        right = relayout_data.get(f"{axis}.range[1]")
+        if left is not None and right is not None:
+            return left, right
+
+    if any(
+        relayout_data.get(key) is True
+        for key in relayout_data.keys()
+        if re.match(r"^xaxis\d*\.autorange$", key)
+    ):
         return None, None
+
     return None, None
 
 
@@ -233,7 +252,7 @@ def _resolve_metric_column(df: pd.DataFrame, signal: str, metric: str) -> str | 
 def _series_has_data(df: pd.DataFrame, column: str | None) -> bool:
     if not column or column not in df.columns:
         return False
-    return df[column].notna().any()
+    return bool(df[column].notna().any())
 
 
 def _signal_has_data(df: pd.DataFrame, signal: str, metric: str) -> bool:
@@ -245,7 +264,9 @@ def _signal_has_data(df: pd.DataFrame, signal: str, metric: str) -> bool:
     return _series_has_data(df, _resolve_metric_column(df, signal, metric))
 
 
-def _build_plot_groups(signals: list[str], plot_mode: str) -> list[tuple[str, str, list[str]]]:
+def _build_plot_groups(
+    signals: list[str], plot_mode: str
+) -> list[tuple[str, str, list[str]]]:
     if plot_mode != "stacked":
         return [
             (SENSOR_TITLES.get(signal, signal), SENSOR_UNITS.get(signal, ""), [signal])
@@ -257,14 +278,14 @@ def _build_plot_groups(signals: list[str], plot_mode: str) -> list[tuple[str, st
         unit = SENSOR_UNITS.get(signal, "value")
         grouped.setdefault(unit, []).append(signal)
 
+    return [(f"{unit} signals", unit, grouped[unit]) for unit in grouped]
+
+
+def _signal_selector_options(signals: list[str]) -> list[dict[str, str]]:
     return [
-        (f"{unit} signals", unit, grouped[unit])
-        for unit in grouped
+        {"label": SENSOR_TITLES.get(signal, signal), "value": signal}
+        for signal in signals
     ]
-
-
-def _legend_ref(row_index: int) -> str:
-    return "legend" if row_index == 1 else f"legend{row_index}"
 
 
 def _build_figure(
@@ -273,6 +294,8 @@ def _build_figure(
     theme: str,
     metric: str = "avg",
     plot_mode: str = "isolated",
+    viewport_start: str | None = None,
+    viewport_end: str | None = None,
 ) -> go.Figure:
     if df.empty:
         return _empty_figure(theme, "No data for selected filters")
@@ -289,7 +312,9 @@ def _build_figure(
     if df.empty:
         return _empty_figure(theme, "No data for selected filters")
 
-    safe_signals = [signal for signal in signals if _signal_has_data(df, signal, metric)]
+    safe_signals = [
+        signal for signal in signals if _signal_has_data(df, signal, metric)
+    ]
     if not safe_signals:
         return _empty_figure(theme, "No plottable data for selected signals")
 
@@ -299,28 +324,23 @@ def _build_figure(
 
     n_groups = len(groups)
     is_stacked = plot_mode == "stacked"
-    vertical_spacing = 0.09 if is_stacked else 0.04
-    total_height = max(360, 270 * n_groups + (56 * n_groups if is_stacked else 0))
+    vertical_spacing = 0.09 if is_stacked else 0.055
+    total_height = max(360, 280 * n_groups + (40 * n_groups if is_stacked else 0))
 
     fig = make_subplots(
         rows=n_groups,
         cols=1,
-        shared_xaxes=True,
+        shared_xaxes=False,
         vertical_spacing=vertical_spacing,
         subplot_titles=[title for title, _unit, _signals in groups],
     )
 
     color_index = 0
     for row_index, (_title, unit, group_signals) in enumerate(groups, start=1):
-        leg_ref = _legend_ref(row_index)
-        show_legend = plot_mode == "stacked"
-        legend_kwargs = {"legend": leg_ref} if show_legend else {}
-
         for signal in group_signals:
             color = _PLOT_COLORS[color_index % len(_PLOT_COLORS)]
             color_index += 1
             signal_title = SENSOR_TITLES.get(signal, signal)
-            signal_group = f"row{row_index}:{signal}"
 
             if metric == "all":
                 min_col = _resolve_metric_column(df, signal, "min")
@@ -340,9 +360,7 @@ def _build_figure(
                             line=dict(width=0, color=color),
                             showlegend=False,
                             hoverinfo="skip",
-                            legendgroup=signal_group,
                             name=f"{signal_title} min",
-                            **legend_kwargs,
                         ),
                         row=row_index,
                         col=1,
@@ -357,9 +375,7 @@ def _build_figure(
                             fillcolor=_hex_to_rgba(color, 0.18),
                             showlegend=False,
                             hoverinfo="skip",
-                            legendgroup=signal_group,
                             name=f"{signal_title} max",
-                            **legend_kwargs,
                         ),
                         row=row_index,
                         col=1,
@@ -373,9 +389,7 @@ def _build_figure(
                             mode="lines",
                             name=signal_title,
                             line=dict(width=2.8, color=color),
-                            showlegend=show_legend,
-                            legendgroup=signal_group,
-                            **legend_kwargs,
+                            showlegend=False,
                         ),
                         row=row_index,
                         col=1,
@@ -393,9 +407,7 @@ def _build_figure(
                     mode="lines",
                     name=signal_title,
                     line=dict(width=1.8, color=color),
-                    showlegend=show_legend,
-                    legendgroup=signal_group,
-                    **legend_kwargs,
+                    showlegend=False,
                 ),
                 row=row_index,
                 col=1,
@@ -408,57 +420,27 @@ def _build_figure(
             gridcolor="rgba(255,255,255,0.15)" if is_dark else "rgba(0,0,0,0.08)",
         )
 
-    fig.update_xaxes(
-        title_text="Time",
-        title_standoff=42,
-        row=n_groups,
-        col=1,
-        gridcolor="rgba(255,255,255,0.15)" if is_dark else "rgba(0,0,0,0.08)",
-    )
+    for row_index in range(1, n_groups + 1):
+        x_axis_kwargs = {
+            "title_text": "",
+            "row": row_index,
+            "col": 1,
+            "gridcolor": "rgba(255,255,255,0.15)" if is_dark else "rgba(0,0,0,0.08)",
+        }
+        if viewport_start and viewport_end:
+            x_axis_kwargs["range"] = [viewport_start, viewport_end]
+        fig.update_xaxes(**x_axis_kwargs)
 
     layout_updates: dict = dict(
         template=template,
         height=total_height,
-        margin=dict(t=48, l=80, r=30, b=520 if is_stacked else 60),
-        showlegend=is_stacked,
+        margin=dict(t=64, l=80, r=30, b=80),
+        showlegend=False,
     )
-
-    # Per-subplot legends: position each legend in the gap below its subplot.
-    if is_stacked:
-        legend_bg = "rgba(255,255,255,0.06)" if is_dark else "rgba(0,0,0,0.03)"
-        row_domains = [
-            getattr(fig.layout, "yaxis" if idx == 1 else f"yaxis{idx}").domain
-            for idx in range(1, n_groups + 1)
-        ]
-        for row_index in range(1, n_groups + 1):
-            domain = row_domains[row_index - 1]
-            if row_index < n_groups:
-                # Keep legend close to the current subplot bottom, away from the
-                # next subplot title at the top of the following domain.
-                legend_y = max(0.02, domain[0] - 0.008)
-                legend_yanchor = "top"
-            else:
-                # Keep last legend directly below the plot area (like other rows).
-                # The increased x-axis title standoff and bottom margin prevent
-                # collisions with the shared x-axis title.
-                legend_y = max(0.01, domain[0] - 0.06)
-                legend_yanchor = "top"
-
-            layout_updates[_legend_ref(row_index)] = dict(
-                x=0.5,
-                xanchor="center",
-                y=legend_y,
-                yanchor=legend_yanchor,
-                orientation="h",
-                tracegroupgap=6,
-                font=dict(size=10),
-                bgcolor=legend_bg,
-                borderwidth=0,
-                groupclick="togglegroup",
-            )
 
     fig.update_layout(**layout_updates)
     return fig
+
 
 def _resolve_time_column(df: pd.DataFrame) -> str | None:
     for candidate in ("bucket_start", "time", "ts"):
@@ -476,7 +458,9 @@ def _humanize_timestamp(value: str | None) -> str:
     return ts.strftime("%Y-%m-%d %H:%M:%S UTC")
 
 
-def _humanize_bucket(bucket_seconds: int | None, bucket_label: str | None = None) -> str | None:
+def _humanize_bucket(
+    bucket_seconds: int | None, bucket_label: str | None = None
+) -> str | None:
     if bucket_label:
         return bucket_label
     if bucket_seconds is None:
@@ -523,7 +507,10 @@ def timeseries_overview_layout():
                                 children=[
                                     dmc.Title("Timeseries Overview", order=2),
                                     dmc.ActionIcon(
-                                        DashIconify(icon="material-symbols:info-outline", width=20),
+                                        DashIconify(
+                                            icon="material-symbols:info-outline",
+                                            width=20,
+                                        ),
                                         id="timeseries-usage-toggle",
                                         variant="subtle",
                                         color="blue",
@@ -540,18 +527,24 @@ def timeseries_overview_layout():
                                 dmc.Blockquote(
                                     dmc.List(
                                         withPadding=False,
-                                        children=[dmc.ListItem(item) for item in USAGE_BLOCKQUOTE_TEXT],
+                                        children=[
+                                            dmc.ListItem(item)
+                                            for item in USAGE_BLOCKQUOTE_TEXT
+                                        ],
                                     ),
                                     color="blue",
                                 ),
-                                opened=True,
+                                opened=False,
                                 id="timeseries-usage-collapse",
                             ),
                         ],
                     ),
                     dcc.Store(id="timeseries-usage-open", data=True),
                     dcc.Store(id="timeseries-metadata-store"),
-                    dcc.Store(id="timeseries-viewport-store", data={"start": None, "end": None}),
+                    dcc.Store(
+                        id="timeseries-viewport-store",
+                        data={"start": None, "end": None},
+                    ),
                     dcc.Store(id="timeseries-init-trigger", data=True),
                     dmc.Paper(
                         withBorder=True,
@@ -660,17 +653,28 @@ def timeseries_overview_layout():
                         withBorder=True,
                         p="md",
                         radius="md",
+                        style={"overflow": "hidden"},
                         children=[
                             dmc.Group(
                                 justify="space-between",
                                 children=[
-                                    dmc.Text(id="timeseries-status-text", c="dimmed", size="sm"),
+                                    dmc.Text(
+                                        id="timeseries-status-text",
+                                        c="dimmed",
+                                        size="sm",
+                                    ),
                                     dmc.Group(
                                         gap="sm",
                                         align="center",
                                         children=[
-                                            dmc.Badge(id="timeseries-meta-badge", variant="light", color="blue"),
-                                            dmc.Text("Value", size="sm", c="dimmed", fw=600),
+                                            dmc.Badge(
+                                                id="timeseries-meta-badge",
+                                                variant="light",
+                                                color="blue",
+                                            ),
+                                            dmc.Text(
+                                                "Value", size="sm", c="dimmed", fw=600
+                                            ),
                                             dmc.SegmentedControl(
                                                 id="timeseries-metric-selector",
                                                 data=[
@@ -684,12 +688,20 @@ def timeseries_overview_layout():
                                                 radius="md",
                                                 style={"minWidth": "220px"},
                                             ),
-                                            dmc.Text("Layout", size="sm", c="dimmed", fw=600),
+                                            dmc.Text(
+                                                "Layout", size="sm", c="dimmed", fw=600
+                                            ),
                                             dmc.SegmentedControl(
                                                 id="timeseries-plot-mode-selector",
                                                 data=[
-                                                    {"label": "Isolated", "value": "isolated"},
-                                                    {"label": "Stacked", "value": "stacked"},
+                                                    {
+                                                        "label": "Isolated",
+                                                        "value": "isolated",
+                                                    },
+                                                    {
+                                                        "label": "Stacked",
+                                                        "value": "stacked",
+                                                    },
                                                 ],
                                                 value="isolated",
                                                 size="xs",
@@ -700,16 +712,48 @@ def timeseries_overview_layout():
                                     ),
                                 ],
                             ),
+                            dmc.MultiSelect(
+                                id="timeseries-signal-selector",
+                                label="Visible Signals",
+                                description="Hide or show signals in stacked and isolated views.",
+                                data=[],
+                                value=None,
+                                searchable=True,
+                                clearable=False,
+                                nothingFoundMessage="No signals available",
+                            ),
                             dmc.Space(h="sm"),
-                            dcc.Loading(
-                                id="timeseries-graph-loading",
-                                type="default",
+                            dmc.Box(
+                                style={
+                                    "width": "100%",
+                                    "minHeight": f"{EMPTY_FIGURE_HEIGHT}px",
+                                },
                                 children=[
-                                    dcc.Graph(
-                                        id="timeseries-graph",
-                                        figure=_empty_figure("light", "Loading metadata..."),
-                                        config={"responsive": True, "displaylogo": False},
+                                    dcc.Loading(
+                                        id="timeseries-graph-loading",
+                                        type="default",
+                                        parent_style={
+                                            "width": "100%",
+                                            "minHeight": f"{EMPTY_FIGURE_HEIGHT}px",
+                                        },
                                         style={"width": "100%"},
+                                        children=[
+                                            dcc.Store(id="timeseries-data-store"),
+                                            dcc.Graph(
+                                                id="timeseries-graph",
+                                                figure=_empty_figure(
+                                                    "light", "Loading metadata..."
+                                                ),
+                                                config={
+                                                    "responsive": True,
+                                                    "displaylogo": False,
+                                                },
+                                                style={
+                                                    "width": "100%",
+                                                    "minHeight": f"{EMPTY_FIGURE_HEIGHT}px",
+                                                },
+                                            ),
+                                        ],
                                     )
                                 ],
                             ),
@@ -767,9 +811,21 @@ def populate_filter_options(metadata_rows):
 
     df = pd.DataFrame(metadata_rows)
 
-    order_values = sorted(df["order_id"].dropna().unique().tolist(), reverse=True) if "order_id" in df.columns else []
-    testrig_values = sorted(df["testrig_id"].dropna().unique().tolist()) if "testrig_id" in df.columns else []
-    sample_values = sorted(df["sample_name"].dropna().unique().tolist()) if "sample_name" in df.columns else []
+    order_values = (
+        sorted(df["order_id"].dropna().unique().tolist(), reverse=True)
+        if "order_id" in df.columns
+        else []
+    )
+    testrig_values = (
+        sorted(df["testrig_id"].dropna().unique().tolist())
+        if "testrig_id" in df.columns
+        else []
+    )
+    sample_values = (
+        sorted(df["sample_name"].dropna().unique().tolist())
+        if "sample_name" in df.columns
+        else []
+    )
 
     if "number_of_cells" in df.columns:
         cell_series = (
@@ -778,7 +834,9 @@ def populate_filter_options(metadata_rows):
             .astype(str)
             .str.replace(r"\.0$", "", regex=True)
         )
-        cell_values = sorted(cell_series.unique().tolist(), key=lambda x: (not str(x).isdigit(), str(x)))
+        cell_values = sorted(
+            cell_series.unique().tolist(), key=lambda x: (not str(x).isdigit(), str(x))
+        )
     else:
         cell_values = []
 
@@ -800,6 +858,14 @@ def populate_filter_options(metadata_rows):
     prevent_initial_call=True,
 )
 def update_viewport_store(relayout_data, current):
+    if not isinstance(relayout_data, dict):
+        raise PreventUpdate
+    if not any(
+        re.search(r"^xaxis\d*\.range", key) or re.search(r"^xaxis\d*\.autorange$", key)
+        for key in relayout_data
+    ):
+        raise PreventUpdate
+
     start, end = _read_viewport(relayout_data)
     current = current or {"start": None, "end": None}
     if start == current.get("start") and end == current.get("end"):
@@ -808,44 +874,38 @@ def update_viewport_store(relayout_data, current):
 
 
 @callback(
-    Output("timeseries-graph", "figure"),
-    Output("timeseries-status-text", "children"),
-    Output("timeseries-meta-badge", "children"),
+    Output("timeseries-data-store", "data"),
     Input("timeseries-order-id-filter", "value"),
     Input("timeseries-testrig-id-filter", "value"),
     Input("timeseries-sample-name-filter", "value"),
     Input("timeseries-number-of-cells-filter", "value"),
     Input("timeseries-extra-signals", "value"),
-    Input("timeseries-metric-selector", "value"),
-    Input("timeseries-plot-mode-selector", "value"),
     Input("timeseries-viewport-store", "data"),
-    Input("theme-store", "data"),
     prevent_initial_call=False,
 )
-def refresh_timeseries(
+def load_timeseries_data(
     order_id,
     testrig_id,
     sample_name,
     number_of_cells,
     extra_signals,
-    metric,
-    plot_mode,
     viewport,
-    theme,
 ):
-    theme = theme or "light"
-    metric = metric or "all"
-    plot_mode = plot_mode or "isolated"
-
     if order_id in (None, ""):
-        fig = _empty_figure(theme, "No order ID available")
-        return fig, "No order selected", "No request yet"
+        return {
+            "error": "No order ID available",
+            "status": "No order selected",
+            "badge": "No request yet",
+            "signals": [],
+            "records": [],
+            "viewport": viewport or {"start": None, "end": None},
+        }
 
     signals = CORE_SIGNALS + (extra_signals or [])
 
     viewport = viewport or {"start": None, "end": None}
-    start_value = viewport.get("start") or DEFAULT_START.isoformat()
-    end_value = viewport.get("end") or DEFAULT_END.isoformat()
+    start_value = viewport.get("start")
+    end_value = viewport.get("end")
 
     filters = {"order_id": order_id}
     if testrig_id not in (None, ""):
@@ -867,16 +927,113 @@ def refresh_timeseries(
             filters=filters,
         )
     except Exception as exc:
-        fig = _empty_figure(theme, f"Request failed: {exc}")
-        return fig, "Failed to load timeseries", "Request error"
+        return {
+            "error": f"Request failed: {exc}",
+            "status": "Failed to load timeseries",
+            "badge": "Request error",
+            "signals": signals,
+            "records": [],
+            "viewport": viewport,
+        }
 
     time_col = _resolve_time_column(df)
     if not time_col:
-        fig = _empty_figure(theme, "No supported time column was returned")
-        return fig, "No time axis available", "Request error"
+        return {
+            "error": "No supported time column was returned",
+            "status": "No time axis available",
+            "badge": "Request error",
+            "signals": signals,
+            "records": [],
+            "viewport": viewport,
+        }
 
     plot_df = df.rename(columns={time_col: PLOT_TIME_COLUMN}).copy()
-    resolved_signals = [signal for signal in signals if _signal_has_data(plot_df, signal, metric)]
+    plot_df[PLOT_TIME_COLUMN] = pd.to_datetime(
+        plot_df[PLOT_TIME_COLUMN], errors="coerce", utc=True
+    ).dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    meta = df.attrs.get("meta", {}) if hasattr(df, "attrs") else {}
+    bucket_seconds = meta.get("bucket_seconds")
+    bucket_label = meta.get("bucket_label")
+    bucket_display = _humanize_bucket(bucket_seconds, bucket_label)
+    effective_start = meta.get("effective_start") or start_value
+    effective_end = meta.get("effective_end") or end_value
+    readable_start = _humanize_timestamp(effective_start)
+    readable_end = _humanize_timestamp(effective_end)
+
+    status_text = f"Viewport: {readable_start} to {readable_end}"
+    badge = f" Bucket: {bucket_display}" if bucket_display else ""
+
+    return {
+        "error": None,
+        "status": status_text,
+        "badge": badge,
+        "signals": signals,
+        "records": plot_df.to_dict("records"),
+        "viewport": viewport,
+    }
+
+
+@callback(
+    Output("timeseries-signal-selector", "data"),
+    Output("timeseries-signal-selector", "value"),
+    Input("timeseries-data-store", "data"),
+    State("timeseries-signal-selector", "value"),
+)
+def sync_signal_selector(data, current_selection):
+    data = data or {}
+    signals = data.get("signals") or []
+    options = _signal_selector_options(signals)
+
+    if not signals:
+        return [], []
+
+    if current_selection is None:
+        return options, signals
+
+    selected = [signal for signal in current_selection if signal in signals]
+    return options, selected
+
+
+@callback(
+    Output("timeseries-graph", "figure"),
+    Output("timeseries-status-text", "children"),
+    Output("timeseries-meta-badge", "children"),
+    Input("timeseries-data-store", "data"),
+    Input("timeseries-signal-selector", "value"),
+    Input("timeseries-metric-selector", "value"),
+    Input("timeseries-plot-mode-selector", "value"),
+    Input("theme-store", "data"),
+    prevent_initial_call=False,
+)
+def render_timeseries(data, selected_signals, metric, plot_mode, theme):
+    theme = theme or "light"
+    metric = metric or "all"
+    plot_mode = plot_mode or "isolated"
+    data = data or {}
+
+    error_message = data.get("error")
+    if error_message:
+        fig = _empty_figure(theme, error_message)
+        return fig, data.get("status", "No data"), data.get("badge", "Request error")
+
+    records = data.get("records") or []
+    signals = data.get("signals") or []
+    viewport = data.get("viewport") or {"start": None, "end": None}
+
+    if selected_signals is None:
+        active_signals = signals
+    else:
+        active_signals = [signal for signal in selected_signals if signal in signals]
+
+    if not active_signals:
+        fig = _empty_figure(theme, "No signals selected")
+        return fig, data.get("status", "No data"), data.get("badge", "")
+
+    plot_df = pd.DataFrame(records)
+    resolved_signals = [
+        signal for signal in active_signals if _signal_has_data(plot_df, signal, metric)
+    ]
 
     fig = _build_figure(
         plot_df,
@@ -884,23 +1041,27 @@ def refresh_timeseries(
         theme,
         metric=metric,
         plot_mode=plot_mode,
+        viewport_start=viewport.get("start"),
+        viewport_end=viewport.get("end"),
     )
 
-    meta = df.attrs.get("meta", {}) if hasattr(df, "attrs") else {}
-    returned_points = meta.get("returned_points", len(df))
-    bucket_seconds = meta.get("bucket_seconds")
-    bucket_label = meta.get("bucket_label")
-    bucket_display = _humanize_bucket(bucket_seconds, bucket_label)
-    effective_start = meta.get("effective_start", start_value)
-    effective_end = meta.get("effective_end", end_value)
-    readable_start = _humanize_timestamp(effective_start)
-    readable_end = _humanize_timestamp(effective_end)
+    return fig, data.get("status", "No data"), data.get("badge", "")
 
-    status_text = (
-        f"Viewport: {readable_start} to {readable_end}"
-    )
-    badge = (
-        (f" | Bucket: {bucket_display}" if bucket_display else "")
-    )
 
-    return fig, status_text, badge
+@callback(
+    Output("timeseries-metric-selector", "disabled"),
+    Output("timeseries-plot-mode-selector", "disabled"),
+    Output("timeseries-signal-selector", "disabled"),
+    Output("timeseries-graph", "style"),
+    Input("timeseries-data-store", "loading_state"),
+)
+def sync_plot_loading_state(loading_state):
+    is_loading = bool((loading_state or {}).get("is_loading"))
+    graph_style: dict[str, object] = {
+        "width": "100%",
+        "minHeight": f"{EMPTY_FIGURE_HEIGHT}px",
+    }
+    if is_loading:
+        graph_style["pointerEvents"] = "none"
+        graph_style["opacity"] = 0.7
+    return is_loading, is_loading, is_loading, graph_style

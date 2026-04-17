@@ -75,8 +75,8 @@ def get_tabular(
 def get_timeseries(
     space: str,
     route_name: str,
-    start: datetime,
-    end: datetime,
+    start: datetime | str | None,
+    end: datetime | str | None,
     columns: List[str],
     time_column: str = "time",
     target_points: int = 1200,
@@ -88,8 +88,8 @@ def get_timeseries(
     Args:
         space: The space name (e.g., 'sherlock')
         route_name: The timeseries route name (e.g., 'timeseries_exp')
-        start: Start datetime
-        end: End datetime
+        start: Optional start datetime (backend infers from filters when omitted)
+        end: Optional end datetime (backend infers from filters when omitted)
         columns: List of column names to fetch
         time_column: Name of the time column in the dataset
         target_points: Target number of buckets (~1200 is good default)
@@ -97,11 +97,14 @@ def get_timeseries(
     """
     headers = get_api_headers()
     params = {
-        "start": start.isoformat() if isinstance(start, datetime) else start,
-        "end": end.isoformat() if isinstance(end, datetime) else end,
         "time_column": time_column,
         "target_points": target_points,
     }
+
+    if start is not None:
+        params["start"] = start.isoformat() if isinstance(start, datetime) else start
+    if end is not None:
+        params["end"] = end.isoformat() if isinstance(end, datetime) else end
     
     # Add columns as separate query params
     if columns:
