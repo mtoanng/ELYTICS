@@ -5,7 +5,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from backend.internal.auth import require_groups
 from backend.internal.config_types import TimeseriesConfig
-from backend.internal.util import _TARGET_POINTS_DEFAULT, fully_qualified_view, get_timeseries_result
+from backend.internal.util import (
+    _TARGET_POINTS_DEFAULT,
+    fully_qualified_view,
+    get_timeseries_result,
+)
 
 import backend.config.sherlock as sherlock
 import backend.config.watson as watson
@@ -16,9 +20,9 @@ router = APIRouter()
 
 SPACE_TIMESERIES_MAP: dict[str, list[TimeseriesConfig]] = {
     "sherlock": sherlock.TIMESERIES_CONFIG,
-    "watson":   watson.TIMESERIES_CONFIG,
-    "enola":    enola.TIMESERIES_CONFIG,
-    "mycroft":  mycroft.TIMESERIES_CONFIG,
+    "watson": watson.TIMESERIES_CONFIG,
+    "enola": enola.TIMESERIES_CONFIG,
+    "mycroft": mycroft.TIMESERIES_CONFIG,
 }
 
 
@@ -50,8 +54,12 @@ def _bind_route(space: str, cfg: TimeseriesConfig) -> None:
         filters = _parse_filters(request)
         for required in cfg.required_filters:
             if required not in filters:
-                raise HTTPException(status_code=400, detail=f"Missing required filter '{required}'")
-        view_name = fully_qualified_view(space=space, data_kind="data", table_name=cfg.table_name)
+                raise HTTPException(
+                    status_code=400, detail=f"Missing required filter '{required}'"
+                )
+        view_name = fully_qualified_view(
+            space=space, data_kind="data", table_name=cfg.table_name
+        )
         try:
             payload = get_timeseries_result(
                 view_name=view_name,

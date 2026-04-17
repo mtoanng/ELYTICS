@@ -539,7 +539,7 @@ def timeseries_overview_layout():
                             ),
                         ],
                     ),
-                    dcc.Store(id="timeseries-usage-open", data=True),
+                    dcc.Store(id="timeseries-usage-open", data=False),
                     dcc.Store(id="timeseries-metadata-store"),
                     dcc.Store(
                         id="timeseries-viewport-store",

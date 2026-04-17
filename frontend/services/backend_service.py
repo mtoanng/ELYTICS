@@ -8,6 +8,7 @@ from datetime import datetime
 
 API_BASE = os.environ.get("BACKEND_API_URL", "http://localhost:8000")
 
+
 def get_api_headers():
     """Extract OIDC token from Flask session and return headers"""
     token = session.get("access_token")
@@ -15,11 +16,12 @@ def get_api_headers():
         print(f"[DEBUG] Session keys: {list(session.keys())}")
         print(f"[DEBUG] access_token present: {('access_token' in session)}")
         raise ValueError("No OIDC token available in session")
-    
+
     return {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json",
     }
+
 
 def get_metadata(space: str, route_name: str) -> List[Dict[str, Any]]:
     """
@@ -32,6 +34,7 @@ def get_metadata(space: str, route_name: str) -> List[Dict[str, Any]]:
     response.raise_for_status()
     return response.json().get("data", [])
 
+
 def get_tabular(
     space: str,
     route_name: str,
@@ -42,7 +45,7 @@ def get_tabular(
     """
     Fetch tabular data from the backend.
     Returns the full filtered dataset as a pandas DataFrame.
-    
+
     Args:
         space: The space name (e.g., 'sherlock')
         route_name: The tabular route name (e.g., 'order', 'polcurve')
@@ -52,7 +55,7 @@ def get_tabular(
     """
     headers = get_api_headers()
     params = {}
-    
+
     # Add filters as query params
     if filters:
         for key, value in filters.items():
@@ -60,17 +63,18 @@ def get_tabular(
                 params[key] = value
             else:
                 params[key] = str(value)
-    
+
     # Add sort parameters if provided
     if sort_by:
         params["sort_by"] = sort_by
         params["sort_dir"] = sort_dir
-    
+
     url = f"{API_BASE}/api/{space}/tabular/{route_name}"
     response = requests.get(url, params=params, headers=headers)
     response.raise_for_status()
     data = response.json().get("data", [])
     return pd.DataFrame(data)
+
 
 def get_timeseries(
     space: str,
@@ -84,7 +88,7 @@ def get_timeseries(
 ) -> pd.DataFrame:
     """
     Fetch timeseries data from the backend with automatic bucketing.
-    
+
     Args:
         space: The space name (e.g., 'sherlock')
         route_name: The timeseries route name (e.g., 'timeseries_exp')
@@ -105,11 +109,11 @@ def get_timeseries(
         params["start"] = start.isoformat() if isinstance(start, datetime) else start
     if end is not None:
         params["end"] = end.isoformat() if isinstance(end, datetime) else end
-    
+
     # Add columns as separate query params
     if columns:
         params["columns"] = columns
-    
+
     # Add filters including required ones
     if filters:
         for key, value in filters.items():
@@ -117,24 +121,27 @@ def get_timeseries(
                 params[key] = value
             else:
                 params[key] = str(value)
-    
+
     url = f"{API_BASE}/api/{space}/timeseries/{route_name}"
     response = requests.get(url, params=params, headers=headers)
     response.raise_for_status()
     payload = response.json()
-    
+
     # Parse the response which includes data and metadata
     data = payload.get("data", [])
     meta = payload.get("meta", {})
-    
+
     df = pd.DataFrame(data)
     # Attach metadata for reference (e.g., bucket_seconds, returned_points)
     df.attrs["meta"] = meta
     return df
 
-def get_table_as_df(space: str, route_name: str, data_kind: str = "data") -> pd.DataFrame:
+
+def get_table_as_df(
+    space: str, route_name: str, data_kind: str = "data"
+) -> pd.DataFrame:
     """
-    Backward compatibility wrapper. 
+    Backward compatibility wrapper.
     Maps old get_table_as_df calls to new tabular/metadata endpoints.
     """
     if data_kind == "data":
@@ -142,6 +149,7 @@ def get_table_as_df(space: str, route_name: str, data_kind: str = "data") -> pd.
     else:
         data = get_metadata(space, route_name)
         return pd.DataFrame(data)
+
 
 def get_table_stats():
     """Fetch system table statistics from the backend."""
