@@ -6,7 +6,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from backend.internal.auth import require_groups
 from backend.internal.config_types import TimeseriesConfig
-from backend.internal.util import _TARGET_POINTS_DEFAULT, get_timeseries_result, resolve_query_source
+from backend.internal.util import (
+    _TARGET_POINTS_DEFAULT,
+    get_timeseries_result,
+    resolve_query_source,
+)
 
 import backend.config.sherlock as sherlock
 import backend.config.watson as watson
@@ -18,9 +22,9 @@ logger = logging.getLogger(__name__)
 
 SPACE_TIMESERIES_MAP: dict[str, list[TimeseriesConfig]] = {
     "sherlock": sherlock.TIMESERIES_CONFIG,
-    "watson":   watson.TIMESERIES_CONFIG,
-    "enola":    enola.TIMESERIES_CONFIG,
-    "mycroft":  mycroft.TIMESERIES_CONFIG,
+    "watson": watson.TIMESERIES_CONFIG,
+    "enola": enola.TIMESERIES_CONFIG,
+    "mycroft": mycroft.TIMESERIES_CONFIG,
 }
 
 
@@ -41,8 +45,8 @@ def _register_timeseries_routes(space: str, configs: list[TimeseriesConfig]) -> 
 def _bind_route(space: str, cfg: TimeseriesConfig) -> None:
     async def route_handler(
         request: Request,
-        start: datetime = Query(...),
-        end: datetime = Query(...),
+        start: datetime | None = Query(None),
+        end: datetime | None = Query(None),
         columns: list[str] = Query(...),
         time_column: str = Query(...),
         target_points: int = Query(_TARGET_POINTS_DEFAULT),
