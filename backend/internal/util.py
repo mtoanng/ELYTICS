@@ -6,6 +6,7 @@ import re
 import threading
 import time
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any
 
 from databricks import sql as databricks_sql
@@ -20,6 +21,7 @@ DATABRICKS_HTTP_PATH = os.environ["DATABRICKS_HTTP_PATH"]
 DATABRICKS_TOKEN = os.environ["DATABRICKS_TOKEN"]
 DATABRICKS_CATALOG = os.getenv("DATABRICKS_CATALOG", "ps_xplatform_dev")
 DATABRICKS_SCHEMA = os.getenv("DATABRICKS_SCHEMA", "pemely_dev")
+LOCAL_SQL = os.getenv("LOCAL_SQL", "false").strip().lower() in {"1", "true", "yes", "on"}
 
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
@@ -151,6 +153,32 @@ def fully_qualified_view(space: str, data_kind: str, table_name: str) -> str:
     return f"{DATABRICKS_CATALOG}.{DATABRICKS_SCHEMA}.holmes_{safe_space}_{safe_table}_{safe_kind}_view"
 
 
+def _read_local_sql(path: str) -> str:
+    sql = Path(path).read_text(encoding="utf-8").strip()
+    return sql.rstrip(";")
+
+
+def resolve_query_source(space: str, data_kind: str, table_name: str) -> tuple[str, str]:
+    """Resolve query FROM source and cache identifier based on LOCAL_SQL flag."""
+    cache_source = fully_qualified_view(space=space, data_kind=data_kind, table_name=table_name)
+    if not LOCAL_SQL:
+        return cache_source, cache_source
+
+    safe_space = _validate_identifier(space)
+    safe_table = _validate_identifier(table_name)
+    segment = "meta" if data_kind == "metadata" else data_kind
+    safe_kind = _validate_identifier(segment)
+    sql_file = (
+        Path(__file__).resolve().parents[2]
+        / "views"
+        / "spaces"
+        / safe_space
+        / f"{safe_table}_{safe_kind}.sql"
+    )
+    sql_body = _read_local_sql(str(sql_file))
+    return f"({sql_body}) AS local_source", cache_source
+
+
 def _connect_databricks() -> Any:
     return databricks_sql.connect(
         server_hostname=DATABRICKS_SERVER_HOSTNAME,
@@ -258,29 +286,25 @@ def get_query_result(
     sort_by: str | None = None,
     sort_dir: str = "asc",
     ttl: int = 3600,
+    cache_source_name: str | None = None,
 ) -> list[dict[str, Any]]:
     filters = filters or {}
+    effective_ttl = 0 if LOCAL_SQL else ttl
+    source_name = cache_source_name or view_name
     key = _cache_key(
         "tabular",
-        view=view_name,
+        view=source_name,
         filters={k: sorted(v) for k, v in sorted(filters.items())},
         sort_by=sort_by,
         sort_dir=sort_dir.lower(),
     )
     r = get_redis_client()
-    cached = r.get(key)
-    if cached:
-        data: list[dict[str, Any]] = json.loads(cached)
-        record_query(
-            "tabular",
-            space,
-            table,
-            cache_hit=True,
-            duration_s=0,
-            payload_bytes=len(cached),
-            rows=len(data),
-        )
-        return data
+    if effective_ttl > 0:
+        cached = r.get(key)
+        if cached:
+            data: list[dict[str, Any]] = json.loads(cached)
+            record_query("tabular", space, table, cache_hit=True, duration_s=0, payload_bytes=len(cached), rows=len(data))
+            return data
 
     query = build_view_query(
         view=view_name, filters=filters, sort_by=sort_by, sort_dir=sort_dir
@@ -289,16 +313,9 @@ def get_query_result(
     data = execute_sql_query(query)
     duration = time.monotonic() - t0
     payload = json.dumps(data, default=str)
-    _cache_set(r, key, view_name, data, ttl)
-    record_query(
-        "tabular",
-        space,
-        table,
-        cache_hit=False,
-        duration_s=duration,
-        payload_bytes=len(payload),
-        rows=len(data),
-    )
+    if effective_ttl > 0:
+        _cache_set(r, key, source_name, data, effective_ttl)
+    record_query("tabular", space, table, cache_hit=False, duration_s=duration, payload_bytes=len(payload), rows=len(data))
     return data
 
 
@@ -428,8 +445,11 @@ def get_timeseries_result(
     filters: dict[str, list[str]] | None = None,
     target_points: int = _TARGET_POINTS_DEFAULT,
     ttl: int = 3600,
+    cache_source_name: str | None = None,
 ) -> dict[str, Any]:
     filters = filters or {}
+    effective_ttl = 0 if LOCAL_SQL else ttl
+    source_name = cache_source_name or view_name
     effective_start, effective_end = _resolve_timeseries_bounds(
         view_name=view_name,
         time_column=time_column,
@@ -442,7 +462,7 @@ def get_timeseries_result(
     )
     key = _cache_key(
         "timeseries",
-        view=view_name,
+        view=source_name,
         time_column=time_column,
         value_columns=sorted(value_columns),
         filters={k: sorted(v) for k, v in sorted(filters.items())},
@@ -451,18 +471,11 @@ def get_timeseries_result(
         bucket_seconds=bucket_seconds,
     )
     r = get_redis_client()
-    cached = r.get(key)
-    if cached:
-        record_query(
-            "timeseries",
-            space,
-            table,
-            cache_hit=True,
-            duration_s=0,
-            payload_bytes=len(cached),
-            rows=0,
-        )
-        return json.loads(cached)
+    if effective_ttl > 0:
+        cached = r.get(key)
+        if cached:
+            record_query("timeseries", space, table, cache_hit=True, duration_s=0, payload_bytes=len(cached), rows=0)
+            return json.loads(cached)
 
     query = build_timeseries_query(
         view=view_name,
@@ -488,16 +501,9 @@ def get_timeseries_result(
         },
     }
     serialized = json.dumps(payload, default=str)
-    _cache_set(r, key, view_name, payload, ttl)
-    record_query(
-        "timeseries",
-        space,
-        table,
-        cache_hit=False,
-        duration_s=duration,
-        payload_bytes=len(serialized),
-        rows=len(data),
-    )
+    if effective_ttl > 0:
+        _cache_set(r, key, source_name, payload, effective_ttl)
+    record_query("timeseries", space, table, cache_hit=False, duration_s=duration, payload_bytes=len(serialized), rows=len(data))
     return payload
 
 

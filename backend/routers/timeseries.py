@@ -1,3 +1,4 @@
+import logging
 from collections import defaultdict
 from datetime import datetime
 
@@ -7,8 +8,8 @@ from backend.internal.auth import require_groups
 from backend.internal.config_types import TimeseriesConfig
 from backend.internal.util import (
     _TARGET_POINTS_DEFAULT,
-    fully_qualified_view,
     get_timeseries_result,
+    resolve_query_source,
 )
 
 import backend.config.sherlock as sherlock
@@ -17,6 +18,7 @@ import backend.config.enola as enola
 import backend.config.mycroft as mycroft
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 SPACE_TIMESERIES_MAP: dict[str, list[TimeseriesConfig]] = {
     "sherlock": sherlock.TIMESERIES_CONFIG,
@@ -54,15 +56,11 @@ def _bind_route(space: str, cfg: TimeseriesConfig) -> None:
         filters = _parse_filters(request)
         for required in cfg.required_filters:
             if required not in filters:
-                raise HTTPException(
-                    status_code=400, detail=f"Missing required filter '{required}'"
-                )
-        view_name = fully_qualified_view(
-            space=space, data_kind="data", table_name=cfg.table_name
-        )
+                raise HTTPException(status_code=400, detail=f"Missing required filter '{required}'")
         try:
+            query_source, cache_source = resolve_query_source(space=space, data_kind="data", table_name=cfg.table_name)
             payload = get_timeseries_result(
-                view_name=view_name,
+                view_name=query_source,
                 space=space,
                 table=cfg.table_name,
                 time_column=time_column,
@@ -72,9 +70,15 @@ def _bind_route(space: str, cfg: TimeseriesConfig) -> None:
                 filters=filters,
                 target_points=target_points,
                 ttl=cfg.ttl,
+                cache_source_name=cache_source,
             )
+        except HTTPException:
+            raise
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc))
+        except Exception as exc:
+            logger.exception("timeseries query failed [space=%s table=%s]", space, cfg.table_name)
+            raise HTTPException(status_code=500, detail=str(exc))
         return payload
 
     router.add_api_route(
