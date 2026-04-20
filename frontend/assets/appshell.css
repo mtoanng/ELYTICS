@@ -1,0 +1,10 @@
+.fullscreen-page-content {
+    width: 100%;
+}
+
+.fullscreen-page-content .mantine-Container-root {
+    max-width: none;
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+}

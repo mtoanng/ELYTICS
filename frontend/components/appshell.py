@@ -1,10 +1,63 @@
 import dash_mantine_components as dmc
-from dash import dcc, page_container, callback, clientside_callback, Output, Input
+from dash import dcc, page_container, callback, Output, Input, State
+from dash_iconify import DashIconify
 
 from components import header, sidebar
 from services.auth import check_access
 from components.access_warning import create_access_warning
 from config.access_config import SPACE_ACCESS_MAP
+
+
+HEADER_HEIGHT = 70
+NAVBAR_WIDTH = 300
+
+
+def _chrome_toggle_button(chrome_hidden: bool):
+    icon = (
+        "material-symbols:fullscreen"
+        if chrome_hidden
+        else "material-symbols:fullscreen-exit"
+    )
+    label = "Show header and sidebar" if chrome_hidden else "Hide header and sidebar"
+    style = {
+        "position": "fixed",
+        "zIndex": 250,
+        "boxShadow": "0 4px 12px rgba(0, 0, 0, 0.16)",
+    }
+    if chrome_hidden:
+        style.update({"top": "8px", "left": "8px"})
+    else:
+        style.update(
+            {
+                "top": f"{HEADER_HEIGHT}px",
+                "left": f"{NAVBAR_WIDTH}px",
+                "transform": "translate(-50%, -50%)",
+            }
+        )
+
+    return dmc.Tooltip(
+        label=label,
+        position="right",
+        withArrow=True,
+        children=dmc.ActionIcon(
+            DashIconify(icon=icon, width=18),
+            id="appshell-chrome-toggle",
+            variant="filled",
+            radius="xl",
+            size="md",
+            color="gray",
+            style=style,
+            attributes={"aria-label": label, "title": label},
+        ),
+    )
+
+
+def _page_content(children, chrome_hidden: bool):
+    content_class_name = "fullscreen-page-content" if chrome_hidden else None
+    return [
+        _chrome_toggle_button(chrome_hidden),
+        dmc.Box(children, className=content_class_name),
+    ]
 
 
 def create_appshell():
@@ -23,6 +76,7 @@ def create_appshell():
             [
                 dcc.Location(id="url", refresh=False),
                 dcc.Store(id="theme-store", data="light"),
+                dcc.Store(id="appshell-chrome-hidden", data=False),
                 dcc.Store(id="user-access-store", data={"has_access": True}),
                 dcc.Store(id="current-space-store", data=None),
                 dmc.Box(
@@ -37,91 +91,115 @@ def create_appshell():
 @callback(
     Output("appshell-container", "children"),
     Input("url", "pathname"),
-    prevent_initial_call=False
+    Input("appshell-chrome-hidden", "data"),
+    prevent_initial_call=False,
 )
-def update_appshell_content(pathname):
+def update_appshell_content(pathname, chrome_hidden):
     # If at root path, show landing page without sidebar and no navbar config
     if pathname == "/" or pathname == "":
         return dmc.AppShell(
             [
-                dmc.AppShellHeader(header.layout(), h=70),
+                dmc.AppShellHeader(header.layout(), h=HEADER_HEIGHT),
                 dmc.AppShellMain(
                     children=page_container,
                     id="page-content",
                 ),
             ],
-            header={"height": 70},
-            padding="lg",
+            header={"height": HEADER_HEIGHT},
+            padding=0,
         )
-    
+
     # Extract space from pathname (e.g., "/sherlock/..." -> "sherlock")
     path_parts = pathname.split("/")
     space = path_parts[1] if len(path_parts) > 1 else None
     required_groups = SPACE_ACCESS_MAP.get(f"/{space}")
 
     # Check access
-    has_access, user, needs_login = check_access(groups=required_groups) if required_groups else (True, None, False)
-    
+    has_access, user, needs_login = (
+        check_access(groups=required_groups) if required_groups else (True, None, False)
+    )
+
     # If needs login, Dash auth will handle the redirect automatically
     # Just return empty content for now
     if needs_login:
         return dmc.AppShell(
             [
-                dmc.AppShellHeader(header.layout(), h=70),
+                dmc.AppShellHeader(header.layout(), h=HEADER_HEIGHT),
                 dmc.AppShellMain(
                     children=dmc.Center(
                         dmc.Loader(size="lg"),
-                        style={"minHeight": "calc(100vh - 70px)"}
+                        style={"minHeight": f"calc(100vh - {HEADER_HEIGHT}px)"},
                     ),
                     id="page-content",
                     p=0,
                     pt="lg",
                 ),
             ],
-            header={"height": 70},
-            padding="lg",
+            header={"height": HEADER_HEIGHT},
+            padding=0,
         )
-    
+
     # If no access, show access warning without sidebar
-    if not has_access:
+    if not has_access and space is not None:
         access_content = create_access_warning(space)
         return dmc.AppShell(
             [
-                dmc.AppShellHeader(header.layout(), h=70),
+                dmc.AppShellHeader(header.layout(), h=HEADER_HEIGHT),
                 dmc.AppShellMain(
                     children=dmc.Center(
                         access_content,
-                        style={"minHeight": "calc(100vh - 70px)"}
+                        style={"minHeight": f"calc(100vh - {HEADER_HEIGHT}px)"},
                     ),
                     id="page-content",
                     p=0,
                     pt="lg",
                 ),
             ],
-            header={"height": 70},
-            padding="lg",
+            header={"height": HEADER_HEIGHT},
+            padding=0,
         )
-    
+
     # Has access, show full layout with sidebar
+    if chrome_hidden:
+        return dmc.AppShell(
+            [
+                dmc.AppShellMain(
+                    children=_page_content(page_container, True),
+                    id="page-content",
+                ),
+            ],
+            padding=0,
+        )
+
     return dmc.AppShell(
         [
-            dmc.AppShellHeader(header.layout(), h=70),
+            dmc.AppShellHeader(header.layout(), h=HEADER_HEIGHT),
             dmc.AppShellNavbar(
                 sidebar.sidebar_layout(pathname),
                 id="sidebar-container",
-                w=300,
+                w=NAVBAR_WIDTH,
                 display="block",
             ),
             dmc.AppShellMain(
-                children=page_container,
+                children=_page_content(page_container, False),
                 id="page-content",
             ),
         ],
-        header={"height": 70},
+        header={"height": HEADER_HEIGHT},
         navbar={
-            "width": 300,
+            "width": NAVBAR_WIDTH,
             "breakpoint": "lg",
             "collapsed": {"mobile": True},
         },
-        padding="lg",
+        padding=0,
     )
+
+
+@callback(
+    Output("appshell-chrome-hidden", "data"),
+    Input("appshell-chrome-toggle", "n_clicks"),
+    State("appshell-chrome-hidden", "data"),
+    prevent_initial_call=True,
+)
+def toggle_appshell_chrome(_, chrome_hidden):
+    return not bool(chrome_hidden)
