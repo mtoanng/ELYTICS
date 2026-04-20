@@ -64,6 +64,11 @@
       "pr": 772,
       "title": "feat(core): Integrated views back into repository",
       "date": "2026-04-20"
+    },
+    {
+      "pr": 785,
+      "title": "feat(sherlock): Clean up timeseries overview page",
+      "date": "2026-04-20"
     }
   ],
   "releases": {}
