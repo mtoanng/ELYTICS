@@ -69,6 +69,11 @@
       "pr": 773,
       "title": "feat(sherlock): Cleaned CCM overview page",
       "date": "2026-04-13"
+    },
+    {
+      "pr": 772,
+      "title": "feat(core): Integrated views back into repository",
+      "date": "2026-04-20"
     }
   ],
   "releases": {}
