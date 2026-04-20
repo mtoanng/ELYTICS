@@ -288,6 +288,99 @@ def _signal_selector_options(signals: list[str]) -> list[dict[str, str]]:
     ]
 
 
+def _compute_gap_positions(
+    time_values: pd.Series,
+    max_gap_seconds: int | None,
+) -> set[int]:
+    if not max_gap_seconds or max_gap_seconds <= 0:
+        return set()
+
+    timestamps = pd.to_datetime(time_values, errors="coerce")
+    positions: set[int] = set()
+    for idx in range(1, len(timestamps)):
+        prev_ts = timestamps.iloc[idx - 1]
+        curr_ts = timestamps.iloc[idx]
+        if pd.isna(prev_ts) or pd.isna(curr_ts):
+            continue
+        if (curr_ts - prev_ts).total_seconds() > max_gap_seconds:
+            positions.add(idx)
+    return positions
+
+
+def _insert_gap_markers(values: list, gap_positions: set[int]) -> list:
+    if not gap_positions:
+        return values
+
+    output: list = []
+    for idx, value in enumerate(values):
+        if idx in gap_positions:
+            output.append(None)
+        output.append(value)
+    return output
+
+
+def _contiguous_band_segments(
+    df: pd.DataFrame,
+    min_col: str,
+    max_col: str,
+    gap_positions: set[int],
+) -> list[tuple[int, int]]:
+    segments: list[tuple[int, int]] = []
+    start_idx: int | None = None
+
+    for idx in range(len(df)):
+        if idx in gap_positions and start_idx is not None:
+            segments.append((start_idx, idx))
+            start_idx = None
+
+        min_value = df[min_col].iloc[idx]
+        max_value = df[max_col].iloc[idx]
+        time_value = df[PLOT_TIME_COLUMN].iloc[idx]
+        has_values = not (
+            pd.isna(min_value) or pd.isna(max_value) or pd.isna(time_value)
+        )
+
+        if not has_values:
+            if start_idx is not None:
+                segments.append((start_idx, idx))
+                start_idx = None
+            continue
+
+        if start_idx is None:
+            start_idx = idx
+
+    if start_idx is not None:
+        segments.append((start_idx, len(df)))
+
+    return segments
+
+
+def _build_signal_selector_data(
+    df: pd.DataFrame,
+    signals: list[str],
+    metric: str,
+) -> list[dict]:
+    available = [
+        {"label": SENSOR_TITLES.get(signal, signal), "value": signal}
+        for signal in signals
+        if _signal_has_data(df, signal, metric)
+    ]
+    missing = [
+        {
+            "label": SENSOR_TITLES.get(signal, signal),
+            "value": signal,
+            "disabled": True,
+        }
+        for signal in signals
+        if not _signal_has_data(df, signal, metric)
+    ]
+
+    selector_data: list[dict] = [*available]
+    if missing:
+        selector_data.append({"group": "Missing data", "items": missing})
+    return selector_data
+
+
 def _build_figure(
     df: pd.DataFrame,
     signals: list[str],
@@ -296,6 +389,7 @@ def _build_figure(
     plot_mode: str = "isolated",
     viewport_start: str | None = None,
     viewport_end: str | None = None,
+    bucket_seconds: int | None = None,
 ) -> go.Figure:
     if df.empty:
         return _empty_figure(theme, "No data for selected filters")
@@ -335,6 +429,12 @@ def _build_figure(
         subplot_titles=[title for title, _unit, _signals in groups],
     )
 
+    gap_positions = _compute_gap_positions(
+        df[PLOT_TIME_COLUMN],
+        2 * bucket_seconds if bucket_seconds else None,
+    )
+    x_with_gaps = _insert_gap_markers(df[PLOT_TIME_COLUMN].tolist(), gap_positions)
+
     color_index = 0
     for row_index, (_title, unit, group_signals) in enumerate(groups, start=1):
         for signal in group_signals:
@@ -351,44 +451,59 @@ def _build_figure(
                 has_max = _series_has_data(df, max_col)
                 has_avg = _series_has_data(df, avg_col)
 
-                if has_min and has_max:
-                    fig.add_trace(
-                        go.Scatter(
-                            x=df[PLOT_TIME_COLUMN],
-                            y=df[min_col],
-                            mode="lines",
-                            line=dict(width=0, color=color),
-                            showlegend=False,
-                            hoverinfo="skip",
-                            name=f"{signal_title} min",
-                        ),
-                        row=row_index,
-                        col=1,
+                if has_min and has_max and min_col and max_col:
+                    segments = _contiguous_band_segments(
+                        df, min_col, max_col, gap_positions
                     )
-                    fig.add_trace(
-                        go.Scatter(
-                            x=df[PLOT_TIME_COLUMN],
-                            y=df[max_col],
-                            mode="lines",
-                            line=dict(width=0, color=color),
-                            fill="tonexty",
-                            fillcolor=_hex_to_rgba(color, 0.18),
-                            showlegend=False,
-                            hoverinfo="skip",
-                            name=f"{signal_title} max",
-                        ),
-                        row=row_index,
-                        col=1,
-                    )
+                    for seg_start, seg_end in segments:
+                        seg_x = df[PLOT_TIME_COLUMN].iloc[seg_start:seg_end].tolist()
+                        seg_min = df[min_col].iloc[seg_start:seg_end].tolist()
+                        seg_max = df[max_col].iloc[seg_start:seg_end].tolist()
+                        if len(seg_x) < 2:
+                            continue
+
+                        fig.add_trace(
+                            go.Scatter(
+                                x=seg_x,
+                                y=seg_min,
+                                mode="lines",
+                                line=dict(width=0, color=color),
+                                showlegend=False,
+                                hoverinfo="skip",
+                                connectgaps=False,
+                                name=f"{signal_title} min",
+                            ),
+                            row=row_index,
+                            col=1,
+                        )
+                        fig.add_trace(
+                            go.Scatter(
+                                x=seg_x,
+                                y=seg_max,
+                                mode="lines",
+                                line=dict(width=0, color=color),
+                                fill="tonexty",
+                                fillcolor=_hex_to_rgba(color, 0.18),
+                                showlegend=False,
+                                hoverinfo="skip",
+                                connectgaps=False,
+                                name=f"{signal_title} max",
+                            ),
+                            row=row_index,
+                            col=1,
+                        )
 
                 if has_avg:
+                    avg_with_gaps = _insert_gap_markers(
+                        df[avg_col].tolist(), gap_positions
+                    )
                     fig.add_trace(
                         go.Scatter(
-                            x=df[PLOT_TIME_COLUMN],
-                            y=df[avg_col],
+                            x=x_with_gaps,
+                            y=avg_with_gaps,
                             mode="lines",
                             name=signal_title,
-                            line=dict(width=2.8, color=color),
+                            line=dict(width=2.0, color=color),
                             showlegend=False,
                         ),
                         row=row_index,
@@ -402,8 +517,8 @@ def _build_figure(
 
             fig.add_trace(
                 go.Scatter(
-                    x=df[PLOT_TIME_COLUMN],
-                    y=df[value_col],
+                    x=x_with_gaps,
+                    y=_insert_gap_markers(df[value_col].tolist(), gap_positions),
                     mode="lines",
                     name=signal_title,
                     line=dict(width=1.8, color=color),
@@ -969,6 +1084,7 @@ def load_timeseries_data(
         "status": status_text,
         "badge": badge,
         "signals": signals,
+        "bucket_seconds": bucket_seconds,
         "records": plot_df.to_dict("records"),
         "viewport": viewport,
     }
@@ -978,20 +1094,27 @@ def load_timeseries_data(
     Output("timeseries-signal-selector", "data"),
     Output("timeseries-signal-selector", "value"),
     Input("timeseries-data-store", "data"),
+    Input("timeseries-metric-selector", "value"),
     State("timeseries-signal-selector", "value"),
 )
-def sync_signal_selector(data, current_selection):
+def sync_signal_selector(data, metric, current_selection):
     data = data or {}
     signals = data.get("signals") or []
-    options = _signal_selector_options(signals)
+    metric = metric or "all"
+    records = data.get("records") or []
+    plot_df = pd.DataFrame(records)
+    options = _build_signal_selector_data(plot_df, signals, metric)
+    selectable_signals = [
+        signal for signal in signals if _signal_has_data(plot_df, signal, metric)
+    ]
 
     if not signals:
         return [], []
 
     if current_selection is None:
-        return options, signals
+        return options, selectable_signals
 
-    selected = [signal for signal in current_selection if signal in signals]
+    selected = [signal for signal in current_selection if signal in selectable_signals]
     return options, selected
 
 
@@ -1019,6 +1142,7 @@ def render_timeseries(data, selected_signals, metric, plot_mode, theme):
 
     records = data.get("records") or []
     signals = data.get("signals") or []
+    bucket_seconds = data.get("bucket_seconds")
     viewport = data.get("viewport") or {"start": None, "end": None}
 
     if selected_signals is None:
@@ -1043,6 +1167,7 @@ def render_timeseries(data, selected_signals, metric, plot_mode, theme):
         plot_mode=plot_mode,
         viewport_start=viewport.get("start"),
         viewport_end=viewport.get("end"),
+        bucket_seconds=bucket_seconds,
     )
 
     return fig, data.get("status", "No data"), data.get("badge", "")
