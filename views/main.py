@@ -20,7 +20,9 @@ def build_view_name(sql_path: Path, spaces_dir: Path = SPACES_DIR) -> str:
 
 
 def collect_sql_files(spaces_dir: Path = SPACES_DIR) -> list[tuple[Path, str]]:
-    return [(p, build_view_name(p, spaces_dir)) for p in sorted(spaces_dir.rglob("*.sql"))]
+    return [
+        (p, build_view_name(p, spaces_dir)) for p in sorted(spaces_dir.rglob("*.sql"))
+    ]
 
 
 def deploy_view_with_sql_warehouse(
@@ -31,7 +33,9 @@ def deploy_view_with_sql_warehouse(
     view_name: str,
     sql_body: str,
 ) -> None:
-    statement = f"CREATE OR REPLACE VIEW `{catalog}`.`{schema}`.`{view_name}` AS\\n{sql_body}"
+    statement = (
+        f"CREATE OR REPLACE VIEW `{catalog}`.`{schema}`.`{view_name}` AS\n{sql_body}"
+    )
     response = client.statement_execution.execute_statement(
         warehouse_id=warehouse_id,
         statement=statement,
@@ -51,7 +55,9 @@ def deploy_view_with_spark(
     view_name: str,
     sql_body: str,
 ) -> None:
-    statement = f"CREATE OR REPLACE VIEW `{catalog}`.`{schema}`.`{view_name}` AS\\n{sql_body}"
+    statement = (
+        f"CREATE OR REPLACE VIEW `{catalog}`.`{schema}`.`{view_name}` AS\n{sql_body}"
+    )
     spark.sql(statement)
 
 
@@ -60,9 +66,15 @@ def _running_in_databricks_runtime() -> bool:
 
 
 def _parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Deploy SQL views from spaces/ to Databricks")
-    parser.add_argument("--catalog", default=os.environ.get("DATABRICKS_CATALOG", "ps_xplatform_dev"))
-    parser.add_argument("--schema", default=os.environ.get("DATABRICKS_SCHEMA", "pemely_dev"))
+    parser = argparse.ArgumentParser(
+        description="Deploy SQL views from spaces/ to Databricks"
+    )
+    parser.add_argument(
+        "--catalog", default=os.environ.get("DATABRICKS_CATALOG", "ps_xplatform_dev")
+    )
+    parser.add_argument(
+        "--schema", default=os.environ.get("DATABRICKS_SCHEMA", "pemely_dev")
+    )
     return parser.parse_args()
 
 
@@ -112,7 +124,7 @@ def main() -> None:
             )
             print("OK")
 
-    print(f"\\nAll {len(sql_files)} view(s) deployed successfully.")
+    print(f"\nAll {len(sql_files)} view(s) deployed successfully.")
 
 
 if __name__ == "__main__":
