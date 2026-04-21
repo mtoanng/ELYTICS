@@ -43,11 +43,10 @@ def _chrome_toggle_button(chrome_hidden: bool, visible: bool = True):
             children=dmc.ActionIcon(
                 DashIconify(id="appshell-chrome-toggle-icon", icon=icon, width=18, rotate=1),
                 id="appshell-chrome-toggle",
-                variant="filled",
+                variant="default",
                 radius="xs",
                 size="xs",
-                color="gray",
-                style={"boxShadow": "0 4px 12px rgba(0, 0, 0, 0.16)"},
+                style={"boxShadow": "var(--mantine-shadow-sm)"},
                 attributes={"aria-label": label, "title": label},
             ),
         ),
