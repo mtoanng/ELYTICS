@@ -74,6 +74,11 @@
       "pr": 791,
       "title": "feat(core): Added fullscreen functionality",
       "date": "2026-04-21"
+    },
+    {
+      "pr": 792,
+      "title": "fix(core): Fullscreen button styling",
+      "date": "2026-04-21"
     }
   ],
   "releases": {}
