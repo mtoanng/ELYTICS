@@ -16,15 +16,12 @@ def _toggle_style(chrome_hidden: bool, visible: bool = True) -> dict[str, str | 
     style = {
         "position": "absolute",
         "zIndex": 250,
-        "boxShadow": "0 4px 12px rgba(0, 0, 0, 0.16)",
         "top": "2px",
         "left": "2px",
     }
     if not visible:
         style["display"] = "none"
         return style
-
-    # Keep the toggle pinned to the top-left of the page-content container.
     return style
 
 
@@ -50,6 +47,7 @@ def _chrome_toggle_button(chrome_hidden: bool, visible: bool = True):
                 radius="xs",
                 size="xs",
                 color="gray",
+                style={"boxShadow": "0 4px 12px rgba(0, 0, 0, 0.16)"},
                 attributes={"aria-label": label, "title": label},
             ),
         ),
@@ -58,14 +56,26 @@ def _chrome_toggle_button(chrome_hidden: bool, visible: bool = True):
     )
 
 
-def _page_content(children, chrome_hidden: bool, show_toggle: bool = True):
+def _page_content(children, chrome_hidden: bool, show_toggle: bool = True, constrained: bool = False):
+    content_style = {"maxWidth": "1200px", "margin": "0 auto"} if constrained else None
     return dmc.Box(
         [
             _chrome_toggle_button(chrome_hidden, visible=show_toggle),
-            dmc.Box(children, className="appshell-page-content"),
+            dmc.Box(
+                children,
+                className="appshell-page-content",
+                style=content_style,
+            ),
         ],
         style={"position": "relative"},
     )
+
+
+def _is_home_path(pathname: str) -> bool:
+    return pathname in ("/", "") or pathname.endswith("/home")
+
+
+
 
 
 def create_appshell():
@@ -84,7 +94,7 @@ def create_appshell():
             [
                 dcc.Location(id="url", refresh=False),
                 dcc.Store(id="theme-store", data="light"),
-                dcc.Store(id="appshell-chrome-hidden", data=True),
+                dcc.Store(id="appshell-chrome-hidden", data=False),
                 dcc.Store(id="user-access-store", data={"has_access": True}),
                 dcc.Store(id="current-space-store", data=None),
                 dmc.Box(
@@ -103,7 +113,9 @@ def create_appshell():
     prevent_initial_call=False,
 )
 def update_appshell_content(pathname, chrome_hidden):
-    hidden = True if chrome_hidden is None else bool(chrome_hidden)
+    hidden = bool(chrome_hidden) if chrome_hidden is not None else False
+    is_home = _is_home_path(pathname)
+    show_toggle = not is_home
     shell_class = "appshell-root chrome-hidden" if hidden else "appshell-root"
 
     # If at root path, show landing page without sidebar and no navbar config
@@ -114,7 +126,12 @@ def update_appshell_content(pathname, chrome_hidden):
             children=[
                 dmc.AppShellHeader(header.layout(), h=HEADER_HEIGHT),
                 dmc.AppShellMain(
-                    children=_page_content(page_container, hidden, show_toggle=False),
+                    children=_page_content(
+                        page_container,
+                        hidden,
+                        show_toggle=False,
+                        constrained=True,
+                    ),
                     id="page-content",
                 ),
             ],
@@ -147,6 +164,8 @@ def update_appshell_content(pathname, chrome_hidden):
                             style={"minHeight": f"calc(100vh - {HEADER_HEIGHT}px)"},
                         ),
                         hidden,
+                        show_toggle=show_toggle,
+                        constrained=is_home,
                     ),
                     id="page-content",
                     p=0,
@@ -172,6 +191,8 @@ def update_appshell_content(pathname, chrome_hidden):
                             style={"minHeight": f"calc(100vh - {HEADER_HEIGHT}px)"},
                         ),
                         hidden,
+                        show_toggle=show_toggle,
+                        constrained=is_home,
                     ),
                     id="page-content",
                     p=0,
@@ -193,7 +214,12 @@ def update_appshell_content(pathname, chrome_hidden):
                 w=NAVBAR_WIDTH,
             ),
             dmc.AppShellMain(
-                children=_page_content(page_container, hidden),
+                children=_page_content(
+                    page_container,
+                    hidden,
+                    show_toggle=show_toggle,
+                    constrained=is_home,
+                ),
                 id="page-content",
             ),
         ],
@@ -213,7 +239,9 @@ def update_appshell_content(pathname, chrome_hidden):
     State("appshell-chrome-hidden", "data"),
     prevent_initial_call=True,
 )
-def toggle_appshell_chrome(_, chrome_hidden):
+def toggle_appshell_chrome(n_clicks, chrome_hidden):
+    if not n_clicks:
+        return chrome_hidden
     return not bool(chrome_hidden)
 
 
@@ -224,16 +252,19 @@ def toggle_appshell_chrome(_, chrome_hidden):
     Output("appshell-chrome-toggle", "attributes"),
     Output("appshell-chrome-tooltip", "label"),
     Input("appshell-chrome-hidden", "data"),
+    Input("url", "pathname"),
     prevent_initial_call=True,
 )
-def sync_chrome_visibility(chrome_hidden):
-    hidden = True if chrome_hidden is None else bool(chrome_hidden)
+def sync_chrome_visibility(chrome_hidden, pathname):
+    show_toggle = not _is_home_path(pathname)
+    hidden = bool(chrome_hidden) if chrome_hidden is not None else False
     shell_class = "appshell-root chrome-hidden" if hidden else "appshell-root"
     icon = (
         "material-symbols:more-up-rounded"
-        if chrome_hidden
+        if hidden
         else "material-symbols:more-down-rounded"
     )
     label = "Show header and sidebar" if hidden else "Hide header and sidebar"
     attributes = {"aria-label": label, "title": label}
-    return shell_class, _toggle_style(hidden), icon, attributes, label
+    return shell_class, _toggle_style(hidden, visible=show_toggle), icon, attributes, label
+
