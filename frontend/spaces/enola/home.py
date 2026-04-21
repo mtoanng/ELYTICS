@@ -11,8 +11,10 @@ def enola_layout():
     
     return dmc.Container(
         size="md",
+        pt="md",
+        pb="xl",
         children=[
-            dmc.Title("Welcome to Enola Home", order=1, mt="lg"),
+            dmc.Title("Welcome to Enola Home", order=1),
             dmc.Text(
                 "Enola provides comprehensive management and administration tools for system "
                 "configuration and user access control.",
@@ -31,7 +33,6 @@ def enola_layout():
                 mt="xl",
             ),
         ],
-        py="xl",
     )
 
 layout = enola_layout
