@@ -36,7 +36,7 @@ USAGE_BLOCKQUOTE_TEXT = [
 # Column metadata keeps field mapping in one place and avoids repetitive hard-coded dicts.
 BASE_ORDER_COLUMNS = [
     ("Order ID", "order_id", "numeric"),
-    ("Sample Name", "sample_name", "text"),
+    ("Sample Name", "name", "text"),
     ("# cells", "number_of_cells", "numeric"),
     ("Testrig ID", "testrig_id", "numeric"),
     ("Short Description", "short_description", "text"),
@@ -45,6 +45,19 @@ BASE_ORDER_COLUMNS = [
     ("Run [hr]", "timeFacRun", "numeric"),
     ("start count", "startCnt", "numeric"),
     ("polcurve count", "polcurve_count", "numeric"),
+]
+
+SAMPLE_DETAIL_COLUMNS = [
+    ("Leepa number", "leepa_number", "text"),
+    ("Type", "type", "text"),
+    ("State", "state", "text"),
+    ("Plant", "production_plant", "text"),
+    ("Cell description", "description", "text"),
+    ("Cell name", "cellunit_name", "text"),
+    ("CCM", "ccm_name", "text"),
+    ("PTL", "ptl_name", "text"),
+    ("GDL", "gdl_name", "text"),
+    ("Active area / cell", "active_area_per_cell", "numeric"),
 ]
 
 MAX_GROUP_COLUMNS = [
@@ -59,10 +72,63 @@ MAX_GROUP_COLUMNS = [
 ]
 
 
-def build_order_column_defs():
+ORDER_COLUMN_SECTION_OPTIONS = [
+    {
+        "group": "Order columns",
+        "items": [
+            {"value": field, "label": header}
+            for header, field, _ in BASE_ORDER_COLUMNS
+        ],
+    },
+    {
+        "group": "Sample details",
+        "items": [
+            {"value": field, "label": header}
+            for header, field, _ in SAMPLE_DETAIL_COLUMNS
+        ],
+    },
+    {
+        "group": "Maximum values",
+        "items": [
+            {"value": field, "label": header}
+            for header, field in MAX_GROUP_COLUMNS
+        ],
+    },
+]
+ORDER_COLUMN_SECTION_DEFAULT = [field for _, field, _ in BASE_ORDER_COLUMNS]
+
+
+def _column_def(
+    header: str,
+    field: str,
+    col_type: str,
+    *,
+    max_width: int | None = None,
+    min_width: int | None = None,
+) -> dict[str, Any]:
+    is_numeric = col_type == "numeric"
+    return {
+        "headerName": header,
+        "field": field,
+        "type": col_type,
+        "minWidth": min_width if min_width is not None else (90 if is_numeric else 120),
+        "maxWidth": max_width if max_width is not None else (140 if is_numeric else 240),
+        "wrapHeaderText": True,
+        "autoHeaderHeight": True,
+    }
+
+
+def build_order_column_defs(selected_fields: set[str] | None = None):
+    fields = selected_fields or set(ORDER_COLUMN_SECTION_DEFAULT)
     base_defs: list[dict[str, Any]] = [
-        {"headerName": header, "field": field, "type": col_type}
+        _column_def(
+            header,
+            field,
+            col_type,
+            max_width=320 if field == "short_description" else None,
+        )
         for header, field, col_type in BASE_ORDER_COLUMNS
+        if field in fields
     ]
     max_children: list[dict[str, Any]] = [
         {
@@ -78,14 +144,36 @@ def build_order_column_defs():
         if child["columnGroupShow"] is None:
             child.pop("columnGroupShow")
 
-    base_defs.append(
-        {
-            "headerName": "Maximum values",
-            "headerClass": "centered-group-header",
-            "groupId": "maximumGroup",
-            "children": max_children,
-        }
-    )
+    sample_children = [
+        _column_def(
+            header,
+            field,
+            col_type,
+            max_width=300 if field == "description" else None,
+        )
+        for header, field, col_type in SAMPLE_DETAIL_COLUMNS
+        if field in fields
+    ]
+    if sample_children:
+        base_defs.append(
+            {
+                "headerName": "Sample details",
+                "headerClass": "centered-group-header",
+                "groupId": "sampleDetailsGroup",
+                "children": sample_children,
+            }
+        )
+
+    max_children = [child for child in max_children if child["field"] in fields]
+    if max_children:
+        base_defs.append(
+            {
+                "headerName": "Maximum values",
+                "headerClass": "centered-group-header",
+                "groupId": "maximumGroup",
+                "children": max_children,
+            }
+        )
     return base_defs
 
 def order_overview_layout():
@@ -114,7 +202,10 @@ def order_overview_layout():
                                     ),
                                 ],
                             ),
-                            dmc.Text("This page provides an overview of all test orders.", c="dimmed"),
+                            dmc.Text(
+                                "This page provides a merged overview of orders and samples.",
+                                c="dimmed",
+                            ),
                             dmc.Collapse(
                                 dmc.Blockquote(
                                     dmc.List(
@@ -141,7 +232,7 @@ def order_overview_layout():
                             dmc.Group(
                                 gap="md",
                                 align="flex-end",
-                                style={"flexWrap": "nowrap", "overflowX": "auto"},
+                                wrap="wrap",
                                 children=[
                                     dmc.InputWrapper(
                                         dcc.Dropdown(
@@ -158,7 +249,7 @@ def order_overview_layout():
                                         htmlFor="order-order-id-filter",
                                         className="dmc",
                                         styles={"label": {"marginBottom": "6px"}},
-                                        style={"flex": "0 0 220px", "minWidth": "220px"},
+                                        style={"flex": "1 1 160px", "minWidth": "160px"},
                                     ),
                                     dmc.InputWrapper(
                                         dcc.Dropdown(
@@ -175,7 +266,24 @@ def order_overview_layout():
                                         htmlFor="order-sample-name-filter",
                                         className="dmc",
                                         styles={"label": {"marginBottom": "6px"}},
-                                        style={"flex": "0 0 220px", "minWidth": "220px"},
+                                        style={"flex": "1 1 160px", "minWidth": "160px"},
+                                    ),
+                                    dmc.InputWrapper(
+                                        dcc.Dropdown(
+                                            id="order-cell-name-filter",
+                                            options=[],
+                                            value=[],
+                                            multi=True,
+                                            searchable=True,
+                                            clearable=True,
+                                            placeholder="Select cell names",
+                                            style={"width": "100%"},
+                                        ),
+                                        label="Cell Name",
+                                        htmlFor="order-cell-name-filter",
+                                        className="dmc",
+                                        styles={"label": {"marginBottom": "6px"}},
+                                        style={"flex": "1 1 160px", "minWidth": "160px"},
                                     ),
                                     dmc.InputWrapper(
                                         dcc.Dropdown(
@@ -192,7 +300,7 @@ def order_overview_layout():
                                         htmlFor="order-number-of-cells-filter",
                                         className="dmc",
                                         styles={"label": {"marginBottom": "6px"}},
-                                        style={"flex": "0 0 220px", "minWidth": "220px"},
+                                        style={"flex": "1 1 160px", "minWidth": "160px"},
                                     ),
                                     dmc.InputWrapper(
                                         dcc.Dropdown(
@@ -209,7 +317,7 @@ def order_overview_layout():
                                         htmlFor="order-testrig-id-filter",
                                         className="dmc",
                                         styles={"label": {"marginBottom": "6px"}},
-                                        style={"flex": "0 0 220px", "minWidth": "220px"},
+                                        style={"flex": "1 1 160px", "minWidth": "160px"},
                                     ),
                                     dmc.Button(
                                         [
@@ -225,18 +333,23 @@ def order_overview_layout():
                                         id="order-download-btn",
                                         n_clicks=0,
                                         className="download-btn",
-                                        style={"flex": "0 0 auto", "whiteSpace": "nowrap"},
+                                        style={"flex": "0 0 auto", "whiteSpace": "nowrap", "alignSelf": "flex-end"},
                                     ),
                                     dcc.Download(id="order-download-csv"),
                                 ],
-                            )
-                        ],
-                    ),
-                    dmc.Paper(
-                        withBorder=True,
-                        p="md",
-                        radius="md",
-                        children=[
+                            ),
+                            dmc.Divider(my="md"),
+                            dmc.MultiSelect(
+                                id="order-visible-columns",
+                                label="Visible Columns",
+                                description="Hide or show columns. Sample and maximum value groups are hidden by default.",
+                                data=ORDER_COLUMN_SECTION_OPTIONS,
+                                value=ORDER_COLUMN_SECTION_DEFAULT,
+                                searchable=True,
+                                clearable=False,
+                                nothingFoundMessage="No columns available",
+                            ),
+                            dmc.Space(h="sm"),
                             dcc.Loading(
                                 id="order-table-loading",
                                 type="default",
@@ -249,7 +362,9 @@ def order_overview_layout():
                                             "resizable": True,
                                             "sortable": True,
                                             "filter": True,
-                                            "minWidth": 110,
+                                            "minWidth": 90,
+                                            "wrapHeaderText": True,
+                                            "autoHeaderHeight": True,
                                         },
                                         dashGridOptions={
                                             "pagination": True,
@@ -287,6 +402,7 @@ layout = order_overview_layout
     Input("order-order-table", "id"),
 )
 def load_order_data(_):
+    # Order data now includes joined sample fields for cross-page consistency.
     df = get_tabular('sherlock', "order")
     if df.empty:
         return []
@@ -296,119 +412,89 @@ def load_order_data(_):
         df[max_cols] = df[max_cols].round(2)
     return df.to_dict("records")
 
-# Update table and filter dropdowns
+# Populate filter dropdown options once when data loads (no re-fetch on filter change)
 @callback(
-    Output("order-order-table", "rowData"),
     Output("order-order-id-filter", "options"),
     Output("order-sample-name-filter", "options"),
+    Output("order-cell-name-filter", "options"),
     Output("order-number-of-cells-filter", "options"),
     Output("order-testrig-id-filter", "options"),
-    Input("order-order-id-filter", "value"),
-    Input("order-number-of-cells-filter", "value"),
-    Input("order-sample-name-filter", "value"),
-    Input("order-testrig-id-filter", "value"),
     Input("order-data-store", "data"),
 )
-def update_table(order_id, number_of_cells, sample_name, testrig_id, data):
+def populate_filter_options(data):
     if not data:
         return [], [], [], [], []
-
-    def as_list(value):
-        if value is None:
-            return []
-        if isinstance(value, list):
-            return value
-        return [value]
-
     df = pd.DataFrame(data)
-    dff = df.copy()
-    order_id_list = as_list(order_id)
-    number_of_cells_list = as_list(number_of_cells)
-    sample_name_list = as_list(sample_name)
-    testrig_id_list = as_list(testrig_id)
-
-    # Filtering logic
-    if order_id_list:
-        dff = dff[dff["order_id"].isin(order_id_list)]
-    if number_of_cells_list:
-        dff = dff[dff["number_of_cells"].isin(number_of_cells_list)]
-    if sample_name_list:
-        sample_name_keys = [str(v) for v in sample_name_list]
-        dff = dff[
-            dff["sample_name"].apply(lambda x: "Null" if pd.isna(x) else str(x)).isin(sample_name_keys)
-        ]
-    if testrig_id_list:
-        testrig_keys = [str(v) for v in testrig_id_list]
-        dff = dff[
-            dff["testrig_id"].apply(lambda x: "Null" if pd.isna(x) else str(x)).isin(testrig_keys)
-        ]
-
-    records = dff.to_dict("records")
-
-    # Now, update options for all dropdowns based on the filtered df
-    filtered_df = df.copy()
-    true_mask = pd.Series([True] * len(filtered_df), index=filtered_df.index)
-    mask_order_id = filtered_df["order_id"].isin(order_id_list) if order_id_list else true_mask
-    mask_number_of_cells = (
-        filtered_df["number_of_cells"].isin(number_of_cells_list)
-        if number_of_cells_list
-        else true_mask
-    )
-    sample_name_keys = [str(v) for v in sample_name_list]
-    mask_sample_name = (
-        filtered_df["sample_name"].apply(lambda x: "Null" if pd.isna(x) else str(x)).isin(sample_name_keys)
-        if sample_name_list
-        else true_mask
-    )
-    testrig_keys = [str(v) for v in testrig_id_list]
-    mask_testrig_id = (
-        filtered_df["testrig_id"].apply(lambda x: "Null" if pd.isna(x) else str(x)).isin(testrig_keys)
-        if testrig_id_list
-        else true_mask
-    )
-
-    # Order ID options (apply all except order_id)
-    mask = mask_number_of_cells & mask_sample_name & mask_testrig_id
     order_id_options = [
         {"label": str(oid), "value": oid}
-        for oid in sorted(filtered_df[mask]["order_id"].dropna().unique(), reverse=True)
+        for oid in sorted(df["order_id"].dropna().unique(), reverse=True)
     ]
-    # Sample Name options (apply all except sample_name)
-    mask = mask_order_id & mask_number_of_cells & mask_testrig_id
     sample_name_options = [
         {
             "label": "Null" if pd.isna(sname) else str(sname),
             "value": "Null" if pd.isna(sname) else str(sname),
         }
-        for sname in sorted(
-            filtered_df[mask]["sample_name"].unique(),
-            key=lambda x: "Null" if pd.isna(x) else str(x),
-        )
+        for sname in sorted(df["name"].unique(), key=lambda x: "Null" if pd.isna(x) else str(x))
     ]
-    # Number of Cells options (apply all except number_of_cells)
-    mask = mask_order_id & mask_sample_name & mask_testrig_id
+    cell_name_options = [
+        {"label": str(cn), "value": cn}
+        for cn in sorted(df["cellunit_name"].dropna().unique())
+    ]
     number_of_cells_options = [
         {"label": str(int(nc)), "value": int(nc)}
-        for nc in sorted(filtered_df[mask]["number_of_cells"].dropna().unique())
+        for nc in sorted(df["number_of_cells"].dropna().unique())
     ]
-    # Testrig ID options (apply all except testrig_id)
-    mask = mask_order_id & mask_number_of_cells & mask_sample_name
     testrig_id_options = [
         {
             "label": "Null" if pd.isna(tid) else str(tid),
             "value": "Null" if pd.isna(tid) else str(tid),
         }
-        for tid in sorted(
-            filtered_df[mask]["testrig_id"].unique(),
-            key=lambda x: "Null" if pd.isna(x) else str(x),
-        )
+        for tid in sorted(df["testrig_id"].unique(), key=lambda x: "Null" if pd.isna(x) else str(x))
     ]
-    return records, order_id_options, sample_name_options, number_of_cells_options, testrig_id_options
+    return order_id_options, sample_name_options, cell_name_options, number_of_cells_options, testrig_id_options
+
+
+# Client-side filtering — no server round-trip when filter values change
+clientside_callback(
+    """
+    function(orderId, sampleName, cellName, numCells, testrigId, data) {
+        if (!data || !data.length) return [];
+        var dff = data;
+        if (orderId && orderId.length)
+            dff = dff.filter(function(r) { return orderId.indexOf(r.order_id) !== -1; });
+        if (sampleName && sampleName.length) {
+            dff = dff.filter(function(r) {
+                var v = (r.name == null) ? 'Null' : String(r.name);
+                return sampleName.indexOf(v) !== -1;
+            });
+        }
+        if (cellName && cellName.length)
+            dff = dff.filter(function(r) { return cellName.indexOf(r.cellunit_name) !== -1; });
+        if (numCells && numCells.length)
+            dff = dff.filter(function(r) { return numCells.indexOf(r.number_of_cells) !== -1; });
+        if (testrigId && testrigId.length) {
+            dff = dff.filter(function(r) {
+                var v = (r.testrig_id == null) ? 'Null' : String(r.testrig_id);
+                return testrigId.indexOf(v) !== -1;
+            });
+        }
+        return dff;
+    }
+    """,
+    Output("order-order-table", "rowData"),
+    Input("order-order-id-filter", "value"),
+    Input("order-sample-name-filter", "value"),
+    Input("order-cell-name-filter", "value"),
+    Input("order-number-of-cells-filter", "value"),
+    Input("order-testrig-id-filter", "value"),
+    Input("order-data-store", "data"),
+)
 
 # Callback to update filter dropdowns when a cell is double-clicked
 @callback(
     Output("order-order-id-filter", "value"),
     Output("order-sample-name-filter", "value"),
+    Output("order-cell-name-filter", "value"),
     Output("order-number-of-cells-filter", "value"),
     Output("order-testrig-id-filter", "value"),
     Input("order-order-table", "cellDoubleClicked"),
@@ -420,13 +506,15 @@ def update_filter_on_cell_dblclick(cell):
     col = cell["colId"]
     val = cell["value"]
     if col == "order_id":
-        return [val], [], [], []
-    if col == "sample_name":
-        return [], ["Null" if val is None else str(val)], [], []
+        return [val], [], [], [], []
+    if col == "name":
+        return [], ["Null" if val is None else str(val)], [], [], []
+    if col == "cellunit_name":
+        return [], [], [val], [], []
     if col == "number_of_cells":
-        return [], [], [int(val)], []
+        return [], [], [], [int(val)], []
     if col == "testrig_id":
-        return [], [], [], ["Null" if val is None else str(val)]
+        return [], [], [], [], ["Null" if val is None else str(val)]
     raise PreventUpdate
 
 @callback(
@@ -440,6 +528,17 @@ def download_order_table(n_clicks, table_data):
         return no_update
     df_filtered = pd.DataFrame(table_data)
     return send_data_frame(df_filtered.to_csv, "order_table.csv", index=False)
+
+
+@callback(
+    Output("order-order-table", "columnDefs"),
+    Input("order-visible-columns", "value"),
+)
+def update_column_sections(selected_sections):
+    selected = set(selected_sections or [])
+    if not selected:
+        return []
+    return build_order_column_defs(selected)
 
 @callback(
     Output("order-usage-open", "data"),

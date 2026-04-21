@@ -1,6 +1,17 @@
 SELECT
   o.order_id,
   o.sample_name,
+  samp.name,
+  samp.leepa_number,
+  samp.type,
+  samp.state,
+  samp.production_plant,
+  samp.description,
+  samp.cellunit_name,
+  samp.ccm_name,
+  samp.ptl_name,
+  samp.gdl_name,
+  samp.active_area_per_cell,
   o.number_of_cells,
   o.testrig_id,
   o.short_description,
@@ -19,6 +30,8 @@ SELECT
   t.maxh2out
 FROM
   ps_xplatform_dev.pemely_ops.gold_genericstack_order o
+    LEFT JOIN ps_xplatform_dev.pemely_ops.gold_sample samp
+      ON o.sample_id = samp.sample_id
     INNER JOIN (
       SELECT
         order_id,

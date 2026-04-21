@@ -21,7 +21,6 @@ SIDEBAR_STRUCTURE = {
             "path": "data-exploration",
             "pages": [
                 {"path": "order-overview", "label": "Order Overview"},
-                {"path": "sample-overview", "label": "Sample Overview"},
                 {"path": "runtime-overview", "label": "Runtime Overview"},
                 {"path": "polarization-curves", "label": "Polarization Curves"},
                 {"path": "timeseries-overview", "label": "Timeseries Overview"},
