@@ -69,6 +69,11 @@
       "pr": 785,
       "title": "feat(sherlock): Clean up timeseries overview page",
       "date": "2026-04-20"
+    },
+    {
+      "pr": 791,
+      "title": "feat(core): Added fullscreen functionality",
+      "date": "2026-04-21"
     }
   ],
   "releases": {}
