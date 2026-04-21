@@ -12,57 +12,60 @@ HEADER_HEIGHT = 70
 NAVBAR_WIDTH = 300
 
 
-def _toggle_style(chrome_hidden: bool) -> dict[str, str | int]:
+def _toggle_style(chrome_hidden: bool, visible: bool = True) -> dict[str, str | int]:
     style = {
-        "position": "fixed",
+        "position": "absolute",
         "zIndex": 250,
         "boxShadow": "0 4px 12px rgba(0, 0, 0, 0.16)",
+        "top": "2px",
+        "left": "2px",
     }
-    if chrome_hidden:
-        style.update({"top": "8px", "left": "8px"})
-    else:
-        style.update(
-            {
-                "top": f"{HEADER_HEIGHT}px",
-                "left": f"{NAVBAR_WIDTH}px",
-                "transform": "translate(-50%, -50%)",
-            }
-        )
+    if not visible:
+        style["display"] = "none"
+        return style
+
+    # Keep the toggle pinned to the top-left of the page-content container.
     return style
 
 
-def _chrome_toggle_button(chrome_hidden: bool):
+def _chrome_toggle_button(chrome_hidden: bool, visible: bool = True):
     icon = (
-        "material-symbols:fullscreen"
+        "material-symbols:more-up-rounded"
         if chrome_hidden
-        else "material-symbols:fullscreen-exit"
+        else "material-symbols:more-down-rounded"
     )
     label = "Show header and sidebar" if chrome_hidden else "Hide header and sidebar"
-    style = _toggle_style(chrome_hidden)
+    style = _toggle_style(chrome_hidden, visible)
 
-    return dmc.Tooltip(
-        id="appshell-chrome-tooltip",
-        label=label,
-        position="right",
-        withArrow=True,
-        children=dmc.ActionIcon(
-            DashIconify(id="appshell-chrome-toggle-icon", icon=icon, width=18),
-            id="appshell-chrome-toggle",
-            variant="filled",
-            radius="xl",
-            size="md",
-            color="gray",
-            style=style,
-            attributes={"aria-label": label, "title": label},
+    return dmc.Box(
+        dmc.Tooltip(
+            id="appshell-chrome-tooltip",
+            label=label,
+            position="right",
+            withArrow=True,
+            children=dmc.ActionIcon(
+                DashIconify(id="appshell-chrome-toggle-icon", icon=icon, width=18, rotate=1),
+                id="appshell-chrome-toggle",
+                variant="filled",
+                radius="xs",
+                size="xs",
+                color="gray",
+                attributes={"aria-label": label, "title": label},
+            ),
         ),
+        id="appshell-chrome-toggle-wrapper",
+        style=style,
     )
 
 
-def _page_content(children, chrome_hidden: bool):
-    return [
-        _chrome_toggle_button(chrome_hidden),
-        dmc.Box(children, className="appshell-page-content"),
-    ]
+def _page_content(children, chrome_hidden: bool, show_toggle: bool = True):
+    return dmc.Box(
+        [
+            _chrome_toggle_button(chrome_hidden, visible=show_toggle),
+            dmc.Box(children, className="appshell-page-content"),
+        ],
+        style={"position": "relative"},
+    )
 
 
 def create_appshell():
@@ -100,7 +103,8 @@ def create_appshell():
     prevent_initial_call=False,
 )
 def update_appshell_content(pathname, chrome_hidden):
-    shell_class = "appshell-root chrome-hidden" if chrome_hidden else "appshell-root"
+    hidden = True if chrome_hidden is None else bool(chrome_hidden)
+    shell_class = "appshell-root chrome-hidden" if hidden else "appshell-root"
 
     # If at root path, show landing page without sidebar and no navbar config
     if pathname == "/" or pathname == "":
@@ -110,7 +114,7 @@ def update_appshell_content(pathname, chrome_hidden):
             children=[
                 dmc.AppShellHeader(header.layout(), h=HEADER_HEIGHT),
                 dmc.AppShellMain(
-                    children=_page_content(page_container, bool(chrome_hidden)),
+                    children=_page_content(page_container, hidden, show_toggle=False),
                     id="page-content",
                 ),
             ],
@@ -142,7 +146,7 @@ def update_appshell_content(pathname, chrome_hidden):
                             dmc.Loader(size="lg"),
                             style={"minHeight": f"calc(100vh - {HEADER_HEIGHT}px)"},
                         ),
-                        bool(chrome_hidden),
+                        hidden,
                     ),
                     id="page-content",
                     p=0,
@@ -167,7 +171,7 @@ def update_appshell_content(pathname, chrome_hidden):
                             access_content,
                             style={"minHeight": f"calc(100vh - {HEADER_HEIGHT}px)"},
                         ),
-                        bool(chrome_hidden),
+                        hidden,
                     ),
                     id="page-content",
                     p=0,
@@ -189,7 +193,7 @@ def update_appshell_content(pathname, chrome_hidden):
                 w=NAVBAR_WIDTH,
             ),
             dmc.AppShellMain(
-                children=_page_content(page_container, bool(chrome_hidden)),
+                children=_page_content(page_container, hidden),
                 id="page-content",
             ),
         ],
@@ -215,7 +219,7 @@ def toggle_appshell_chrome(_, chrome_hidden):
 
 @callback(
     Output("main-appshell", "className"),
-    Output("appshell-chrome-toggle", "style"),
+    Output("appshell-chrome-toggle-wrapper", "style"),
     Output("appshell-chrome-toggle-icon", "icon"),
     Output("appshell-chrome-toggle", "attributes"),
     Output("appshell-chrome-tooltip", "label"),
@@ -223,9 +227,13 @@ def toggle_appshell_chrome(_, chrome_hidden):
     prevent_initial_call=True,
 )
 def sync_chrome_visibility(chrome_hidden):
-    hidden = bool(chrome_hidden)
+    hidden = True if chrome_hidden is None else bool(chrome_hidden)
     shell_class = "appshell-root chrome-hidden" if hidden else "appshell-root"
-    icon = "material-symbols:fullscreen" if hidden else "material-symbols:fullscreen-exit"
+    icon = (
+        "material-symbols:more-up-rounded"
+        if chrome_hidden
+        else "material-symbols:more-down-rounded"
+    )
     label = "Show header and sidebar" if hidden else "Hide header and sidebar"
     attributes = {"aria-label": label, "title": label}
     return shell_class, _toggle_style(hidden), icon, attributes, label
