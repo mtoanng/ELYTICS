@@ -56,9 +56,13 @@ def _bind_route(space: str, cfg: TimeseriesConfig) -> None:
         filters = _parse_filters(request)
         for required in cfg.required_filters:
             if required not in filters:
-                raise HTTPException(status_code=400, detail=f"Missing required filter '{required}'")
+                raise HTTPException(
+                    status_code=400, detail=f"Missing required filter '{required}'"
+                )
         try:
-            query_source, cache_source = resolve_query_source(space=space, data_kind="data", table_name=cfg.table_name)
+            query_source, cache_source = resolve_query_source(
+                space=space, data_kind="data", table_name=cfg.table_name
+            )
             payload = get_timeseries_result(
                 view_name=query_source,
                 space=space,
@@ -77,7 +81,9 @@ def _bind_route(space: str, cfg: TimeseriesConfig) -> None:
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc))
         except Exception as exc:
-            logger.exception("timeseries query failed [space=%s table=%s]", space, cfg.table_name)
+            logger.exception(
+                "timeseries query failed [space=%s table=%s]", space, cfg.table_name
+            )
             raise HTTPException(status_code=500, detail=str(exc))
         return payload
 

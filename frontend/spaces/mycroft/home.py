@@ -11,8 +11,10 @@ def mycroft_layout():
     
     return dmc.Container(
         size="md",
+        pt="md",
+        pb="xl",
         children=[
-            dmc.Title("Welcome to Mycroft Home", order=1, mt="lg"),
+            dmc.Title("Welcome to Mycroft Home", order=1),
             dmc.Text(
                 "Mycroft provides comprehensive data visualization and reporting tools "
                 "for business intelligence and insights.",
@@ -31,7 +33,6 @@ def mycroft_layout():
                 mt="xl",
             ),
         ],
-        py="xl",
     )
 
 layout = mycroft_layout

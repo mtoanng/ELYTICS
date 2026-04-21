@@ -11,8 +11,10 @@ def watson_layout():
     
     return dmc.Container(
         size="md",
+        pt="md",
+        pb="xl",
         children=[
-            dmc.Title("Welcome to Watson Home", order=1, mt="lg"),
+            dmc.Title("Welcome to Watson Home", order=1),
             dmc.Text(
                 "Watson is your intelligent data processing and analysis workspace. "
                 "Leverage advanced analytics and natural language processing for enhanced decision-making.",
@@ -31,7 +33,6 @@ def watson_layout():
                 mt="xl",
             ),
         ],
-        py="xl",
     )
 
 layout = watson_layout
