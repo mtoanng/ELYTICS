@@ -99,6 +99,11 @@
       "pr": 799,
       "title": "feat(sherlock): Cleanup runtime overview",
       "date": "2026-04-22"
+    },
+    {
+      "pr": 800,
+      "title": "fix(sherlock): Fullscreen button fixed position and order overview divider padding",
+      "date": "2026-04-22"
     }
   ],
   "releases": {}
