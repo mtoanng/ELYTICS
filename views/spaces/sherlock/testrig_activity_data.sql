@@ -14,6 +14,7 @@ WITH base_ts AS (
   WHERE
     1 = 1
     AND ts.jStck > 0.03 -- operational definition
+    AND ts.order_id LIKE 'E%'
 ),
 joined AS (
   SELECT
