@@ -47,6 +47,7 @@ PLOT_IDS = [
     "plot-tAndeIn",
     "plot-vfAndeIn",
 ]
+PLOT_HEIGHT_PX = 360
 
 USAGE_BLOCKQUOTE_TEXT = [
     "Select a test rig from the dropdown to load its sensor data.",
@@ -75,7 +76,7 @@ layout = dmc.Container(
                             gap="xs",
                             align="center",
                             children=[
-                                dmc.Title("ELY Test Rig Activity", order=2),
+                                dmc.Title("Test Rig Activity", order=2),
                                 dmc.ActionIcon(
                                     DashIconify(
                                         icon="material-symbols:info-outline", width=20
@@ -103,6 +104,7 @@ layout = dmc.Container(
                                 ),
                                 color="blue",
                             ),
+                            opened=False,
                             id="activity-usage-collapse",
                         ),
                     ],
@@ -120,22 +122,6 @@ layout = dmc.Container(
                             children=[
                                 dmc.InputWrapper(
                                     dcc.Dropdown(
-                                        id="activity-testrig-filter",
-                                        options=[],
-                                        value=None,
-                                        searchable=True,
-                                        clearable=False,
-                                        placeholder="Loading test rigs…",
-                                        style={"width": "100%"},
-                                    ),
-                                    label="Test Rig",
-                                    htmlFor="activity-testrig-filter",
-                                    className="dmc",
-                                    styles={"label": {"marginBottom": "6px"}},
-                                    style={"flex": 1, "minWidth": "200px"},
-                                ),
-                                dmc.InputWrapper(
-                                    dcc.Dropdown(
                                         id="activity-location-filter",
                                         options=[],
                                         value=[],
@@ -150,6 +136,23 @@ layout = dmc.Container(
                                     className="dmc",
                                     styles={"label": {"marginBottom": "6px"}},
                                     style={"flex": 1, "minWidth": "180px"},
+                                ),
+                                dmc.InputWrapper(
+                                    dcc.Dropdown(
+                                        id="activity-testrig-filter",
+                                        options=[],
+                                        value=[],
+                                        multi=True,
+                                        searchable=True,
+                                        clearable=True,
+                                        placeholder="Loading test rigs...",
+                                        style={"width": "100%"},
+                                    ),
+                                    label="Test Rig",
+                                    htmlFor="activity-testrig-filter",
+                                    className="dmc",
+                                    styles={"label": {"marginBottom": "6px"}},
+                                    style={"flex": 1, "minWidth": "200px"},
                                 ),
                                 dmc.InputWrapper(
                                     dcc.Dropdown(
@@ -182,32 +185,44 @@ layout = dmc.Container(
                     ],
                 ),
                 # ── Sensor plots ─────────────────────────────────────
-                dcc.Loading(
-                    type="default",
-                    children=[
-                        dmc.SimpleGrid(
-                            cols=2,
-                            spacing="md",
-                            verticalSpacing="md",
-                            children=[
-                                dmc.Paper(
-                                    withBorder=True,
-                                    p="xs",
-                                    radius="md",
-                                    children=dcc.Graph(
-                                        id=plot_id,
-                                        config={"responsive": True},
+                dmc.Paper(
+                    withBorder=True,
+                    p="md",
+                    radius="md",
+                    children=dmc.SimpleGrid(
+                        cols=2,
+                        spacing="md",
+                        verticalSpacing="md",
+                        children=[
+                            dmc.Box(
+                                pos="relative",
+                                children=[
+                                    dmc.LoadingOverlay(
+                                        id=f"{plot_id}-loading-overlay",
+                                        visible=True,
+                                        zIndex=10,
+                                        loaderProps={"color": "blue", "size": "lg", "variant": "dots"},
+                                        overlayProps={"radius": "sm", "blur": 1},
                                     ),
-                                )
-                                for plot_id in PLOT_IDS
-                            ],
-                        ),
-                    ],
+                                    dmc.Box(
+                                        id=f"{plot_id}-wrapper",
+                                        style={"opacity": 0},
+                                        children=dcc.Graph(
+                                            id=plot_id,
+                                            config={"responsive": True},
+                                            style={"height": f"{PLOT_HEIGHT_PX}px"},
+                                        ),
+                                    ),
+                                ],
+                            )
+                            for plot_id in PLOT_IDS
+                        ],
+                    ),
                 ),
                 # ── Stores ────────────────────────────────────────────
                 dcc.Store(id="activity-metadata-store"),
-                dcc.Store(id="activity-raw-store"),
-                dcc.Store(id="activity-usage-open", data=True),
+                dcc.Store(id="activity-raw-store", data=None),
+                dcc.Store(id="activity-usage-open", data=False),
             ],
         )
     ],
@@ -258,35 +273,43 @@ def init_metadata(_):
     Output("activity-testrig-filter", "options"),
     Output("activity-testrig-filter", "value"),
     Output("activity-location-filter", "options"),
+    Output("activity-location-filter", "value"),
     Input("activity-metadata-store", "data"),
     Input("activity-location-filter", "value"),
     State("activity-testrig-filter", "value"),
 )
-def populate_filters(meta, selected_locations, current_testrig):
+def populate_filters(meta, selected_locations, current_testrigs):
     if not meta:
-        return [], None, []
+        return [], [], [], []
 
     df = pd.DataFrame(meta)
 
     # Build location options from full metadata
     location_options = []
+    normalized_locations = []
     if "location" in df.columns:
         locations = sorted(df["location"].dropna().unique().tolist())
         location_options = [{"label": l, "value": l} for l in locations]
-        if selected_locations:
-            df = df[df["location"].isin(selected_locations)]
+        tbp_locations = [
+            loc for loc in locations if "tbp" in str(loc).strip().lower()
+        ]
+        default_locations = tbp_locations or locations
+        normalized_locations = selected_locations or default_locations
+        if normalized_locations:
+            df = df[df["location"].isin(normalized_locations)]
 
     ids = sorted(df["testrig_id"].dropna().unique().tolist(), key=str)
     testrig_options = [{"label": str(i), "value": str(i)} for i in ids]
+    available_ids = {str(i) for i in ids}
 
-    str_ids = {str(i) for i in ids}
-    value = (
-        str(current_testrig)
-        if current_testrig and str(current_testrig) in str_ids
-        else (str(ids[0]) if ids else None)
-    )
+    if current_testrigs:
+        selected_testrigs = [
+            str(i) for i in current_testrigs if str(i) in available_ids
+        ]
+    else:
+        selected_testrigs = [str(i) for i in ids]
 
-    return testrig_options, value, location_options
+    return testrig_options, selected_testrigs, location_options, normalized_locations
 
 
 # =========================================================
@@ -299,12 +322,144 @@ def populate_filters(meta, selected_locations, current_testrig):
     Input("activity-testrig-filter", "value"),
     prevent_initial_call=True,
 )
-def load_testrig_data(testrig_id):
-    if not testrig_id:
+def load_testrig_data(testrig_ids):
+    if not testrig_ids:
         return []
-    df = get_tabular("sherlock", "testrig_activity", filters={"testrig_id": testrig_id})
-    print(df.head())
-    return [] if df.empty else df.to_dict("records")
+
+    frames = []
+    for testrig_id in testrig_ids:
+        df = get_tabular(
+            "sherlock",
+            "testrig_activity",
+            filters={"testrig_id": str(testrig_id)},
+        )
+        if not df.empty:
+            frames.append(df)
+
+    if not frames:
+        return []
+
+    merged_df = pd.concat(frames, ignore_index=True)
+    return merged_df.drop_duplicates().to_dict("records")
+
+
+@callback(
+    Output("plot-uCell-loading-overlay", "visible"),
+    Output("plot-jStck-loading-overlay", "visible"),
+    Output("plot-pAndeIn-loading-overlay", "visible"),
+    Output("plot-pCtdeOut-loading-overlay", "visible"),
+    Output("plot-tAndeIn-loading-overlay", "visible"),
+    Output("plot-vfAndeIn-loading-overlay", "visible"),
+    Output("plot-uCell-wrapper", "style"),
+    Output("plot-jStck-wrapper", "style"),
+    Output("plot-pAndeIn-wrapper", "style"),
+    Output("plot-pCtdeOut-wrapper", "style"),
+    Output("plot-tAndeIn-wrapper", "style"),
+    Output("plot-vfAndeIn-wrapper", "style"),
+    Input("activity-testrig-filter", "value"),
+    Input("activity-raw-store", "data"),
+    Input("plot-uCell", "figure"),
+    Input("plot-jStck", "figure"),
+    Input("plot-pAndeIn", "figure"),
+    Input("plot-pCtdeOut", "figure"),
+    Input("plot-tAndeIn", "figure"),
+    Input("plot-vfAndeIn", "figure"),
+    Input("plot-uCell", "loading_state"),
+    Input("plot-jStck", "loading_state"),
+    Input("plot-pAndeIn", "loading_state"),
+    Input("plot-pCtdeOut", "loading_state"),
+    Input("plot-tAndeIn", "loading_state"),
+    Input("plot-vfAndeIn", "loading_state"),
+)
+def sync_plots_loading_state(
+    _,
+    data,
+    ucell_fig,
+    jstck_fig,
+    pandein_fig,
+    pctdeout_fig,
+    tandein_fig,
+    vfandein_fig,
+    ucell_loading,
+    jstck_loading,
+    pandein_loading,
+    pctdeout_loading,
+    tandein_loading,
+    vfandein_loading,
+):
+    ctx = callback_context
+    triggered_prop = ctx.triggered[0]["prop_id"] if ctx.triggered else ""
+
+    # Show loader immediately when filter selection changes.
+    if triggered_prop == "activity-testrig-filter.value":
+        return (
+            True, True, True, True, True, True,
+            {"opacity": 0},
+            {"opacity": 0},
+            {"opacity": 0},
+            {"opacity": 0},
+            {"opacity": 0},
+            {"opacity": 0},
+        )
+
+    if data is None:
+        return (
+            True, True, True, True, True, True,
+            {"opacity": 0},
+            {"opacity": 0},
+            {"opacity": 0},
+            {"opacity": 0},
+            {"opacity": 0},
+            {"opacity": 0},
+        )
+
+    figure_states = [
+        ucell_fig,
+        jstck_fig,
+        pandein_fig,
+        pctdeout_fig,
+        tandein_fig,
+        vfandein_fig,
+    ]
+    if any(fig is None for fig in figure_states):
+        return (
+            True, True, True, True, True, True,
+            {"opacity": 0},
+            {"opacity": 0},
+            {"opacity": 0},
+            {"opacity": 0},
+            {"opacity": 0},
+            {"opacity": 0},
+        )
+
+    plot_loading_states = [
+        ucell_loading,
+        jstck_loading,
+        pandein_loading,
+        pctdeout_loading,
+        tandein_loading,
+        vfandein_loading,
+    ]
+    if any((state or {}).get("is_loading", False) for state in plot_loading_states):
+        return (
+            True, True, True, True, True, True,
+            {"opacity": 0},
+            {"opacity": 0},
+            {"opacity": 0},
+            {"opacity": 0},
+            {"opacity": 0},
+            {"opacity": 0},
+        )
+
+    return (
+        False, False, False, False, False, False,
+        {"opacity": 1, "transition": "opacity 120ms ease"},
+        {"opacity": 1, "transition": "opacity 120ms ease"},
+        {"opacity": 1, "transition": "opacity 120ms ease"},
+        {"opacity": 1, "transition": "opacity 120ms ease"},
+        {"opacity": 1, "transition": "opacity 120ms ease"},
+        {"opacity": 1, "transition": "opacity 120ms ease"},
+    )
 
 
 # =========================================================
@@ -313,13 +468,19 @@ def load_testrig_data(testrig_id):
 
 
 @callback(
-    Output("activity-location-filter", "value"),
+    Output("activity-location-filter", "value", allow_duplicate=True),
     Output("activity-date-range", "value"),
     Input("activity-reset-btn", "n_clicks"),
+    State("activity-location-filter", "options"),
     prevent_initial_call=True,
 )
-def reset_filters(_):
-    return [], 7
+def reset_filters_to_default(_, location_options):
+    options = location_options or []
+    option_values = [opt.get("value") for opt in options if opt.get("value") is not None]
+    tbp_values = [
+        val for val in option_values if "tbp" in str(val).strip().lower()
+    ]
+    return (tbp_values or option_values), 7
 
 
 # =========================================================
@@ -345,8 +506,8 @@ def reset_filters(_):
     Input("plot-vfAndeIn", "relayoutData"),
     State("activity-testrig-filter", "value"),
 )
-def update_plots(data, last_n_days, theme, r1, r2, r3, r4, r5, r6, testrig_id):
-    FIG_HEIGHT = 360
+def update_plots(data, last_n_days, theme, r1, r2, r3, r4, r5, r6, testrig_ids):
+    FIG_HEIGHT = PLOT_HEIGHT_PX
     template = "plotly_dark" if theme == "dark" else "plotly"
 
     def empty_fig(title="No data"):
@@ -358,6 +519,9 @@ def update_plots(data, last_n_days, theme, r1, r2, r3, r4, r5, r6, testrig_id):
             margin=dict(l=48, r=20, t=48, b=40),
         )
         return fig
+
+    if data is None:
+        return tuple(no_update for _ in SENSOR_KEYS)
 
     if not data:
         return tuple(empty_fig() for _ in SENSOR_KEYS)
@@ -390,29 +554,50 @@ def update_plots(data, last_n_days, theme, r1, r2, r3, r4, r5, r6, testrig_id):
             reset_autorange = True
 
     # uirevision key: changes when testrig changes or when an explicit zoom is applied
-    base_rev = f"activity-{testrig_id}"
-    uirev_key = f"zoom-{x_range}-{testrig_id}" if x_range else base_rev
-
-    trace_name = str(testrig_id) if testrig_id else "Testrig"
+    selected_testrigs = [str(tid) for tid in (testrig_ids or [])]
+    selected_key = ",".join(sorted(selected_testrigs)) if selected_testrigs else "none"
+    base_rev = f"activity-{selected_key}"
+    uirev_key = f"zoom-{x_range}-{selected_key}" if x_range else base_rev
 
     def make_fig(col):
         if col not in df.columns:
             return empty_fig(f"{SENSORS[col]['title']} — column not available")
 
-        fig = go.Figure()
-        fig.add_trace(
-            go.Scatter(
-                x=df[time_col],
-                y=df[col],
-                mode="lines",
-                name=trace_name,
-                line=dict(width=1.5),
-                hovertemplate=(
-                    f"<b>{col}</b>: %{{y:.3f}} {SENSORS[col]['unit']}<br>"
-                    "Time: %{x}<extra></extra>"
-                ),
-            )
+        trace_col = next(
+            (c for c in ("testrig_id", "testrig_label", "testrig_name") if c in df.columns),
+            None,
         )
+
+        fig = go.Figure()
+        if trace_col is None:
+            fig.add_trace(
+                go.Scatter(
+                    x=df[time_col],
+                    y=df[col],
+                    mode="lines",
+                    name="Testrig",
+                    line=dict(width=1.5),
+                    hovertemplate=(
+                        f"<b>{col}</b>: %{{y:.3f}} {SENSORS[col]['unit']}<br>"
+                        "Time: %{x}<extra></extra>"
+                    ),
+                )
+            )
+        else:
+            for trace_name, group_df in df.groupby(trace_col):
+                fig.add_trace(
+                    go.Scatter(
+                        x=group_df[time_col],
+                        y=group_df[col],
+                        mode="lines",
+                        name=str(trace_name),
+                        line=dict(width=1.5),
+                        hovertemplate=(
+                            f"<b>{col}</b>: %{{y:.3f}} {SENSORS[col]['unit']}<br>"
+                            "Time: %{x}<extra></extra>"
+                        ),
+                    )
+                )
         fig.update_layout(
             title=dict(
                 text=f"{SENSORS[col]['title']}",
