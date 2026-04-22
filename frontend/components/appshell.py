@@ -14,10 +14,10 @@ NAVBAR_WIDTH = 300
 
 def _toggle_style(chrome_hidden: bool, visible: bool = True) -> dict[str, str | int]:
     style = {
-        "position": "absolute",
+        "position": "fixed",
         "zIndex": 250,
-        "top": "2px",
-        "left": "2px",
+        "top": "calc(var(--app-shell-header-offset, 0rem) + 2px)",
+        "left": "calc(var(--app-shell-navbar-offset, 0rem) + 2px)",
     }
     if not visible:
         style["display"] = "none"
