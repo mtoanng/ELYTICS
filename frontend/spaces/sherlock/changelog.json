@@ -104,6 +104,11 @@
       "pr": 800,
       "title": "fix(sherlock): Fullscreen button fixed position and order overview divider padding",
       "date": "2026-04-22"
+    },
+    {
+      "pr": 802,
+      "title": "fix(sherlock): Added legend to new timeseries plot",
+      "date": "2026-04-22"
     }
   ],
   "releases": {}
