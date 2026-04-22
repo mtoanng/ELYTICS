@@ -94,6 +94,11 @@
       "pr": 795,
       "title": "feat(sherlock): Cleanup test rig activity page",
       "date": "2026-04-22"
+    },
+    {
+      "pr": 799,
+      "title": "feat(sherlock): Cleanup runtime overview",
+      "date": "2026-04-22"
     }
   ],
   "releases": {}

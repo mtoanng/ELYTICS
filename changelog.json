@@ -84,6 +84,11 @@
       "pr": 794,
       "title": "feat(sherlock): Merge order and sample page",
       "date": "2026-04-22"
+    },
+    {
+      "pr": 799,
+      "title": "feat(sherlock): Cleanup runtime overview",
+      "date": "2026-04-22"
     }
   ],
   "releases": {}
