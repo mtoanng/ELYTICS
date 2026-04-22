@@ -10,3 +10,5 @@ SELECT DISTINCT
   END AS testrig_location
 FROM
   ps_xplatform_prod.pemely_dev.silver_dim_testrig
+  WHERE
+  testrig_id LIKE 'E%'
