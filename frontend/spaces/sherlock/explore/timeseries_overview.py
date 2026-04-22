@@ -381,6 +381,20 @@ def _build_signal_selector_data(
     return selector_data
 
 
+def _format_subplot_legend(entries: list[tuple[str, str]]) -> str:
+    if not entries:
+        return ""
+    preview = entries[:3]
+    parts = [
+        f"<span style='color:{color};font-size:11px'>{name}</span>"
+        for name, color in preview
+    ]
+    extra_count = len(entries) - len(preview)
+    if extra_count > 0:
+        parts.append(f"<span style='font-size:11px'>+{extra_count} more</span>")
+    return " | ".join(parts)
+
+
 def _build_figure(
     df: pd.DataFrame,
     signals: list[str],
@@ -436,11 +450,14 @@ def _build_figure(
     x_with_gaps = _insert_gap_markers(df[PLOT_TIME_COLUMN].tolist(), gap_positions)
 
     color_index = 0
+    subplot_legends: dict[int, list[tuple[str, str]]] = {}
     for row_index, (_title, unit, group_signals) in enumerate(groups, start=1):
+        subplot_legends[row_index] = []
         for signal in group_signals:
             color = _PLOT_COLORS[color_index % len(_PLOT_COLORS)]
             color_index += 1
             signal_title = SENSOR_TITLES.get(signal, signal)
+            signal_added = False
 
             if metric == "all":
                 min_col = _resolve_metric_column(df, signal, "min")
@@ -476,6 +493,7 @@ def _build_figure(
                             row=row_index,
                             col=1,
                         )
+                        signal_added = True
                         fig.add_trace(
                             go.Scatter(
                                 x=seg_x,
@@ -492,6 +510,7 @@ def _build_figure(
                             row=row_index,
                             col=1,
                         )
+                        signal_added = True
 
                 if has_avg:
                     avg_with_gaps = _insert_gap_markers(
@@ -509,6 +528,9 @@ def _build_figure(
                         row=row_index,
                         col=1,
                     )
+                    signal_added = True
+                if signal_added:
+                    subplot_legends[row_index].append((signal_title, color))
                 continue
 
             value_col = _resolve_metric_column(df, signal, metric)
@@ -527,6 +549,7 @@ def _build_figure(
                 row=row_index,
                 col=1,
             )
+            subplot_legends[row_index].append((signal_title, color))
 
         fig.update_yaxes(
             title_text=unit,
@@ -554,6 +577,28 @@ def _build_figure(
     )
 
     fig.update_layout(**layout_updates)
+
+    for row_index in range(1, n_groups + 1):
+        row_suffix = "" if row_index == 1 else str(row_index)
+        yaxis_name = f"yaxis{row_suffix}"
+        y_domain = getattr(fig.layout, yaxis_name).domain
+        legend_text = _format_subplot_legend(subplot_legends.get(row_index, []))
+        if not legend_text:
+            continue
+        fig.add_annotation(
+            x=0.995,
+            y=y_domain[1] - 0.01,
+            xref="paper",
+            yref="paper",
+            text=legend_text,
+            showarrow=False,
+            xanchor="right",
+            yanchor="top",
+            align="right",
+            borderwidth=0,
+            bgcolor="rgba(0,0,0,0)",
+        )
+
     return fig
 
 
@@ -661,6 +706,7 @@ def timeseries_overview_layout():
                         data={"start": None, "end": None},
                     ),
                     dcc.Store(id="timeseries-init-trigger", data=True),
+                    dcc.Store(id="timeseries-data-store"),
                     dmc.Paper(
                         withBorder=True,
                         p="md",
@@ -770,6 +816,17 @@ def timeseries_overview_layout():
                         radius="md",
                         style={"overflow": "hidden"},
                         children=[
+                            dmc.MultiSelect(
+                                id="timeseries-signal-selector",
+                                label="Visible Signals",
+                                description="Hide or show signals in stacked and isolated views.",
+                                data=[],
+                                value=None,
+                                searchable=True,
+                                clearable=False,
+                                nothingFoundMessage="No signals available",
+                            ),
+                            dmc.Divider(size="xs", my="sm"),
                             dmc.Group(
                                 justify="space-between",
                                 children=[
@@ -827,49 +884,39 @@ def timeseries_overview_layout():
                                     ),
                                 ],
                             ),
-                            dmc.MultiSelect(
-                                id="timeseries-signal-selector",
-                                label="Visible Signals",
-                                description="Hide or show signals in stacked and isolated views.",
-                                data=[],
-                                value=None,
-                                searchable=True,
-                                clearable=False,
-                                nothingFoundMessage="No signals available",
-                            ),
                             dmc.Space(h="sm"),
                             dmc.Box(
+                                id="timeseries-graph-wrapper",
                                 style={
                                     "width": "100%",
                                     "minHeight": f"{EMPTY_FIGURE_HEIGHT}px",
+                                    "maxHeight": f"{EMPTY_FIGURE_HEIGHT}px",
+                                    "overflow": "hidden",
+                                    "opacity": 0,
                                 },
                                 children=[
-                                    dcc.Loading(
-                                        id="timeseries-graph-loading",
-                                        type="default",
-                                        parent_style={
+                                    dmc.LoadingOverlay(
+                                        id="timeseries-plot-loading-overlay",
+                                        visible=True,
+                                        zIndex=10,
+                                        loaderProps={"color": "blue", "size": "lg", "variant": "dots"},
+                                        overlayProps={"radius": "sm", "blur": 1},
+                                    )
+                                    ,
+                                    dcc.Graph(
+                                        id="timeseries-graph",
+                                        figure=_empty_figure(
+                                            "light", "Loading metadata..."
+                                        ),
+                                        config={
+                                            "responsive": True,
+                                            "displaylogo": False,
+                                        },
+                                        style={
                                             "width": "100%",
                                             "minHeight": f"{EMPTY_FIGURE_HEIGHT}px",
                                         },
-                                        style={"width": "100%"},
-                                        children=[
-                                            dcc.Store(id="timeseries-data-store"),
-                                            dcc.Graph(
-                                                id="timeseries-graph",
-                                                figure=_empty_figure(
-                                                    "light", "Loading metadata..."
-                                                ),
-                                                config={
-                                                    "responsive": True,
-                                                    "displaylogo": False,
-                                                },
-                                                style={
-                                                    "width": "100%",
-                                                    "minHeight": f"{EMPTY_FIGURE_HEIGHT}px",
-                                                },
-                                            ),
-                                        ],
-                                    )
+                                    ),
                                 ],
                             ),
                         ],
@@ -1178,6 +1225,8 @@ def render_timeseries(data, selected_signals, metric, plot_mode, theme):
     Output("timeseries-plot-mode-selector", "disabled"),
     Output("timeseries-signal-selector", "disabled"),
     Output("timeseries-graph", "style"),
+    Output("timeseries-plot-loading-overlay", "visible"),
+    Output("timeseries-graph-wrapper", "style"),
     Input("timeseries-data-store", "loading_state"),
 )
 def sync_plot_loading_state(loading_state):
@@ -1186,7 +1235,19 @@ def sync_plot_loading_state(loading_state):
         "width": "100%",
         "minHeight": f"{EMPTY_FIGURE_HEIGHT}px",
     }
+    wrapper_style: dict[str, object] = {
+        "width": "100%",
+        "minHeight": f"{EMPTY_FIGURE_HEIGHT}px",
+    }
     if is_loading:
         graph_style["pointerEvents"] = "none"
-        graph_style["opacity"] = 0.7
-    return is_loading, is_loading, is_loading, graph_style
+        wrapper_style["maxHeight"] = f"{EMPTY_FIGURE_HEIGHT}px"
+        wrapper_style["overflow"] = "hidden"
+        wrapper_style["opacity"] = 0
+    else:
+        wrapper_style["maxHeight"] = "none"
+        wrapper_style["overflow"] = "visible"
+        wrapper_style["opacity"] = 1
+        wrapper_style["transition"] = "opacity 180ms ease"
+
+    return is_loading, is_loading, is_loading, graph_style, is_loading, wrapper_style
