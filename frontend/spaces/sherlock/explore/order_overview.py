@@ -180,9 +180,16 @@ def order_overview_layout():
     return dmc.Container(
         size="xl",
         py="md",
+        style={
+            "height": "calc(100dvh - var(--app-shell-header-offset, 0rem))",
+            "display": "flex",
+            "flexDirection": "column",
+            "minHeight": 0,
+        },
         children=[
             dmc.Stack(
                 gap="md",
+                style={"flex": "1 1 0", "minHeight": 0},
                 children=[
                     dmc.Stack(
                         gap=2,
@@ -202,10 +209,6 @@ def order_overview_layout():
                                     ),
                                 ],
                             ),
-                            dmc.Text(
-                                "This page provides a merged overview of orders and samples.",
-                                c="dimmed",
-                            ),
                             dmc.Collapse(
                                 dmc.Blockquote(
                                     dmc.List(
@@ -223,11 +226,18 @@ def order_overview_layout():
                         ],
                     ),
                     dcc.Store(id="order-usage-open", data=False),
-                    dcc.Store(id="order-data-store"),
+                    dcc.Store(id="order-data-store", data=None),
                     dmc.Paper(
                         withBorder=True,
                         p="md",
                         radius="md",
+                        style={
+                            "flex": "1 1 0",
+                            "minHeight": 0,
+                            "display": "flex",
+                            "flexDirection": "column",
+                            "overflow": "hidden",
+                        },
                         children=[
                             dmc.Group(
                                 gap="md",
@@ -350,45 +360,68 @@ def order_overview_layout():
                                 nothingFoundMessage="No columns available",
                             ),
                             dmc.Space(h="sm"),
-                            dcc.Loading(
-                                id="order-table-loading",
-                                type="default",
+                            dmc.Box(
+                                pos="relative",
+                                style={
+                                    "flex": "1 1 0",
+                                    "minHeight": 0,
+                                    "display": "flex",
+                                    "width": "100%",
+                                },
                                 children=[
-                                    dag.AgGrid(
-                                        id="order-order-table",
-                                        columnDefs=build_order_column_defs(),
-                                        rowData=[],
-                                        defaultColDef={
-                                            "resizable": True,
-                                            "sortable": True,
-                                            "filter": True,
-                                            "minWidth": 90,
-                                            "wrapHeaderText": True,
-                                            "autoHeaderHeight": True,
+                                    dmc.LoadingOverlay(
+                                        id="order-table-loading-overlay",
+                                        visible=True,
+                                        zIndex=10,
+                                        overlayProps={"radius": "sm", "blur": 1},
+                                    ),
+                                    html.Div(
+                                        id="order-table-grid-wrapper",
+                                        style={
+                                            "flex": "1 1 0",
+                                            "minHeight": 0,
+                                            "display": "flex",
+                                            "width": "100%",
+                                            "visibility": "hidden",
                                         },
-                                        dashGridOptions={
-                                            "pagination": True,
-                                            "paginationPageSize": 20,
-                                            "animateRows": True,
-                                            "floatingFilter": True,
-                                            "groupDisplayType": "multipleColumns",
-                                            "theme": {
-                                                "function": (
-                                                    "themeQuartz.withParams({"
-                                                    "accentColor: 'var(--mantine-primary-color-filled)', "
-                                                    "fontFamily: 'var(--mantine-font-family)', "
-                                                    "headerFontWeight: 'bold'"
-                                                    "})"
-                                                )
-                                            },
-                                        },
-                                        style={"height": "calc(100vh - 330px)", "width": "100%"},
-                                    )
+                                        children=[
+                                            dag.AgGrid(
+                                                id="order-order-table",
+                                                columnDefs=build_order_column_defs(),
+                                                rowData=[],
+                                                defaultColDef={
+                                                    "resizable": True,
+                                                    "sortable": True,
+                                                    "filter": True,
+                                                    "minWidth": 90,
+                                                    "wrapHeaderText": True,
+                                                    "autoHeaderHeight": True,
+                                                },
+                                                dashGridOptions={
+                                                    "pagination": True,
+                                                    "paginationPageSize": 20,
+                                                    "animateRows": True,
+                                                    "floatingFilter": True,
+                                                    "groupDisplayType": "multipleColumns",
+                                                    "theme": {
+                                                        "function": (
+                                                            "themeQuartz.withParams({"
+                                                            "accentColor: 'var(--mantine-primary-color-filled)', "
+                                                            "fontFamily: 'var(--mantine-font-family)', "
+                                                            "headerFontWeight: 'bold'"
+                                                            "})"
+                                                        )
+                                                    },
+                                                },
+                                                style={"height": "100%", "width": "100%"},
+                                            )
+                                        ],
+                                    ),
                                 ],
                             )
                         ],
                     ),
-                    html.Div(id="order-table-theme-dummy"),
+                    html.Div(id="order-table-theme-dummy", style={"display": "none"}),
                 ],
             )
         ],
@@ -422,6 +455,8 @@ def load_order_data(_):
     Input("order-data-store", "data"),
 )
 def populate_filter_options(data):
+    if data is None:
+        raise PreventUpdate
     if not data:
         return [], [], [], [], []
     df = pd.DataFrame(data)
@@ -458,7 +493,10 @@ def populate_filter_options(data):
 clientside_callback(
     """
     function(orderId, sampleName, cellName, numCells, testrigId, data) {
-        if (!data || !data.length) return [];
+        if (data === null || data === undefined) {
+            return window.dash_clientside.no_update;
+        }
+        if (!data.length) return [];
         var dff = data;
         if (orderId && orderId.length)
             dff = dff.filter(function(r) { return orderId.indexOf(r.order_id) !== -1; });
@@ -489,6 +527,23 @@ clientside_callback(
     Input("order-testrig-id-filter", "value"),
     Input("order-data-store", "data"),
 )
+
+
+@callback(
+    Output("order-table-loading-overlay", "visible"),
+    Output("order-table-grid-wrapper", "style"),
+    Input("order-data-store", "data"),
+)
+def sync_table_loading_state(data):
+    base_style = {
+        "flex": "1 1 0",
+        "minHeight": 0,
+        "display": "flex",
+        "width": "100%",
+    }
+    if data is None:
+        return True, {**base_style, "visibility": "hidden"}
+    return False, {**base_style, "visibility": "visible"}
 
 # Callback to update filter dropdowns when a cell is double-clicked
 @callback(
