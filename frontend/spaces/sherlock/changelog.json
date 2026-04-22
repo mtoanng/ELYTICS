@@ -84,6 +84,11 @@
       "pr": 791,
       "title": "feat(core): Added fullscreen functionality",
       "date": "2026-04-21"
+    },
+    {
+      "pr": 794,
+      "title": "feat(sherlock): Merge order and sample page",
+      "date": "2026-04-22"
     }
   ],
   "releases": {}

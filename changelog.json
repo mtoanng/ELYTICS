@@ -79,6 +79,11 @@
       "pr": 792,
       "title": "fix(core): Fullscreen button styling",
       "date": "2026-04-21"
+    },
+    {
+      "pr": 794,
+      "title": "feat(sherlock): Merge order and sample page",
+      "date": "2026-04-22"
     }
   ],
   "releases": {}
