@@ -13,8 +13,6 @@ def get_api_headers():
     """Extract OIDC token from Flask session and return headers"""
     token = session.get("access_token")
     if not token:
-        print(f"[DEBUG] Session keys: {list(session.keys())}")
-        print(f"[DEBUG] access_token present: {('access_token' in session)}")
         raise ValueError("No OIDC token available in session")
 
     return {
