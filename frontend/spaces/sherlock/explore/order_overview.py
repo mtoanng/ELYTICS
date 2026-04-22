@@ -348,7 +348,7 @@ def order_overview_layout():
                                     dcc.Download(id="order-download-csv"),
                                 ],
                             ),
-                            dmc.Divider(size="xs"),
+                            dmc.Divider(size="xs", my="sm"),
                             dmc.MultiSelect(
                                 id="order-visible-columns",
                                 label="Visible Columns",
