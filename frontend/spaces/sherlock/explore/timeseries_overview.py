@@ -2,6 +2,7 @@ import re
 
 from dash import (
     callback,
+    clientside_callback,
     dcc,
     Input,
     Output,
@@ -28,16 +29,32 @@ REQUEST_TIME_COLUMN = "time"
 PLOT_TIME_COLUMN = "bucket_start"
 TARGET_POINTS = 1200
 EMPTY_FIGURE_HEIGHT = 320
+PAPER_BG_TRANSPARENT = "rgba(0,0,0,0)"
+PLOT_BG_LIGHT = "rgba(0,0,0,0)"
+PLOT_BG_DARK = "#1f1f1f"
 
-CORE_SIGNALS = [
-    "jStck",
-    "uStck",
-    "pAndeIn",
-    "pAndeOut",
-    "mfH2Out",
-    "tAndeIn",
-    "tAndeOut",
-]
+_GRAPH_STYLE_READY = {
+    "width": "100%",
+    "minHeight": f"{EMPTY_FIGURE_HEIGHT}px",
+}
+
+_GRAPH_STYLE_LOADING = {
+    "width": "100%",
+    "minHeight": f"{EMPTY_FIGURE_HEIGHT}px",
+    "pointerEvents": "none",
+}
+
+_GRAPH_WRAPPER_STYLE_READY = {
+    "width": "100%",
+    "minHeight": f"{EMPTY_FIGURE_HEIGHT}px",
+    "overflow": "visible",
+}
+
+_GRAPH_WRAPPER_STYLE_LOADING = {
+    "width": "100%",
+    "minHeight": f"{EMPTY_FIGURE_HEIGHT}px",
+    "overflow": "visible",
+}
 
 SIGNAL_META = {
     "jStck": ("Current Density", "A/cm^2"),
@@ -160,11 +177,14 @@ def _empty_figure(
     theme: str, message: str = "Select filters to view timeseries data"
 ) -> go.Figure:
     is_dark = theme == "dark"
+    plot_bg = PLOT_BG_DARK if is_dark else PLOT_BG_LIGHT
     fig = go.Figure()
     fig.update_layout(
         template="plotly_dark" if is_dark else "plotly",
         autosize=True,
         height=EMPTY_FIGURE_HEIGHT,
+        paper_bgcolor=PAPER_BG_TRANSPARENT,
+        plot_bgcolor=plot_bg,
         margin=dict(t=40, l=80, r=30, b=60),
         annotations=[
             dict(
@@ -413,6 +433,7 @@ def _build_figure(
 
     is_dark = theme == "dark"
     template = "plotly_dark" if is_dark else "plotly"
+    plot_bg = PLOT_BG_DARK if is_dark else PLOT_BG_LIGHT
 
     df = df.copy()
     df[PLOT_TIME_COLUMN] = pd.to_datetime(df[PLOT_TIME_COLUMN], errors="coerce")
@@ -571,6 +592,8 @@ def _build_figure(
 
     layout_updates: dict = dict(
         template=template,
+        paper_bgcolor=PAPER_BG_TRANSPARENT,
+        plot_bgcolor=plot_bg,
         height=total_height,
         margin=dict(t=64, l=80, r=30, b=80),
         showlegend=False,
@@ -707,6 +730,15 @@ def timeseries_overview_layout():
                     ),
                     dcc.Store(id="timeseries-init-trigger", data=True),
                     dcc.Store(id="timeseries-data-store"),
+                    dcc.Store(
+                        id="timeseries-filter-state-store",
+                        data={
+                            "order_id": None,
+                            "testrig_id": None,
+                            "sample_name": None,
+                            "number_of_cells": None,
+                        },
+                    ),
                     dmc.Paper(
                         withBorder=True,
                         p="md",
@@ -886,36 +918,59 @@ def timeseries_overview_layout():
                             ),
                             dmc.Space(h="sm"),
                             dmc.Box(
-                                id="timeseries-graph-wrapper",
+                                id="timeseries-plot-container",
+                                pos="relative",
                                 style={
                                     "width": "100%",
                                     "minHeight": f"{EMPTY_FIGURE_HEIGHT}px",
-                                    "maxHeight": f"{EMPTY_FIGURE_HEIGHT}px",
-                                    "overflow": "hidden",
-                                    "opacity": 0,
                                 },
                                 children=[
                                     dmc.LoadingOverlay(
                                         id="timeseries-plot-loading-overlay",
                                         visible=True,
                                         zIndex=10,
-                                        loaderProps={"color": "blue", "size": "lg", "variant": "dots"},
-                                        overlayProps={"radius": "sm", "blur": 1},
-                                    )
-                                    ,
-                                    dcc.Graph(
-                                        id="timeseries-graph",
-                                        figure=_empty_figure(
-                                            "light", "Loading metadata..."
-                                        ),
-                                        config={
-                                            "responsive": True,
-                                            "displaylogo": False,
+                                        loaderProps={
+                                            "color": "blue",
+                                            "size": "lg",
+                                            "variant": "dots",
                                         },
-                                        style={
-                                            "width": "100%",
-                                            "minHeight": f"{EMPTY_FIGURE_HEIGHT}px",
+                                        overlayProps={
+                                            "radius": "sm",
+                                            "blur": 2,
+                                            "backgroundOpacity": 0.92,
                                         },
+                                    ),
+                                    dmc.LoadingOverlay(
+                                        id="timeseries-render-loading-overlay",
+                                        visible=False,
+                                        zIndex=11,
+                                        loaderProps={
+                                            "color": "blue",
+                                            "size": "lg",
+                                            "variant": "dots",
+                                        },
+                                        overlayProps={
+                                            "radius": "sm",
+                                            "blur": 2,
+                                            "backgroundOpacity": 0.92,
+                                        },
+                                    ),
+                                    dmc.Box(
+                                        id="timeseries-graph-wrapper",
+                                        style=_GRAPH_WRAPPER_STYLE_LOADING,
+                                        children=[
+                                            dcc.Graph(
+                                                id="timeseries-graph",
+                                                figure=_empty_figure(
+                                                    "light", "Loading metadata..."
+                                                ),
+                                                config={
+                                                    "responsive": True,
+                                                    "displaylogo": False,
+                                                },
+                                                style=_GRAPH_STYLE_READY,
+                                            ),
+                                        ],
                                     ),
                                 ],
                             ),
@@ -962,14 +1017,11 @@ def load_timeseries_metadata(_):
 @callback(
     Output("timeseries-order-id-filter", "options"),
     Output("timeseries-order-id-filter", "value"),
-    Output("timeseries-testrig-id-filter", "options"),
-    Output("timeseries-sample-name-filter", "options"),
-    Output("timeseries-number-of-cells-filter", "options"),
     Input("timeseries-metadata-store", "data"),
 )
-def populate_filter_options(metadata_rows):
+def populate_order_filter(metadata_rows):
     if not metadata_rows:
-        return [], None, [], [], []
+        return [], None
 
     df = pd.DataFrame(metadata_rows)
 
@@ -978,20 +1030,78 @@ def populate_filter_options(metadata_rows):
         if "order_id" in df.columns
         else []
     )
+    first_order = order_values[0] if order_values else None
+
+    return (
+        _to_options(order_values),
+        first_order,
+    )
+
+
+@callback(
+    Output("timeseries-filter-state-store", "data"),
+    Output("timeseries-testrig-id-filter", "options"),
+    Output("timeseries-testrig-id-filter", "value"),
+    Output("timeseries-sample-name-filter", "options"),
+    Output("timeseries-sample-name-filter", "value"),
+    Output("timeseries-number-of-cells-filter", "options"),
+    Output("timeseries-number-of-cells-filter", "value"),
+    Input("timeseries-metadata-store", "data"),
+    Input("timeseries-order-id-filter", "value"),
+    State("timeseries-filter-state-store", "data"),
+    State("timeseries-testrig-id-filter", "value"),
+    State("timeseries-sample-name-filter", "value"),
+    State("timeseries-number-of-cells-filter", "value"),
+)
+def sync_stateful_filters(
+    metadata_rows,
+    order_id,
+    filter_state,
+    current_testrig_id,
+    current_sample_name,
+    current_number_of_cells,
+):
+    if not metadata_rows:
+        return (
+            {
+                "order_id": order_id,
+                "testrig_id": None,
+                "sample_name": None,
+                "number_of_cells": None,
+            },
+            [],
+            None,
+            [],
+            None,
+            [],
+            None,
+        )
+
+    df = pd.DataFrame(metadata_rows)
+    filtered_df = df
+    if order_id not in (None, "") and "order_id" in df.columns:
+        filtered_df = df[df["order_id"] == order_id]
+
+    testrig_column = None
+    if "testrig_id" in filtered_df.columns:
+        testrig_column = "testrig_id"
+    elif "testrig_label" in filtered_df.columns:
+        testrig_column = "testrig_label"
+
     testrig_values = (
-        sorted(df["testrig_id"].dropna().unique().tolist())
-        if "testrig_id" in df.columns
+        sorted(filtered_df[testrig_column].dropna().unique().tolist())
+        if testrig_column
         else []
     )
     sample_values = (
-        sorted(df["sample_name"].dropna().unique().tolist())
-        if "sample_name" in df.columns
+        sorted(filtered_df["sample_name"].dropna().unique().tolist())
+        if "sample_name" in filtered_df.columns
         else []
     )
 
-    if "number_of_cells" in df.columns:
+    if "number_of_cells" in filtered_df.columns:
         cell_series = (
-            df["number_of_cells"]
+            filtered_df["number_of_cells"]
             .dropna()
             .astype(str)
             .str.replace(r"\.0$", "", regex=True)
@@ -1002,14 +1112,40 @@ def populate_filter_options(metadata_rows):
     else:
         cell_values = []
 
-    first_order = order_values[0] if order_values else None
+    filter_state = filter_state or {}
+    preferred_testrig = current_testrig_id or filter_state.get("testrig_id")
+    preferred_sample = current_sample_name or filter_state.get("sample_name")
+    preferred_cells = current_number_of_cells or filter_state.get("number_of_cells")
+
+    selected_testrig = (
+        preferred_testrig if preferred_testrig in testrig_values else None
+    )
+    if selected_testrig is None and testrig_values:
+        selected_testrig = testrig_values[0]
+
+    selected_sample = preferred_sample if preferred_sample in sample_values else None
+    if selected_sample is None and sample_values:
+        selected_sample = sample_values[0]
+
+    selected_cells = preferred_cells if preferred_cells in cell_values else None
+    if selected_cells is None and cell_values:
+        selected_cells = cell_values[0]
+
+    next_state = {
+        "order_id": order_id,
+        "testrig_id": selected_testrig,
+        "sample_name": selected_sample,
+        "number_of_cells": selected_cells,
+    }
 
     return (
-        _to_options(order_values),
-        first_order,
+        next_state,
         _to_options(testrig_values),
+        selected_testrig,
         _to_options(sample_values),
+        selected_sample,
         _to_options(cell_values),
+        selected_cells,
     )
 
 
@@ -1043,6 +1179,18 @@ def update_viewport_store(relayout_data, current):
     Input("timeseries-number-of-cells-filter", "value"),
     Input("timeseries-extra-signals", "value"),
     Input("timeseries-viewport-store", "data"),
+    running=[
+        (Output("timeseries-metric-selector", "disabled"), True, False),
+        (Output("timeseries-plot-mode-selector", "disabled"), True, False),
+        (Output("timeseries-signal-selector", "disabled"), True, False),
+        (Output("timeseries-graph", "style"), _GRAPH_STYLE_LOADING, _GRAPH_STYLE_READY),
+        (Output("timeseries-plot-loading-overlay", "visible"), True, False),
+        (
+            Output("timeseries-graph-wrapper", "style"),
+            _GRAPH_WRAPPER_STYLE_LOADING,
+            _GRAPH_WRAPPER_STYLE_READY,
+        ),
+    ],
     prevent_initial_call=False,
 )
 def load_timeseries_data(
@@ -1063,7 +1211,7 @@ def load_timeseries_data(
             "viewport": viewport or {"start": None, "end": None},
         }
 
-    signals = CORE_SIGNALS + (extra_signals or [])
+    signals = list(SIGNAL_META.keys()) + (extra_signals or [])
 
     viewport = viewport or {"start": None, "end": None}
     start_value = viewport.get("start")
@@ -1136,7 +1284,6 @@ def load_timeseries_data(
         "viewport": viewport,
     }
 
-
 @callback(
     Output("timeseries-signal-selector", "data"),
     Output("timeseries-signal-selector", "value"),
@@ -1174,6 +1321,9 @@ def sync_signal_selector(data, metric, current_selection):
     Input("timeseries-metric-selector", "value"),
     Input("timeseries-plot-mode-selector", "value"),
     Input("theme-store", "data"),
+    running=[
+        (Output("timeseries-render-loading-overlay", "visible"), True, False),
+    ],
     prevent_initial_call=False,
 )
 def render_timeseries(data, selected_signals, metric, plot_mode, theme):
@@ -1218,36 +1368,3 @@ def render_timeseries(data, selected_signals, metric, plot_mode, theme):
     )
 
     return fig, data.get("status", "No data"), data.get("badge", "")
-
-
-@callback(
-    Output("timeseries-metric-selector", "disabled"),
-    Output("timeseries-plot-mode-selector", "disabled"),
-    Output("timeseries-signal-selector", "disabled"),
-    Output("timeseries-graph", "style"),
-    Output("timeseries-plot-loading-overlay", "visible"),
-    Output("timeseries-graph-wrapper", "style"),
-    Input("timeseries-data-store", "loading_state"),
-)
-def sync_plot_loading_state(loading_state):
-    is_loading = bool((loading_state or {}).get("is_loading"))
-    graph_style: dict[str, object] = {
-        "width": "100%",
-        "minHeight": f"{EMPTY_FIGURE_HEIGHT}px",
-    }
-    wrapper_style: dict[str, object] = {
-        "width": "100%",
-        "minHeight": f"{EMPTY_FIGURE_HEIGHT}px",
-    }
-    if is_loading:
-        graph_style["pointerEvents"] = "none"
-        wrapper_style["maxHeight"] = f"{EMPTY_FIGURE_HEIGHT}px"
-        wrapper_style["overflow"] = "hidden"
-        wrapper_style["opacity"] = 0
-    else:
-        wrapper_style["maxHeight"] = "none"
-        wrapper_style["overflow"] = "visible"
-        wrapper_style["opacity"] = 1
-        wrapper_style["transition"] = "opacity 180ms ease"
-
-    return is_loading, is_loading, is_loading, graph_style, is_loading, wrapper_style

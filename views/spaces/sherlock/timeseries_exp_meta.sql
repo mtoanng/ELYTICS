@@ -41,13 +41,13 @@ WITH filtered_ts AS (
 )
 SELECT
   order_id,
-  testrig_label,
+  testrig_id,
   sample_name,
   number_of_cells
 FROM
   filtered_ts
 GROUP BY
   filtered_ts.order_id,
-  testrig_label,
+  testrig_id,
   sample_name,
   number_of_cells
