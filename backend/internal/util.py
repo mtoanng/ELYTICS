@@ -399,7 +399,7 @@ def build_timeseries_query(
         raise ValueError("At least one non-time metric column is required")
 
     agg_parts = [
-        f"{fn}({col}) AS {col}_{fn.lower()}"
+        f"ROUND({fn}({col}), 3) AS {col}_{fn.lower()}"
         for col in safe_values
         for fn in ("MIN", "MAX", "AVG")
     ]
