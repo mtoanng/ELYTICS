@@ -109,6 +109,11 @@
       "pr": 818,
       "title": "feat(core): Added session refresh",
       "date": "2026-04-28"
+    },
+    {
+      "pr": 820,
+      "title": "fix(core): Fixed logo vertical alignment",
+      "date": "2026-04-28"
     }
   ],
   "releases": {}
