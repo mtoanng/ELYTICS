@@ -104,6 +104,11 @@
       "pr": 813,
       "title": "fix(core): Fixed header logo styling & search content",
       "date": "2026-04-28"
+    },
+    {
+      "pr": 818,
+      "title": "feat(core): Added session refresh",
+      "date": "2026-04-28"
     }
   ],
   "releases": {}
