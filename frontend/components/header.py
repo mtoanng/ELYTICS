@@ -15,25 +15,53 @@ IS_DEVELOPMENT = os.getenv("ENVIRONMENT", "development").lower() == "development
 def _build_search_options():
     options = []
     for space, groups in SIDEBAR_STRUCTURE.items():
+        general_items = []
         if None in groups:
             for page in groups[None]:
-                options.append({
-                    "label": f"{space.title()} / {page['label']}",
-                    "value": f"/{space}/{page['path']}"
-                })
+                if page.get("path") == "home" or page.get("label", "").strip().lower() == "home":
+                    continue
+                general_items.append(
+                    {
+                        "label": page["label"],
+                        "value": f"/{space}/{page['path']}",
+                    }
+                )
+
+        if general_items:
+            options.append(
+                {
+                    "group": f"{space.title()} - General",
+                    "items": general_items,
+                }
+            )
+
         for group, group_data in groups.items():
             if group is None or isinstance(group_data, list):
                 continue
-            
+
             # group_data is now a dict with "path" and "pages"
             group_path = group_data.get("path", group.lower().replace(" ", "-"))
             pages = group_data.get("pages", [])
-            
+
+            if not pages:
+                continue
+
+            grouped_items = []
             for page in pages:
-                options.append({
-                    "label": f"{space.title()} / {group} / {page['label']}",
-                    "value": f"/{space}/{group_path}/{page['path']}"
-                })
+                grouped_items.append(
+                    {
+                        "label": page["label"],
+                        "value": f"/{space}/{group_path}/{page['path']}",
+                    }
+                )
+
+            options.append(
+                {
+                    "group": f"{space.title()} - {group}",
+                    "items": grouped_items,
+                }
+            )
+
     return options
 
 def _create_search():
