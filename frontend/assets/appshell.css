@@ -30,3 +30,7 @@
     padding-top: 0 !important;
     padding-inline-start: 0 !important;
 }
+
+.header-logo-right.invert-logo {
+    filter: brightness(0) invert(1);
+}
