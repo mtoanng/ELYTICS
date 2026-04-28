@@ -85,11 +85,14 @@ def _create_space_selector():
         data=[],
         placeholder="Select Space",
         leftSectionPointerEvents="none",
-        leftSection=html.Img(
-            id="space-logo-img",
-            src="/assets/sherlock_logo.png",
-            height="32px",
-            style={"marginLeft": "8px"},
+        leftSection=html.Div(
+            html.Img(
+                id="space-logo-img",
+                src="/assets/sherlock_logo.png",
+                height="32px",
+                style={"marginLeft": "8px", "display": "block"},
+            ),
+            style={"display": "flex", "alignItems": "center", "height": "100%"},
         ),
         checkIconPosition="right",
         w=240,
@@ -271,7 +274,7 @@ def update_bosch_logo(theme):
         src=src,
         height="50px",
         className=class_name,
-        style={"cursor": "pointer"},
+        style={"cursor": "pointer", "display": "block", "alignSelf": "center"},
     )
 
 
