@@ -316,7 +316,7 @@ layout = dmc.Container(
                 ),
                 dcc.Store(id="polcurve-metadata-store"),
                 dcc.Store(id="polcurve-data-store"),
-                dcc.Store(id="polcurve-usage-open", data=True),
+                dcc.Store(id="polcurve-usage-open", data=False),
                 dcc.Store(id="polcurve-theme-store"),
                 html.Div(id="polcurve-theme-dummy"),
             ],
