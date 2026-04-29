@@ -119,6 +119,11 @@
       "pr": 822,
       "title": "feat(mycroft): Added sidebar structure and page templates",
       "date": "2026-04-29"
+    },
+    {
+      "pr": 823,
+      "title": "feat(mycroft): Migrated queries and added backend routes",
+      "date": "2026-04-29"
     }
   ],
   "releases": {}
