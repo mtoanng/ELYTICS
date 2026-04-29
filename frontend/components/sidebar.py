@@ -6,6 +6,27 @@ from typing import Any
 SIDEBAR_STRUCTURE = {
     "mycroft": {
         None: [{"path": "home", "label": "Home"}],
+        "Management": {
+            "path": "management",
+            "pages": [
+                {"path": "production-overview", "label": "Production Overview", "preview": True},
+            ],
+        },
+        "Data Exploration": {
+            "path": "data-exploration",
+            "pages": [
+                {"path": "stack-overview", "label": "Stack Overview"},
+                {"path": "soaking-overview", "label": "Soaking Overview"},
+                {"path": "cvm-overview", "label": "CVM Overview"},
+                {"path": "eol-polcurve", "label": "EOL Polarization Curve"},
+            ],
+        },
+        "Data Analysis": {
+            "path": "data-analysis",
+            "pages": [
+                {"path": "eol-trend-analysis", "label": "EOL Trend Analysis"},
+            ],
+        },
     },
     "sherlock": {
         None: [{"path": "home", "label": "Home"}],
