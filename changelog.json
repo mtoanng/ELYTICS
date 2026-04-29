@@ -114,6 +114,11 @@
       "pr": 820,
       "title": "fix(core): Fixed logo vertical alignment",
       "date": "2026-04-28"
+    },
+    {
+      "pr": 822,
+      "title": "feat(mycroft): Added sidebar structure and page templates",
+      "date": "2026-04-29"
     }
   ],
   "releases": {}

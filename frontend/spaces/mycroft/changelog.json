@@ -19,6 +19,11 @@
       "pr": 791,
       "title": "feat(core): Added fullscreen functionality",
       "date": "2026-04-21"
+    },
+    {
+      "pr": 822,
+      "title": "feat(mycroft): Added sidebar structure and page templates",
+      "date": "2026-04-29"
     }
   ],
   "releases": {}
