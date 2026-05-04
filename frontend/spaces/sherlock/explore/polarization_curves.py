@@ -209,43 +209,47 @@ layout = dmc.Container(
                                     align="flex-end",
                                     style={"flexWrap": "wrap"},
                                     children=[
-                                        dmc.InputWrapper(
-                                            dcc.RangeSlider(
-                                                id="polcurve-temp-set-filter",
-                                                min=0,
-                                                max=1,
-                                                value=[0, 1],
-                                                marks={},
-                                                allowCross=False,
-                                                tooltip={
-                                                    "placement": "top",
-                                                    "always_visible": False,
-                                                },
-                                            ),
-                                            label="Anode Inlet Temperature",
-                                            htmlFor="polcurve-temp-set-filter",
-                                            className="dmc",
-                                            styles={"label": {"marginBottom": "6px"}},
+                                        dmc.Stack(
+                                            gap=4,
                                             style={"flex": 1, "minWidth": "260px"},
+                                            children=[
+                                                dmc.Text(
+                                                    "Anode Inlet Temperature",
+                                                    fw=500,
+                                                    size="sm",
+                                                ),
+                                                dmc.RangeSlider(
+                                                    id="polcurve-temp-set-filter",
+                                                    min=0,
+                                                    max=1,
+                                                    value=[0, 1],
+                                                    step=0.01,
+                                                    marks=[],
+                                                    thumbSize=16,
+                                                    size="sm",
+                                                ),
+                                            ],
                                         ),
-                                        dmc.InputWrapper(
-                                            dcc.RangeSlider(
-                                                id="polcurve-pressure-set-filter",
-                                                min=0,
-                                                max=1,
-                                                value=[0, 1],
-                                                marks={},
-                                                allowCross=False,
-                                                tooltip={
-                                                    "placement": "top",
-                                                    "always_visible": False,
-                                                },
-                                            ),
-                                            label="Pressure Setpoint",
-                                            htmlFor="polcurve-pressure-set-filter",
-                                            className="dmc",
-                                            styles={"label": {"marginBottom": "6px"}},
+                                        dmc.Stack(
+                                            gap=4,
                                             style={"flex": 1, "minWidth": "260px"},
+                                            children=[
+                                                dmc.Text(
+                                                    "Pressure Setpoint",
+                                                    fw=500,
+                                                    size="sm",
+                                                ),
+                                                dmc.RangeSlider(
+                                                    id="polcurve-pressure-set-filter",
+                                                    min=0,
+                                                    max=1,
+                                                    value=[0, 1],
+                                                    step=0.01,
+                                                    marks=[],
+                                                    thumbSize=16,
+                                                    size="sm",
+                                                ),
+                                            ],
                                         ),
                                         dmc.InputWrapper(
                                             dmc.SegmentedControl(
@@ -262,6 +266,87 @@ layout = dmc.Container(
                                                 "flex": "0 1 280px",
                                                 "minWidth": "220px",
                                             },
+                                        ),
+                                    ],
+                                ),
+                                dmc.Group(
+                                    gap="md",
+                                    mb="sm",
+                                    style={"flexWrap": "wrap"},
+                                    children=[
+                                        dmc.Stack(
+                                            gap=4,
+                                            style={
+                                                "flex": 1,
+                                                "minWidth": "260px",
+                                                "overflow": "hidden",
+                                            },
+                                            children=[
+                                                html.Div(
+                                                    style={},
+                                                    children=dmc.BubbleChart(
+                                                        id="polcurve-temp-distribution-chart",
+                                                        h=70,
+                                                        data=[],
+                                                        range=[10, 30],
+                                                        color="blue.6",
+                                                        dataKey={
+                                                            "x": "bucket",
+                                                            "y": "row",
+                                                            "z": "count",
+                                                        },
+                                                        yAxisProps={"hide": True},
+                                                        xAxisProps={
+                                                            "interval": "preserveStartEnd"
+                                                        },
+                                                        style={
+                                                            "width": "100%",
+                                                            "overflow": "hidden",
+                                                        },
+                                                        withTooltip=True,
+                                                    ),
+                                                ),
+                                            ],
+                                        ),
+                                        dmc.Stack(
+                                            gap=4,
+                                            style={
+                                                "flex": 1,
+                                                "minWidth": "260px",
+                                                "overflow": "hidden",
+                                            },
+                                            children=[
+                                                html.Div(
+                                                    style={},
+                                                    children=dmc.BubbleChart(
+                                                        id="polcurve-pressure-distribution-chart",
+                                                        h=70,
+                                                        data=[],
+                                                        range=[10, 30],
+                                                        color="teal.6",
+                                                        dataKey={
+                                                            "x": "bucket",
+                                                            "y": "row",
+                                                            "z": "count",
+                                                        },
+                                                        yAxisProps={"hide": True},
+                                                        xAxisProps={
+                                                            "interval": "preserveStartEnd"
+                                                        },
+                                                        style={
+                                                            "width": "100%",
+                                                            "overflow": "hidden",
+                                                        },
+                                                        withTooltip=True,
+                                                    ),
+                                                ),
+                                            ],
+                                        ),
+                                        dmc.Box(
+                                            style={
+                                                "flex": "0 1 280px",
+                                                "minWidth": "220px",
+                                            }
                                         ),
                                     ],
                                 ),
@@ -469,11 +554,13 @@ def fetch_polcurve_data(order_id, sample_name, testrig_id):
     Output("polcurve-temp-set-filter", "min"),
     Output("polcurve-temp-set-filter", "max"),
     Output("polcurve-temp-set-filter", "value"),
-    Output("polcurve-temp-set-filter", "marks"),
     Output("polcurve-pressure-set-filter", "min"),
     Output("polcurve-pressure-set-filter", "max"),
     Output("polcurve-pressure-set-filter", "value"),
-    Output("polcurve-pressure-set-filter", "marks"),
+    Output("polcurve-temp-distribution-chart", "data"),
+    Output("polcurve-temp-distribution-chart", "range"),
+    Output("polcurve-pressure-distribution-chart", "data"),
+    Output("polcurve-pressure-distribution-chart", "range"),
     Input("polcurve-data-store", "data"),
     Input("polcurve-is-rising-filter", "value"),  # <-- add this
 )
@@ -481,31 +568,52 @@ def populate_data_driven_filter_options(data, is_rising):
     import numpy as np
 
     if not data:
-        return 0, 1, [0, 1], {}, 0, 1, [0, 1], {}
+        return 0, 1, [0, 1], 0, 1, [0, 1], [], [10, 30], [], [10, 30]
     df = pd.DataFrame(data)
+
+    def _build_bubble_distribution(series, bins=10):
+        numeric = pd.to_numeric(series, errors="coerce").dropna()
+        if numeric.empty:
+            return [], [10, 30]
+
+        counts, bin_edges = np.histogram(numeric, bins=bins)
+        bubble_data = []
+        for i in range(len(counts)):
+            count = int(counts[i])
+            if count <= 0:
+                continue
+            center = round(float((bin_edges[i] + bin_edges[i + 1]) / 2), 2)
+            bubble_data.append({"bucket": f"{center:.2f}", "row": 1, "count": count})
+
+        if not bubble_data:
+            return [], [10, 30]
+
+        max_count = max(item["count"] for item in bubble_data)
+        return bubble_data, [10, max(18, min(40, 10 + max_count * 2))]
+
     # Apply direction filter
     df = _apply_local_polcurve_filters(df, None, None, (is_rising or "both").lower())
-    # Temperature marks
+    # Keep slider marks simple (endpoints only) and render detailed distribution below.
     t_min, t_max, t_value, _ = _get_slider_config(df, "tAndeIn")
-    t_marks = {}
-    if "tAndeIn" in df and not df["tAndeIn"].dropna().empty:
-        counts, bin_edges = np.histogram(df["tAndeIn"].dropna(), bins=10)
-        for i, edge in enumerate(bin_edges[:-1]):
-            if counts[i] > 0:
-                center = (edge + bin_edges[i + 1]) / 2
-                bar = "|" * max(1, int(counts[i] / counts.max() * 5))
-                t_marks[round(center, 2)] = bar
-    # Pressure marks
     p_min, p_max, p_value, _ = _get_slider_config(df, "pCtSp")
-    p_marks = {}
-    if "pCtSp" in df and not df["pCtSp"].dropna().empty:
-        counts, bin_edges = np.histogram(df["pCtSp"].dropna(), bins=10)
-        for i, edge in enumerate(bin_edges[:-1]):
-            if counts[i] > 0:
-                center = (edge + bin_edges[i + 1]) / 2
-                bar = "|" * max(1, int(counts[i] / counts.max() * 5))
-                p_marks[round(center, 2)] = bar
-    return t_min, t_max, t_value, t_marks, p_min, p_max, p_value, p_marks
+
+    temp_bubble_data, temp_bubble_range = _build_bubble_distribution(df.get("tAndeIn"))
+    pressure_bubble_data, pressure_bubble_range = _build_bubble_distribution(
+        df.get("pCtSp")
+    )
+
+    return (
+        t_min,
+        t_max,
+        t_value,
+        p_min,
+        p_max,
+        p_value,
+        temp_bubble_data,
+        temp_bubble_range,
+        pressure_bubble_data,
+        pressure_bubble_range,
+    )
 
 
 # ========== TABLE RENDERING ==========
