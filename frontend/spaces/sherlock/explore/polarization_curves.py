@@ -204,14 +204,21 @@ layout = dmc.Container(
                             p="md",
                             radius="md",
                             children=[
-                                dmc.Group(
+                                dmc.Box(
                                     mb="sm",
-                                    align="flex-end",
-                                    style={"flexWrap": "wrap"},
+                                    style={
+                                        "display": "grid",
+                                        "gridTemplateColumns": "minmax(260px, 1fr) minmax(260px, 1fr) minmax(80px, 100px)",
+                                        "gap": "16px",
+                                        "alignItems": "stretch",
+                                        "width": "100%",
+                                    },
                                     children=[
                                         dmc.Stack(
                                             gap=4,
-                                            style={"flex": 1, "minWidth": "260px"},
+                                            style={
+                                                "width": "100%",
+                                            },
                                             children=[
                                                 dmc.Text(
                                                     "Anode Inlet Temperature",
@@ -228,61 +235,6 @@ layout = dmc.Container(
                                                     thumbSize=16,
                                                     size="sm",
                                                 ),
-                                            ],
-                                        ),
-                                        dmc.Stack(
-                                            gap=4,
-                                            style={"flex": 1, "minWidth": "260px"},
-                                            children=[
-                                                dmc.Text(
-                                                    "Cathode Outlet Pressure",
-                                                    fw=500,
-                                                    size="sm",
-                                                ),
-                                                dmc.RangeSlider(
-                                                    id="polcurve-pressure-set-filter",
-                                                    min=0,
-                                                    max=1,
-                                                    value=[0, 1],
-                                                    step=0.01,
-                                                    marks=[],
-                                                    thumbSize=16,
-                                                    size="sm",
-                                                ),
-                                            ],
-                                        ),
-                                        dmc.InputWrapper(
-                                            dmc.SegmentedControl(
-                                                id="polcurve-is-rising-filter",
-                                                data=["Both", "Rising", "Falling"],
-                                                value="Both",
-                                                fullWidth=True,
-                                                orientation="vertical",
-                                            ),
-                                            label="Direction",
-                                            htmlFor="polcurve-is-rising-filter",
-                                            className="dmc",
-                                            styles={"label": {"marginBottom": "6px"}},
-                                            style={
-                                                "flex": "0 1 280px",
-                                                "minWidth": "220px",
-                                            },
-                                        ),
-                                    ],
-                                ),
-                                dmc.Group(
-                                    gap="md",
-                                    mb="sm",
-                                    style={"flexWrap": "wrap"},
-                                    children=[
-                                        dmc.Stack(
-                                            gap=4,
-                                            style={
-                                                "flex": 1,
-                                                "minWidth": "260px",
-                                                "overflow": "hidden",
-                                            },
-                                            children=[
                                                 html.Div(
                                                     style={},
                                                     children=dmc.BubbleChart(
@@ -312,11 +264,24 @@ layout = dmc.Container(
                                         dmc.Stack(
                                             gap=4,
                                             style={
-                                                "flex": 1,
-                                                "minWidth": "260px",
-                                                "overflow": "hidden",
+                                                "width": "100%",
                                             },
                                             children=[
+                                                dmc.Text(
+                                                    "Cathode Outlet Pressure",
+                                                    fw=500,
+                                                    size="sm",
+                                                ),
+                                                dmc.RangeSlider(
+                                                    id="polcurve-pressure-set-filter",
+                                                    min=0,
+                                                    max=1,
+                                                    value=[0, 1],
+                                                    step=0.01,
+                                                    marks=[],
+                                                    thumbSize=16,
+                                                    size="sm",
+                                                ),
                                                 html.Div(
                                                     style={},
                                                     children=dmc.BubbleChart(
@@ -343,11 +308,25 @@ layout = dmc.Container(
                                                 ),
                                             ],
                                         ),
-                                        dmc.Box(
+                                        dmc.Stack(
+                                            gap=4,
                                             style={
-                                                "flex": "0 1 280px",
-                                                "minWidth": "220px",
-                                            }
+                                                "width": "100%",
+                                                "height": "100%",
+                                            },
+                                            children=[
+                                                dmc.Text(
+                                                    "Direction", fw=500, size="sm"
+                                                ),
+                                                dmc.SegmentedControl(
+                                                    id="polcurve-is-rising-filter",
+                                                    data=["Both", "Rising", "Falling"],
+                                                    value="Both",
+                                                    orientation="vertical",
+                                                    fullWidth=True,
+                                                    style={"flex": 1},
+                                                ),
+                                            ],
                                         ),
                                     ],
                                 ),
