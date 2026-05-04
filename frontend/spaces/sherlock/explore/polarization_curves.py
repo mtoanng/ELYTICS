@@ -35,22 +35,22 @@ def _get_slider_config(df, col):
     if numeric.empty:
         return 0, 1, [0, 1], {0: "0", 1: "1"}
 
-    min_v = float(numeric.min())
-    max_v = float(numeric.max())
+    min_v = round(float(numeric.min()), 2)
+    max_v = round(float(numeric.max()), 2)
     if min_v == max_v:
-        return min_v, max_v, [min_v, max_v], {min_v: f"{min_v:g}"}
+        return min_v, max_v, [min_v, max_v], {min_v: f"{min_v:.2f}"}
 
     return (
         min_v,
         max_v,
         [min_v, max_v],
-        {min_v: f"{min_v:g}", max_v: f"{max_v:g}"},
+        {min_v: f"{min_v:.2f}", max_v: f"{max_v:.2f}"},
     )
 
 
 def _apply_local_polcurve_filters(df, tSp_range, pCtSp_range, filter_type):
-    if "tSp" in df.columns and tSp_range and len(tSp_range) == 2:
-        t_numeric = pd.to_numeric(df["tSp"], errors="coerce")
+    if "tAndeIn" in df.columns and tSp_range and len(tSp_range) == 2:
+        t_numeric = pd.to_numeric(df["tAndeIn"], errors="coerce")
         df = df[(t_numeric >= tSp_range[0]) & (t_numeric <= tSp_range[1])]
     if "pCtSp" in df.columns and pCtSp_range and len(pCtSp_range) == 2:
         p_numeric = pd.to_numeric(df["pCtSp"], errors="coerce")
@@ -222,7 +222,7 @@ layout = dmc.Container(
                                                     "always_visible": False,
                                                 },
                                             ),
-                                            label="Temperature Setpoint",
+                                            label="Anode Inlet Temperature",
                                             htmlFor="polcurve-temp-set-filter",
                                             className="dmc",
                                             styles={"label": {"marginBottom": "6px"}},
@@ -486,10 +486,10 @@ def populate_data_driven_filter_options(data, is_rising):
     # Apply direction filter
     df = _apply_local_polcurve_filters(df, None, None, (is_rising or "both").lower())
     # Temperature marks
-    t_min, t_max, t_value, _ = _get_slider_config(df, "tSp")
+    t_min, t_max, t_value, _ = _get_slider_config(df, "tAndeIn")
     t_marks = {}
-    if "tSp" in df and not df["tSp"].dropna().empty:
-        counts, bin_edges = np.histogram(df["tSp"].dropna(), bins=10)
+    if "tAndeIn" in df and not df["tAndeIn"].dropna().empty:
+        counts, bin_edges = np.histogram(df["tAndeIn"].dropna(), bins=10)
         for i, edge in enumerate(bin_edges[:-1]):
             if counts[i] > 0:
                 center = (edge + bin_edges[i + 1]) / 2
