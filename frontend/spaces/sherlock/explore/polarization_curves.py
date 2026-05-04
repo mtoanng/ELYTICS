@@ -486,10 +486,13 @@ def fetch_polcurve_data(order_id, sample_name, testrig_id):
     df = get_tabular("sherlock", "polcurve", filters=filters)
     if df.empty:
         return [], "No data found for selected filters.", {"display": "block"}
+    else:
+        df["event_short_id"] = df.apply(
+            lambda row: f"{row['sample_name']}_{row['order_id']}_{str(row['event_id']).split('_')[-1]}",
+            axis=1,
+        )
+
     return df.to_dict("records"), "", {"display": "none"}
-
-
-# ========== TABLE RENDERING ==========
 
 
 # ========== DATA-DRIVEN LOCAL FILTER CONFIG ==========
@@ -606,7 +609,7 @@ def update_polcurve_plot(data, theme, tSp, pCtSp, is_rising):
     df = pd.DataFrame(data)
     df = _apply_local_polcurve_filters(df, tSp, pCtSp, (is_rising or "both").lower())
     if "uCell" in df and "jStck" in df:
-        color_col = "event_id" if "event_id" in df else None
+        color_col = "event_short_id" if "event_short_id" in df else None
         plot_df = df.dropna(subset=["uCell", "jStck"])
         if plot_df.empty:
             return {}, "No plot available for selected data."
