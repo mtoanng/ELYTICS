@@ -1,12 +1,12 @@
 import hashlib
 import json
 import logging
-import math
 import os
 import re
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any
 
 from databricks import sql as databricks_sql
@@ -19,8 +19,14 @@ logger = logging.getLogger(__name__)
 DATABRICKS_SERVER_HOSTNAME = os.environ["DATABRICKS_SERVER_HOSTNAME"]
 DATABRICKS_HTTP_PATH = os.environ["DATABRICKS_HTTP_PATH"]
 DATABRICKS_TOKEN = os.environ["DATABRICKS_TOKEN"]
-DATABRICKS_CATALOG = os.getenv("DATABRICKS_CATALOG", "ps_xplatform_prod")
-DATABRICKS_SCHEMA = os.getenv("DATABRICKS_SCHEMA", "pemely_ops")
+DATABRICKS_CATALOG = os.getenv("DATABRICKS_CATALOG", "ps_xplatform_dev")
+DATABRICKS_SCHEMA = os.getenv("DATABRICKS_SCHEMA", "pemely_dev")
+LOCAL_SQL = os.getenv("LOCAL_SQL", "false").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
 
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
@@ -29,9 +35,27 @@ REDIS_DB = int(os.getenv("REDIS_DB", "0"))
 _TARGET_POINTS_DEFAULT = 1200
 _TARGET_POINTS_MIN = 100
 _TARGET_POINTS_MAX = 5000
-_TARGET_POINTS_ROUND = 100
 _BUCKET_SECONDS_MIN = 1
 _BUCKET_SECONDS_MAX = 30 * 24 * 60 * 60
+_BUCKET_SECONDS_CHOICES = (
+    1,
+    5,
+    10,
+    15,
+    30,
+    60,
+    5 * 60,
+    10 * 60,
+    15 * 60,
+    30 * 60,
+    60 * 60,
+    2 * 60 * 60,
+    6 * 60 * 60,
+    12 * 60 * 60,
+    24 * 60 * 60,
+    7 * 24 * 60 * 60,
+    30 * 24 * 60 * 60,
+)
 
 _IDENTIFIER_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _CONNECTION_LOCK = threading.Lock()
@@ -39,8 +63,11 @@ _THREAD_CONNECTIONS: dict[int, Any] = {}
 
 
 _redis_pool = redis.ConnectionPool(
-    host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB,
-    decode_responses=True, max_connections=20,
+    host=REDIS_HOST,
+    port=REDIS_PORT,
+    db=REDIS_DB,
+    decode_responses=True,
+    max_connections=20,
 )
 
 
@@ -48,7 +75,9 @@ def get_redis_client() -> redis.Redis:
     return redis.Redis(connection_pool=_redis_pool)
 
 
-def configure_redis_cache_policy(max_memory_bytes: int = 2 * 1024 * 1024 * 1024) -> None:
+def configure_redis_cache_policy(
+    max_memory_bytes: int = 2 * 1024 * 1024 * 1024,
+) -> None:
     client = get_redis_client()
     try:
         client.config_set("maxmemory", max_memory_bytes)
@@ -105,7 +134,9 @@ def _cache_key(prefix: str, **kwargs: Any) -> str:
     return f"holmes:{prefix}:{digest}"
 
 
-def _cache_set(r: redis.Redis, key: str, view_name: str, payload: Any, ttl: int) -> None:
+def _cache_set(
+    r: redis.Redis, key: str, view_name: str, payload: Any, ttl: int
+) -> None:
     r.set(key, json.dumps(payload, default=str), ex=ttl)
     r.sadd(f"holmes:index:{view_name}", key)
 
@@ -124,7 +155,37 @@ def fully_qualified_view(space: str, data_kind: str, table_name: str) -> str:
     safe_table = _validate_identifier(table_name)
     segment = "meta" if data_kind == "metadata" else data_kind
     safe_kind = _validate_identifier(segment)
-    return f"{DATABRICKS_CATALOG}.{DATABRICKS_SCHEMA}.holmes_{safe_space}_{safe_kind}_{safe_table}_view"
+    return f"{DATABRICKS_CATALOG}.{DATABRICKS_SCHEMA}.holmes_{safe_space}_{safe_table}_{safe_kind}_view"
+
+
+def _read_local_sql(path: str) -> str:
+    sql = Path(path).read_text(encoding="utf-8").strip()
+    return sql.rstrip(";")
+
+
+def resolve_query_source(
+    space: str, data_kind: str, table_name: str
+) -> tuple[str, str]:
+    """Resolve query FROM source and cache identifier based on LOCAL_SQL flag."""
+    cache_source = fully_qualified_view(
+        space=space, data_kind=data_kind, table_name=table_name
+    )
+    if not LOCAL_SQL:
+        return cache_source, cache_source
+
+    safe_space = _validate_identifier(space)
+    safe_table = _validate_identifier(table_name)
+    segment = "meta" if data_kind == "metadata" else data_kind
+    safe_kind = _validate_identifier(segment)
+    sql_file = (
+        Path(__file__).resolve().parents[2]
+        / "views"
+        / "spaces"
+        / safe_space
+        / f"{safe_table}_{safe_kind}.sql"
+    )
+    sql_body = _read_local_sql(str(sql_file))
+    return f"({sql_body}) AS local_source", cache_source
 
 
 def _connect_databricks() -> Any:
@@ -201,7 +262,9 @@ def execute_sql_query(query: str) -> list[dict[str, Any]]:
                 return [dict(zip(columns, row)) for row in cursor.fetchall()]
         except Exception as exc:
             if attempt == 0 and _should_reconnect(exc):
-                logger.warning("Databricks connection became unusable, reconnecting once")
+                logger.warning(
+                    "Databricks connection became unusable, reconnecting once"
+                )
                 connection = _reset_thread_connection()
                 continue
             raise
@@ -232,40 +295,89 @@ def get_query_result(
     sort_by: str | None = None,
     sort_dir: str = "asc",
     ttl: int = 3600,
+    cache_source_name: str | None = None,
 ) -> list[dict[str, Any]]:
     filters = filters or {}
+    effective_ttl = 0 if LOCAL_SQL else ttl
+    source_name = cache_source_name or view_name
     key = _cache_key(
         "tabular",
-        view=view_name,
+        view=source_name,
         filters={k: sorted(v) for k, v in sorted(filters.items())},
         sort_by=sort_by,
         sort_dir=sort_dir.lower(),
     )
     r = get_redis_client()
-    cached = r.get(key)
-    if cached:
-        data: list[dict[str, Any]] = json.loads(cached)
-        record_query("tabular", space, table, cache_hit=True, duration_s=0, payload_bytes=len(cached), rows=len(data))
-        return data
+    if effective_ttl > 0:
+        cached = r.get(key)
+        if cached:
+            data: list[dict[str, Any]] = json.loads(cached)
+            record_query(
+                "tabular",
+                space,
+                table,
+                cache_hit=True,
+                duration_s=0,
+                payload_bytes=len(cached),
+                rows=len(data),
+            )
+            return data
 
-    query = build_view_query(view=view_name, filters=filters, sort_by=sort_by, sort_dir=sort_dir)
+    query = build_view_query(
+        view=view_name, filters=filters, sort_by=sort_by, sort_dir=sort_dir
+    )
     t0 = time.monotonic()
     data = execute_sql_query(query)
     duration = time.monotonic() - t0
     payload = json.dumps(data, default=str)
-    _cache_set(r, key, view_name, data, ttl)
-    record_query("tabular", space, table, cache_hit=False, duration_s=duration, payload_bytes=len(payload), rows=len(data))
+    if effective_ttl > 0:
+        _cache_set(r, key, source_name, data, effective_ttl)
+    record_query(
+        "tabular",
+        space,
+        table,
+        cache_hit=False,
+        duration_s=duration,
+        payload_bytes=len(payload),
+        rows=len(data),
+    )
     return data
 
 
-def compute_bucket_seconds(start_time: datetime, end_time: datetime, target_points: int) -> int:
+def compute_bucket_seconds(
+    start_time: datetime, end_time: datetime, target_points: int
+) -> int:
     if not (_TARGET_POINTS_MIN <= target_points <= _TARGET_POINTS_MAX):
-        raise ValueError(f"target_points must be between {_TARGET_POINTS_MIN} and {_TARGET_POINTS_MAX}")
+        raise ValueError(
+            f"target_points must be between {_TARGET_POINTS_MIN} and {_TARGET_POINTS_MAX}"
+        )
     if start_time >= end_time:
         raise ValueError("start must be before end")
     range_seconds = max((end_time - start_time).total_seconds(), 1.0)
-    raw = math.ceil(range_seconds / target_points)
-    return max(_BUCKET_SECONDS_MIN, min(raw, _BUCKET_SECONDS_MAX))
+    raw = range_seconds / target_points
+    candidates = [
+        bucket
+        for bucket in _BUCKET_SECONDS_CHOICES
+        if _BUCKET_SECONDS_MIN <= bucket <= _BUCKET_SECONDS_MAX
+    ]
+    if not candidates:
+        raise ValueError("No valid bucket choices configured")
+
+    # Choose the nearest fixed bucket; on ties prefer the larger bucket to keep
+    # response sizes bounded.
+    return min(candidates, key=lambda bucket: (abs(bucket - raw), -bucket))
+
+
+def format_bucket_label(bucket_seconds: int) -> str:
+    if bucket_seconds <= 0:
+        return f"{bucket_seconds}s"
+    if bucket_seconds % (24 * 60 * 60) == 0:
+        return f"{bucket_seconds // (24 * 60 * 60)}d"
+    if bucket_seconds % (60 * 60) == 0:
+        return f"{bucket_seconds // (60 * 60)}h"
+    if bucket_seconds % 60 == 0:
+        return f"{bucket_seconds // 60}m"
+    return f"{bucket_seconds}s"
 
 
 def build_timeseries_query(
@@ -286,7 +398,11 @@ def build_timeseries_query(
     if not safe_values:
         raise ValueError("At least one non-time metric column is required")
 
-    agg_parts = [f"{fn}({col}) AS {col}_{fn.lower()}" for col in safe_values for fn in ("MIN", "MAX", "AVG")]
+    agg_parts = [
+        f"ROUND({fn}({col}), 3) AS {col}_{fn.lower()}"
+        for col in safe_values
+        for fn in ("MIN", "MAX", "AVG")
+    ]
     conditions = _build_filter_conditions(filters)
     conditions += [
         f"{safe_time} >= {_to_sql_timestamp_literal(start_time)}",
@@ -298,47 +414,108 @@ def build_timeseries_query(
     return f"SELECT {select} FROM {view}{where} GROUP BY bucket_start ORDER BY bucket_start ASC"
 
 
+def _resolve_timeseries_bounds(
+    view_name: str,
+    time_column: str,
+    filters: dict[str, list[str]],
+    start_time: datetime | None,
+    end_time: datetime | None,
+) -> tuple[datetime, datetime]:
+    safe_time = _validate_identifier(time_column)
+
+    query_start = start_time
+    query_end = end_time
+    if query_start is not None and query_end is not None:
+        return query_start, query_end
+
+    conditions = _build_filter_conditions(filters)
+    conditions.append(f"{safe_time} IS NOT NULL")
+    where = " WHERE " + " AND ".join(conditions) if conditions else ""
+    bounds_query = (
+        f"SELECT MIN({safe_time}) AS min_time, MAX({safe_time}) AS max_time "
+        f"FROM {view_name}{where}"
+    )
+    bounds_rows = execute_sql_query(bounds_query)
+    min_time = bounds_rows[0].get("min_time") if bounds_rows else None
+    max_time = bounds_rows[0].get("max_time") if bounds_rows else None
+    if min_time is None or max_time is None:
+        raise ValueError("No time bounds available for selected filters")
+
+    query_start = query_start or min_time
+    query_end = query_end or max_time
+
+    if not isinstance(query_start, datetime):
+        query_start = datetime.fromisoformat(str(query_start).replace("Z", "+00:00"))
+    if not isinstance(query_end, datetime):
+        query_end = datetime.fromisoformat(str(query_end).replace("Z", "+00:00"))
+
+    if query_start >= query_end:
+        # Include at least one full second when datasource min=max.
+        query_end = query_end.replace(microsecond=0)
+        query_start = query_start.replace(microsecond=0)
+        if query_start >= query_end:
+            query_end = query_start + timedelta(seconds=1)
+
+    return query_start, query_end
+
+
 def get_timeseries_result(
     view_name: str,
     space: str,
     table: str,
     time_column: str,
     value_columns: list[str],
-    start_time: datetime,
-    end_time: datetime,
+    start_time: datetime | None,
+    end_time: datetime | None,
     filters: dict[str, list[str]] | None = None,
     target_points: int = _TARGET_POINTS_DEFAULT,
     ttl: int = 3600,
+    cache_source_name: str | None = None,
 ) -> dict[str, Any]:
     filters = filters or {}
-    # Round target_points to the nearest bucket so requests with similar point
-    # counts (e.g. 1150 vs 1200 vs 1250) share the same cache entry.
-    rounded_points = round(target_points / _TARGET_POINTS_ROUND) * _TARGET_POINTS_ROUND
-    rounded_points = max(_TARGET_POINTS_MIN, min(rounded_points, _TARGET_POINTS_MAX))
-    bucket_seconds = compute_bucket_seconds(start_time, end_time, rounded_points)
+    effective_ttl = 0 if LOCAL_SQL else ttl
+    source_name = cache_source_name or view_name
+    effective_start, effective_end = _resolve_timeseries_bounds(
+        view_name=view_name,
+        time_column=time_column,
+        filters=filters,
+        start_time=start_time,
+        end_time=end_time,
+    )
+    bucket_seconds = compute_bucket_seconds(
+        effective_start, effective_end, target_points
+    )
     key = _cache_key(
         "timeseries",
-        view=view_name,
+        view=source_name,
         time_column=time_column,
         value_columns=sorted(value_columns),
         filters={k: sorted(v) for k, v in sorted(filters.items())},
-        start=start_time.isoformat(),
-        end=end_time.isoformat(),
-        target_points=rounded_points,
+        start=effective_start.isoformat(),
+        end=effective_end.isoformat(),
         bucket_seconds=bucket_seconds,
     )
     r = get_redis_client()
-    cached = r.get(key)
-    if cached:
-        record_query("timeseries", space, table, cache_hit=True, duration_s=0, payload_bytes=len(cached), rows=0)
-        return json.loads(cached)
+    if effective_ttl > 0:
+        cached = r.get(key)
+        if cached:
+            record_query(
+                "timeseries",
+                space,
+                table,
+                cache_hit=True,
+                duration_s=0,
+                payload_bytes=len(cached),
+                rows=0,
+            )
+            return json.loads(cached)
 
     query = build_timeseries_query(
         view=view_name,
         time_column=time_column,
         value_columns=value_columns,
-        start_time=start_time,
-        end_time=end_time,
+        start_time=effective_start,
+        end_time=effective_end,
         filters=filters,
         bucket_seconds=bucket_seconds,
     )
@@ -349,13 +526,25 @@ def get_timeseries_result(
         "data": data,
         "meta": {
             "bucket_seconds": bucket_seconds,
-            "requested_points": rounded_points,
+            "bucket_label": format_bucket_label(bucket_seconds),
+            "requested_points": target_points,
             "returned_points": len(data),
+            "effective_start": effective_start,
+            "effective_end": effective_end,
         },
     }
     serialized = json.dumps(payload, default=str)
-    _cache_set(r, key, view_name, payload, ttl)
-    record_query("timeseries", space, table, cache_hit=False, duration_s=duration, payload_bytes=len(serialized), rows=len(data))
+    if effective_ttl > 0:
+        _cache_set(r, key, source_name, payload, effective_ttl)
+    record_query(
+        "timeseries",
+        space,
+        table,
+        cache_hit=False,
+        duration_s=duration,
+        payload_bytes=len(serialized),
+        rows=len(data),
+    )
     return payload
 
 

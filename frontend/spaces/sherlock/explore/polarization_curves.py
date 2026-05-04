@@ -1,5 +1,4 @@
 from dash import (
-    html,
     dcc,
     callback,
     Output,
@@ -7,172 +6,608 @@ from dash import (
     State,
     register_page,
     no_update,
+    html,
     clientside_callback,
 )
-from dash_iconify import DashIconify
 import dash_mantine_components as dmc
 import dash_ag_grid as dag
+from dash_iconify import DashIconify
+import pandas as pd
+from services.backend_service import get_metadata, get_tabular
 
 register_page(
-    __name__, path="/sherlock/data-exploration/polarization-curves", 
-    title="HOLMES - Sherlock - Polarization Curves")
+    __name__,
+    path="/sherlock/data-exploration/polarization-curves",
+    title="HOLMES - Sherlock - Polcurve Viewer",
+)
 
 USAGE_BLOCKQUOTE_TEXT = [
-    "This page is under construction. Please check back later for updates." 
+    "This page allows you to explore polarization curve data.",
+    "Select at least one filter to load and plot data.",
+    "Download the table as CSV using the Download CSV button below the filters.",
 ]
 
-def polarization_curves_layout():
-    return dmc.Container(
-        size="xl",
-        py="md",
-        children=[
-            dmc.Stack(
-                gap="md",
-                children=[
-                    dmc.Stack(
-                        gap=2,
-                        children=[
-                            dmc.Group(
-                                gap="xs",
-                                align="center",
-                                children=[
-                                    dmc.Title("Polarization Curve viewer", order=2),
-                                    dmc.ActionIcon(
-                                        DashIconify(icon="material-symbols:info-outline", width=20),
-                                        id="polcurve-usage-toggle",
-                                        variant="subtle",
-                                        color="blue",
-                                        size="md",
-                                        radius="xl",
-                                    ),
-                                ],
-                            ),
-                            dmc.Text("This page provides an overview of all polarization curves.", c="dimmed"),
-                            dmc.Collapse(
-                                dmc.Blockquote(
-                                    dmc.List(
-                                        withPadding=False,
-                                        children=[
-                                            dmc.ListItem(item)
-                                            for item in USAGE_BLOCKQUOTE_TEXT
-                                        ],
-                                    ),
-                                    color="blue",
-                                ),
-                                opened=False,
-                                id="polcurve-usage-collapse",
-                            ),
-                        ],
-                    ),
-                    dmc.Paper(
-                        withBorder=True,
-                        p="md",
-                        radius="md",
-                        children=[
-                            dmc.Stack(
-                                gap="md",
-                                children=[
-                                    dmc.Group(
-                                        gap="md",
-                                        align="flex-start",
-                                        style={"flexWrap": "wrap"},
-                                        children=[
-                                            dmc.InputWrapper(
-                                                dcc.Dropdown(
-                                                    id="polcurve-order-id-filter",
-                                                    options=[],
-                                                    value=[],
-                                                    multi=True,
-                                                    searchable=True,
-                                                    clearable=True,
-                                                    placeholder="Select order IDs",
-                                                    style={"width": "100%"},
-                                                ),
-                                                label="Order ID",
-                                                htmlFor="polcurve-order-id-filter",
-                                                className="dmc",
-                                                styles={"label": {"marginBottom": "6px"}},
-                                                style={"flex": "0 0 220px", "minWidth": "220px"},
-                                            ),
-                                            dmc.InputWrapper(
-                                                dcc.Dropdown(
-                                                    id="polcurve-sample-id-filter",
-                                                    options=[],
-                                                    value=[],
-                                                    multi=True,
-                                                    searchable=True,
-                                                    clearable=True,
-                                                    placeholder="Select order IDs",
-                                                    style={"width": "100%"},
-                                                ),
-                                                label="Sample Name",
-                                                htmlFor="polcurve-sample-id-filter",
-                                                className="dmc",
-                                                styles={"label": {"marginBottom": "6px"}},
-                                                style={"flex": "0 0 220px", "minWidth": "220px"},
-                                            ),
-                                            dmc.Button(
-                                                [
-                                                    html.I(
-                                                        className="bi bi-download",
-                                                        style={
-                                                            "marginRight": "10px",
-                                                            "fontSize": "1.1em",
-                                                        },
-                                                    ),
-                                                    "Download CSV",
-                                                ],
-                                                id="sample-download-btn",
-                                                n_clicks=0,
-                                                className="download-btn",
-                                                style={"flex": "0 0 auto", "whiteSpace": "nowrap"},
-                                            ),
-                                        ],
-                                    ),
-                                    dmc.Group(
-                                        gap="md",
-                                        align="flex-end",
-                                        style={"flexWrap": "nowrap", "overflowX": "auto"},
-                                        children=[ 
-                                            dmc.InputWrapper(
-                                                # No 'label' prop here anymore
-                                                style={"flex": "1", "minWidth": "300px"}, # Give it more space
-                                                mb="xl",
-                                                children=[
-                                                    dmc.Group(
-                                                        align="center",
-                                                        gap="sm",
-                                                        preventGrowOverflow=False, # Important for the slider to grow
-                                                        children=[
-                                                            # 1. The Label as a dmc.Text component
-                                                            dmc.Text("Temperature (°C):", size="sm", style={"width": "120px"}),
 
-                                                            # 2. The RangeSlider, taking up the remaining space
-                                                            dmc.RangeSlider(
-                                                                id="polcurve-temperature-filter",
-                                                                min=0,
-                                                                max=100,
-                                                                value=[20, 80],
-                                                                marks=[
-                                                                    {"value": 0, "label": "0°"},
-                                                                    {"value": 50, "label": "50°"},
-                                                                    {"value": 100, "label": "100°"},
-                                                                ],
-                                                                style={"width": "200px"},
-                                                            ),
-                                                        ],
-                                                    )
-                                                ],
-                                            ),
-                                        ],
-                                    ),
-                                ],
-                            ),
-                        ],
-                    ),
-                ],
-            ),
-        ],
+def _get_slider_config(df, col):
+    if col not in df.columns:
+        return 0, 1, [0, 1], {0: "0", 1: "1"}
+    numeric = pd.to_numeric(df[col], errors="coerce").dropna()
+    if numeric.empty:
+        return 0, 1, [0, 1], {0: "0", 1: "1"}
+
+    min_v = float(numeric.min())
+    max_v = float(numeric.max())
+    if min_v == max_v:
+        return min_v, max_v, [min_v, max_v], {min_v: f"{min_v:g}"}
+
+    return (
+        min_v,
+        max_v,
+        [min_v, max_v],
+        {min_v: f"{min_v:g}", max_v: f"{max_v:g}"},
     )
 
-layout = polarization_curves_layout
+
+def _apply_local_polcurve_filters(df, tSp_range, pCtSp_range, filter_type):
+    if "tSp" in df.columns and tSp_range and len(tSp_range) == 2:
+        t_numeric = pd.to_numeric(df["tSp"], errors="coerce")
+        df = df[(t_numeric >= tSp_range[0]) & (t_numeric <= tSp_range[1])]
+    if "pCtSp" in df.columns and pCtSp_range and len(pCtSp_range) == 2:
+        p_numeric = pd.to_numeric(df["pCtSp"], errors="coerce")
+        df = df[(p_numeric >= pCtSp_range[0]) & (p_numeric <= pCtSp_range[1])]
+    if "is_rising" in df.columns:
+        if filter_type == "rising":
+            df = df[df["is_rising"] == True]
+        elif filter_type == "falling":
+            df = df[df["is_rising"] == False]
+    return df
+
+
+# ========== LAYOUT ==========
+
+layout = dmc.Container(
+    size="xl",
+    py="md",
+    children=[
+        dmc.Stack(
+            gap="md",
+            children=[
+                # Title and info
+                dmc.Stack(
+                    gap=2,
+                    children=[
+                        dmc.Group(
+                            gap="xs",
+                            align="center",
+                            children=[
+                                dmc.Title("Polarization Curve Viewer", order=2),
+                                dmc.ActionIcon(
+                                    DashIconify(
+                                        icon="material-symbols:info-outline", width=20
+                                    ),
+                                    id="polcurve-usage-toggle",
+                                    variant="subtle",
+                                    color="blue",
+                                    size="md",
+                                    radius="xl",
+                                ),
+                            ],
+                        ),
+                        dmc.Text(
+                            "Explore polarization curve data from Sherlock.", c="dimmed"
+                        ),
+                        dmc.Collapse(
+                            dmc.Blockquote(
+                                dmc.List(
+                                    withPadding=False,
+                                    children=[
+                                        dmc.ListItem(item)
+                                        for item in USAGE_BLOCKQUOTE_TEXT
+                                    ],
+                                ),
+                                color="blue",
+                            ),
+                            id="polcurve-usage-collapse",
+                        ),
+                    ],
+                ),
+                # Filters and download
+                dmc.Paper(
+                    withBorder=True,
+                    p="md",
+                    radius="md",
+                    children=[
+                        dmc.Group(
+                            gap="md",
+                            align="flex-end",
+                            style={"flexWrap": "nowrap", "overflowX": "auto"},
+                            children=[
+                                dmc.InputWrapper(
+                                    dcc.Dropdown(
+                                        id="polcurve-order-id-filter",
+                                        multi=True,
+                                        placeholder="Order ID",
+                                        style={"width": "100%"},
+                                    ),
+                                    label="Order ID",
+                                    htmlFor="polcurve-order-id-filter",
+                                    className="dmc",
+                                    styles={"label": {"marginBottom": "6px"}},
+                                    style={"flex": 1, "minWidth": "180px"},
+                                ),
+                                dmc.InputWrapper(
+                                    dcc.Dropdown(
+                                        id="polcurve-sample-name-filter",
+                                        multi=True,
+                                        placeholder="Sample Name",
+                                        style={"width": "100%"},
+                                    ),
+                                    label="Sample Name",
+                                    htmlFor="polcurve-sample-name-filter",
+                                    className="dmc",
+                                    styles={"label": {"marginBottom": "6px"}},
+                                    style={"flex": 1, "minWidth": "180px"},
+                                ),
+                                dmc.InputWrapper(
+                                    dcc.Dropdown(
+                                        id="polcurve-testrig-id-filter",
+                                        multi=True,
+                                        placeholder="Testrig ID",
+                                        style={"width": "100%"},
+                                    ),
+                                    label="Testrig ID",
+                                    htmlFor="polcurve-testrig-id-filter",
+                                    className="dmc",
+                                    styles={"label": {"marginBottom": "6px"}},
+                                    style={"flex": 1, "minWidth": "180px"},
+                                ),
+                                dmc.Button(
+                                    [
+                                        html.I(
+                                            className="bi bi-download",
+                                            style={
+                                                "marginRight": "10px",
+                                                "fontSize": "1.1em",
+                                            },
+                                        ),
+                                        "Download CSV",
+                                    ],
+                                    id="polcurve-download-btn",
+                                    n_clicks=0,
+                                    className="download-btn",
+                                    style={
+                                        "flex": "0 0 auto",
+                                        "whiteSpace": "nowrap",
+                                        "alignSelf": "flex-end",
+                                    },
+                                ),
+                            ],
+                        ),
+                        dcc.Download(id="polcurve-download-csv"),
+                        dmc.Space(h="sm"),
+                        dmc.Text(
+                            id="polcurve-empty-message",
+                            c="red",
+                            fw=600,
+                            style={"display": "none"},
+                        ),
+                    ],
+                ),
+                # Plot and table
+                dmc.SimpleGrid(
+                    cols=1,
+                    spacing="md",
+                    verticalSpacing="md",
+                    children=[
+                        dmc.Paper(
+                            withBorder=True,
+                            p="md",
+                            radius="md",
+                            children=[
+                                dmc.Group(
+                                    mb="sm",
+                                    align="flex-end",
+                                    style={"flexWrap": "wrap"},
+                                    children=[
+                                        dmc.InputWrapper(
+                                            dcc.RangeSlider(
+                                                id="polcurve-temp-set-filter",
+                                                min=0,
+                                                max=1,
+                                                value=[0, 1],
+                                                marks={},
+                                                allowCross=False,
+                                                tooltip={
+                                                    "placement": "top",
+                                                    "always_visible": False,
+                                                },
+                                            ),
+                                            label="Temperature Setpoint",
+                                            htmlFor="polcurve-temp-set-filter",
+                                            className="dmc",
+                                            styles={"label": {"marginBottom": "6px"}},
+                                            style={"flex": 1, "minWidth": "260px"},
+                                        ),
+                                        dmc.InputWrapper(
+                                            dcc.RangeSlider(
+                                                id="polcurve-pressure-set-filter",
+                                                min=0,
+                                                max=1,
+                                                value=[0, 1],
+                                                marks={},
+                                                allowCross=False,
+                                                tooltip={
+                                                    "placement": "top",
+                                                    "always_visible": False,
+                                                },
+                                            ),
+                                            label="Pressure Setpoint",
+                                            htmlFor="polcurve-pressure-set-filter",
+                                            className="dmc",
+                                            styles={"label": {"marginBottom": "6px"}},
+                                            style={"flex": 1, "minWidth": "260px"},
+                                        ),
+                                        dmc.InputWrapper(
+                                            dmc.SegmentedControl(
+                                                id="polcurve-is-rising-filter",
+                                                data=["Both", "Rising", "Falling"],
+                                                value="Both",
+                                                fullWidth=True,
+                                            ),
+                                            label="Direction",
+                                            htmlFor="polcurve-is-rising-filter",
+                                            className="dmc",
+                                            styles={"label": {"marginBottom": "6px"}},
+                                            style={
+                                                "flex": "0 1 280px",
+                                                "minWidth": "220px",
+                                            },
+                                        ),
+                                    ],
+                                ),
+                                dmc.Text(
+                                    id="polcurve-plot-message",
+                                    c="red",
+                                    fw=600,
+                                    style={"textAlign": "center"},
+                                ),
+                                dcc.Graph(
+                                    id="polcurve-plot",
+                                    config={"responsive": True},
+                                    style={"height": 500},
+                                ),
+                            ],
+                        ),
+                        dmc.Paper(
+                            withBorder=True,
+                            p="xs",
+                            radius="md",
+                            children=[
+                                dmc.Text("Table", fw=600, size="sm"),
+                                dcc.Store(id="polcurve-table-store"),
+                                dcc.Loading(
+                                    id="polcurve-table-loading",
+                                    type="default",
+                                    children=[
+                                        dag.AgGrid(
+                                            id="polcurve-table",
+                                            columnDefs=[],  # Will be set by callback
+                                            rowData=[],
+                                            defaultColDef={
+                                                "resizable": True,
+                                                "sortable": True,
+                                                "filter": True,
+                                                "minWidth": 110,
+                                            },
+                                            dashGridOptions={
+                                                "pagination": True,
+                                                "paginationPageSize": 20,
+                                                "animateRows": True,
+                                                "floatingFilter": True,
+                                                "groupDisplayType": "multipleColumns",
+                                            },
+                                            style={"height": 350, "width": "100%"},
+                                        )
+                                    ],
+                                ),
+                            ],
+                        ),
+                    ],
+                ),
+                dcc.Store(id="polcurve-metadata-store"),
+                dcc.Store(id="polcurve-data-store"),
+                dcc.Store(id="polcurve-usage-open", data=False),
+                dcc.Store(id="polcurve-theme-store"),
+                html.Div(id="polcurve-theme-dummy"),
+            ],
+        )
+    ],
+)
+
+# ========== INFO PANEL COLLAPSE ==========
+
+
+@callback(
+    Output("polcurve-usage-open", "data"),
+    Input("polcurve-usage-toggle", "n_clicks"),
+    State("polcurve-usage-open", "data"),
+    prevent_initial_call=True,
+)
+def toggle_usage_panel(n, open_state):
+    if n:
+        return not open_state
+    return open_state
+
+
+@callback(
+    Output("polcurve-usage-collapse", "opened"),
+    Input("polcurve-usage-open", "data"),
+)
+def set_usage_panel_open(open_state):
+    return open_state
+
+
+# ========== LAZY LOAD METADATA FOR FILTERS ==========
+
+
+@callback(
+    Output("polcurve-metadata-store", "data"),
+    Input("polcurve-order-id-filter", "id"),  # triggers on page load
+)
+def load_polcurve_metadata(_):
+    meta = get_metadata("sherlock", "polcurve")
+    # meta is a list of dicts, each dict is a row with all columns
+    df = pd.DataFrame(meta)
+    return df.to_dict("list") if not df.empty else {}
+
+
+@callback(
+    Output("polcurve-order-id-filter", "options"),
+    Input("polcurve-metadata-store", "data"),
+)
+def populate_order_id_options(meta):
+    if not meta:
+        return []
+    df = pd.DataFrame(meta)
+    # Order ID options (always all)
+    order_id_options = (
+        [
+            {"label": str(oid), "value": oid}
+            for oid in sorted(df["order_id"].dropna().unique(), reverse=True)
+        ]
+        if "order_id" in df
+        else []
+    )
+    return order_id_options
+
+
+@callback(
+    Output("polcurve-sample-name-filter", "options"),
+    Output("polcurve-testrig-id-filter", "options"),
+    Input("polcurve-metadata-store", "data"),
+    Input("polcurve-order-id-filter", "value"),
+)
+def populate_cascading_filter_options(meta, order_id):
+    if not meta:
+        return [], []
+    df = pd.DataFrame(meta)
+    # Filter sample names and testrig ids by selected order_id(s)
+    dff = df.copy()
+    if order_id:
+        dff = dff[dff["order_id"].isin(order_id)]
+    sample_name_options = (
+        [
+            {"label": str(s), "value": s}
+            for s in sorted(dff["sample_name"].dropna().unique())
+        ]
+        if "sample_name" in dff
+        else []
+    )
+    testrig_id_options = (
+        [
+            {"label": str(t), "value": t}
+            for t in sorted(dff["testrig_id"].dropna().unique())
+        ]
+        if "testrig_id" in dff
+        else []
+    )
+    return sample_name_options, testrig_id_options
+
+
+@callback(
+    Output("polcurve-order-id-filter", "value"),
+    Input("polcurve-order-id-filter", "options"),
+    State("polcurve-order-id-filter", "value"),
+)
+def set_default_order_id(order_options, current_value):
+    if not order_options:
+        return []
+
+    valid_order_ids = {opt["value"] for opt in order_options}
+    selected_order = current_value or []
+    selected_order = [oid for oid in selected_order if oid in valid_order_ids]
+
+    if selected_order:
+        return selected_order
+    return [order_options[0]["value"]]
+
+
+# ========== LAZY LOAD DATA WHEN FILTERS SELECTED ==========
+
+
+@callback(
+    Output("polcurve-data-store", "data"),
+    Output("polcurve-empty-message", "children"),
+    Output("polcurve-empty-message", "style"),
+    Input("polcurve-order-id-filter", "value"),
+    Input("polcurve-sample-name-filter", "value"),
+    Input("polcurve-testrig-id-filter", "value"),
+)
+def fetch_polcurve_data(order_id, sample_name, testrig_id):
+    filters = {}
+    if order_id:
+        filters["order_id"] = order_id
+    if sample_name:
+        filters["sample_name"] = sample_name
+    if testrig_id:
+        filters["testrig_id"] = testrig_id
+    if not filters:
+        return [], "Select at least one filter to load data.", {"display": "block"}
+    df = get_tabular("sherlock", "polcurve", filters=filters)
+    if df.empty:
+        return [], "No data found for selected filters.", {"display": "block"}
+    return df.to_dict("records"), "", {"display": "none"}
+
+
+# ========== TABLE RENDERING ==========
+
+
+# ========== DATA-DRIVEN LOCAL FILTER CONFIG ==========
+
+
+@callback(
+    Output("polcurve-temp-set-filter", "min"),
+    Output("polcurve-temp-set-filter", "max"),
+    Output("polcurve-temp-set-filter", "value"),
+    Output("polcurve-temp-set-filter", "marks"),
+    Output("polcurve-pressure-set-filter", "min"),
+    Output("polcurve-pressure-set-filter", "max"),
+    Output("polcurve-pressure-set-filter", "value"),
+    Output("polcurve-pressure-set-filter", "marks"),
+    Input("polcurve-data-store", "data"),
+    Input("polcurve-is-rising-filter", "value"),  # <-- add this
+)
+def populate_data_driven_filter_options(data, is_rising):
+    import numpy as np
+
+    if not data:
+        return 0, 1, [0, 1], {}, 0, 1, [0, 1], {}
+    df = pd.DataFrame(data)
+    # Apply direction filter
+    df = _apply_local_polcurve_filters(df, None, None, (is_rising or "both").lower())
+    # Temperature marks
+    t_min, t_max, t_value, _ = _get_slider_config(df, "tSp")
+    t_marks = {}
+    if "tSp" in df and not df["tSp"].dropna().empty:
+        counts, bin_edges = np.histogram(df["tSp"].dropna(), bins=10)
+        for i, edge in enumerate(bin_edges[:-1]):
+            if counts[i] > 0:
+                center = (edge + bin_edges[i + 1]) / 2
+                bar = "|" * max(1, int(counts[i] / counts.max() * 5))
+                t_marks[round(center, 2)] = bar
+    # Pressure marks
+    p_min, p_max, p_value, _ = _get_slider_config(df, "pCtSp")
+    p_marks = {}
+    if "pCtSp" in df and not df["pCtSp"].dropna().empty:
+        counts, bin_edges = np.histogram(df["pCtSp"].dropna(), bins=10)
+        for i, edge in enumerate(bin_edges[:-1]):
+            if counts[i] > 0:
+                center = (edge + bin_edges[i + 1]) / 2
+                bar = "|" * max(1, int(counts[i] / counts.max() * 5))
+                p_marks[round(center, 2)] = bar
+    return t_min, t_max, t_value, t_marks, p_min, p_max, p_value, p_marks
+
+
+# ========== TABLE RENDERING ==========
+
+
+@callback(
+    Output("polcurve-table", "columnDefs"),
+    Output("polcurve-table", "rowData"),
+    Input("polcurve-data-store", "data"),
+    Input("polcurve-temp-set-filter", "value"),
+    Input("polcurve-pressure-set-filter", "value"),
+    Input("polcurve-is-rising-filter", "value"),
+)
+def render_polcurve_table(data, tSp, pCtSp, is_rising):
+    if not data:
+        return [], []
+    df = pd.DataFrame(data)
+    df = _apply_local_polcurve_filters(df, tSp, pCtSp, (is_rising or "both").lower())
+    columns = df.columns.tolist()
+    columnDefs = []
+    for col in columns:
+        col_type = "numeric" if pd.api.types.is_numeric_dtype(df[col]) else "text"
+        columnDefs.append({"headerName": col, "field": col, "type": col_type})
+    return columnDefs, df.to_dict("records")
+
+
+# ========== THEME SYNC CALLBACKS ==========
+
+# Sync AG Grid theme with Mantine color scheme
+clientside_callback(
+    """
+    (theme) => {
+       document.documentElement.setAttribute('data-ag-theme-mode', theme === 'dark' ? 'dark' : 'light');
+       return window.dash_clientside.no_update;
+    }
+    """,
+    Output("polcurve-theme-dummy", "children"),
+    Input("theme-store", "data"),
+)
+
+
+# Forward theme-store to polcurve-theme-store for server-side callbacks
+@callback(
+    Output("polcurve-theme-store", "data"),
+    Input("theme-store", "data"),
+    prevent_initial_call=False,
+)
+def sync_theme_store(theme):
+    return theme
+
+
+# ========== PLOT CALLBACK ==========
+
+
+@callback(
+    Output("polcurve-plot", "figure"),
+    Output("polcurve-plot-message", "children"),
+    Input("polcurve-data-store", "data"),
+    Input("polcurve-theme-store", "data"),
+    Input("polcurve-temp-set-filter", "value"),
+    Input("polcurve-pressure-set-filter", "value"),
+    Input("polcurve-is-rising-filter", "value"),
+)
+def update_polcurve_plot(data, theme, tSp, pCtSp, is_rising):
+    import plotly.express as px
+
+    if not data:
+        return {}, "No plot available for selected data."
+    df = pd.DataFrame(data)
+    df = _apply_local_polcurve_filters(df, tSp, pCtSp, (is_rising or "both").lower())
+    if "uCell" in df and "jStck" in df:
+        color_col = "event_id" if "event_id" in df else None
+        plot_df = df.dropna(subset=["uCell", "jStck"])
+        if plot_df.empty:
+            return {}, "No plot available for selected data."
+        plotly_template = "plotly_dark" if theme == "dark" else "plotly"
+        fig = px.line(
+            (
+                plot_df.sort_values([color_col, "jStck"])
+                if color_col
+                else plot_df.sort_values("jStck")
+            ),
+            x="jStck",
+            y="uCell",
+            color=color_col,
+            template=plotly_template,
+        )
+        return fig, ""
+    return {}, "No plot available for selected data."
+
+
+# ========== DOWNLOAD CALLBACK ==========
+
+
+@callback(
+    Output("polcurve-download-csv", "data"),
+    Input("polcurve-download-btn", "n_clicks"),
+    State("polcurve-data-store", "data"),
+    prevent_initial_call=True,
+)
+def download_polcurve_table(n_clicks, data):
+    if not data:
+        return no_update
+    df = pd.DataFrame(data)
+    return dcc.send_data_frame(df.to_csv, "polcurve_data.csv", index=False)

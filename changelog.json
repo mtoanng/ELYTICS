@@ -34,6 +34,96 @@
       "pr": 712,
       "title": "feat(core): Backend refactor for big data support",
       "date": "2026-03-23"
+    },
+    {
+      "pr": 729,
+      "title": "fix(sherlock): Fixed test rig statistics type error",
+      "date": "2026-03-24"
+    },
+    {
+      "pr": 731,
+      "title": "fix(core): added certificates to docker container",
+      "date": "2026-03-25"
+    },
+    {
+      "pr": 736,
+      "title": "fix(core): Fixed plotly default dark mode graph styling",
+      "date": "2026-03-26"
+    },
+    {
+      "pr": 763,
+      "title": "core(fix): Updated view name + databricks env",
+      "date": "2026-04-07"
+    },
+    {
+      "pr": 773,
+      "title": "feat(sherlock): Cleaned CCM overview page",
+      "date": "2026-04-13"
+    },
+    {
+      "pr": 772,
+      "title": "feat(core): Integrated views back into repository",
+      "date": "2026-04-20"
+    },
+    {
+      "pr": 785,
+      "title": "feat(sherlock): Clean up timeseries overview page",
+      "date": "2026-04-20"
+    },
+    {
+      "pr": 791,
+      "title": "feat(core): Added fullscreen functionality",
+      "date": "2026-04-21"
+    },
+    {
+      "pr": 792,
+      "title": "fix(core): Fullscreen button styling",
+      "date": "2026-04-21"
+    },
+    {
+      "pr": 794,
+      "title": "feat(sherlock): Merge order and sample page",
+      "date": "2026-04-22"
+    },
+    {
+      "pr": 799,
+      "title": "feat(sherlock): Cleanup runtime overview",
+      "date": "2026-04-22"
+    },
+    {
+      "pr": 800,
+      "title": "fix(sherlock): Fullscreen button fixed position and order overview divider padding",
+      "date": "2026-04-22"
+    },
+    {
+      "pr": 809,
+      "title": "fix(sherlock): Timeseries loader + performance fixes",
+      "date": "2026-04-24"
+    },
+    {
+      "pr": 813,
+      "title": "fix(core): Fixed header logo styling & search content",
+      "date": "2026-04-28"
+    },
+    {
+      "pr": 818,
+      "title": "feat(core): Added session refresh",
+      "date": "2026-04-28"
+    },
+    {
+      "pr": 820,
+      "title": "fix(core): Fixed logo vertical alignment",
+      "date": "2026-04-28"
+    },
+    {
+      "pr": 822,
+      "title": "feat(mycroft): Added sidebar structure and page templates",
+      "date": "2026-04-29"
+    },
+    {
+      "pr": 823,
+      "title": "feat(mycroft): Migrated queries and added backend routes",
+      "date": "2026-04-29"
     }
   ],
   "releases": {}

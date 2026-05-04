@@ -46,6 +46,26 @@ USAGE_BLOCKQUOTE_TEXT = [
     "Note: some testrigs do not show all data yet, as data is currently being ingested."
 ]
 
+
+def _normalize_statistics_df(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty:
+        return df
+
+    normalized = df.copy()
+
+    if "number_of_cells" in normalized.columns:
+        normalized["number_of_cells"] = (
+            normalized["number_of_cells"]
+            .fillna("Unknown")
+            .astype(str)
+            .str.replace(r"\.0$", "", regex=True)
+        )
+
+    if "sample_type_state" in normalized.columns:
+        normalized["sample_type_state"] = normalized["sample_type_state"].fillna("Unknown")
+
+    return normalized
+
 layout = dmc.Container(
     size="xl",
     py="md",
@@ -84,6 +104,7 @@ layout = dmc.Container(
                                 color="blue",
                             ),
                             id="statistics-usage-collapse",
+                            opened=False,
                         ),
                     ],
                 ),
@@ -221,7 +242,7 @@ layout = dmc.Container(
                     },
                 ),
                 dcc.Store(id="teststat-raw-store"),
-                dcc.Store(id="statistics-usage-open", data=True)
+                dcc.Store(id="statistics-usage-open", data=False)
             ],
         )
     ],
@@ -259,14 +280,7 @@ def sync_usage_blockquote(is_open):
     prevent_initial_call=False,
 )
 def init_teststat_data(_):
-    df = get_table_as_df("sherlock", "testrig_statistics")
-    df["number_of_cells"] = (
-        df["number_of_cells"]
-        .fillna("Unknown")
-        .astype(str)
-        .str.replace(r"\.0$", "", regex=True)
-    )
-    df["sample_type_state"] = df["sample_type_state"].fillna("Unknown")
+    df = _normalize_statistics_df(get_table_as_df("sherlock", "testrig_statistics"))
 
     years = sorted(
         pd.to_numeric(df["year"], errors="coerce")
@@ -293,7 +307,7 @@ def load_data(raw_data, years):
     if not raw_data:
         return [], [], []
 
-    df = pd.DataFrame(raw_data)
+    df = _normalize_statistics_df(pd.DataFrame(raw_data))
 
     if years:
         df = df[df["year"].isin(years)]
@@ -424,20 +438,20 @@ def update_charts(data, selected, years, locations, sample_types, theme):
         entrywidth=110,
         entrywidthmode="pixels",
     )
-    dff = pd.DataFrame(data)
-    dff["number_of_cells"] = (
-        dff["number_of_cells"]
-        .fillna("Unknown")
-        .astype(str)
-        .str.replace(r"\.0$", "", regex=True)
-    )
-    dff["sample_type_state"] = dff["sample_type_state"].fillna("Unknown")
+    dff = _normalize_statistics_df(pd.DataFrame(data))
+    if "run_hours" in dff.columns:
+        dff["run_hours"] = pd.to_numeric(dff["run_hours"], errors="coerce").fillna(0)
+    if "year" in dff.columns:
+        dff["year_numeric"] = pd.to_numeric(dff["year"], errors="coerce")
     if locations:
         dff = dff[dff["location"].isin(locations)]
     if sample_types:
         dff = dff[dff["sample_type_state"].isin(sample_types)]
     if years:
-        dff = dff[dff["year"].isin(years)]
+        if "year_numeric" in dff.columns:
+            dff = dff[dff["year_numeric"].isin(years)]
+        else:
+            dff = dff[dff["year"].isin(years)]
     dff = dff[dff["run_hours"] > 0]
     if selected["testrig_id"]:
         dff = dff[dff["testrig_id"].isin(selected["testrig_id"])]

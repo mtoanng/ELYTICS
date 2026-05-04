@@ -9,7 +9,7 @@ _TS_TTL = 1800
 # track_record disabled, the table and page needs improving.
 
 TABULAR_CONFIG: list[TabularConfig] = [
-    TabularConfig(table_name="ccm",                 route_name="ccm",                 auth_groups=_USER, ttl=_TABULAR_TTL),
+    TabularConfig(table_name="runtime",                 route_name="runtime",                 auth_groups=_USER, ttl=_TABULAR_TTL),
     TabularConfig(table_name="order",               route_name="order",               auth_groups=_USER, ttl=_TABULAR_TTL),
     TabularConfig(table_name="polcurve",            route_name="polcurve",            auth_groups=_USER, ttl=_TABULAR_TTL, required_filters=["order_id"]),
     TabularConfig(table_name="polcurve_vlite",      route_name="polcurve_vlite",      auth_groups=_USER, ttl=_TABULAR_TTL, required_filters=["order_id"]),

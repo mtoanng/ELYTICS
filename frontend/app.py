@@ -1,5 +1,6 @@
 import os
 import dash
+import plotly.io as pio
 
 from components.appshell import create_appshell
 from services.auth import OIDCAuthWithToken
@@ -11,6 +12,9 @@ from dotenv import load_dotenv
 from waitress import serve
 
 load_dotenv()
+
+pio.templates["plotly_dark"].layout.paper_bgcolor = "rgba(0,0,0,0)"
+pio.templates["plotly_dark"].layout.plot_bgcolor = "#1f1f1f"
 
 app = dash.Dash(
     __name__,
@@ -27,7 +31,8 @@ redis_db = int(os.getenv("REDIS_DB", "0"))
 
 app.server.config["SESSION_TYPE"] = "redis"
 app.server.config["SESSION_REDIS"] = redis.StrictRedis(host=redis_host, port=redis_port, db=redis_db)
-app.server.config["SESSION_PERMANENT"] = False
+app.server.config["SESSION_PERMANENT"] = True
+app.server.config["PERMANENT_SESSION_LIFETIME"] = int(os.getenv("SESSION_LIFETIME_SECONDS", str(7 * 24 * 60 * 60)))  # 7 days
 app.server.config["PREFERRED_URL_SCHEME"] = "https"
 Session(app.server)
 
@@ -38,7 +43,7 @@ auth.register_provider(
     client_id=os.getenv("FRONTEND_AZURE_CLIENT_ID"),
     client_secret=os.getenv("FRONTEND_AZURE_CLIENT_SECRET"),
     server_metadata_url=f'https://login.microsoftonline.com/{os.getenv("FRONTEND_AZURE_TENANT_ID")}/v2.0/.well-known/openid-configuration',
-    scope=f"openid profile email api://{os.getenv('BACKEND_AZURE_CLIENT_ID')}/user_impersonation"
+    scope=f"openid profile email offline_access api://{os.getenv('BACKEND_AZURE_CLIENT_ID')}/user_impersonation"
 )
 
 app.layout = create_appshell()

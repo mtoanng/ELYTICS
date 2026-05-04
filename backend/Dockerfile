@@ -3,6 +3,7 @@ FROM python:3.12-slim
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app
 
 # Set work directory
 WORKDIR /app
@@ -17,8 +18,8 @@ COPY requirements.txt .
 RUN pip install --upgrade pip && \
     if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-# Copy application code
-COPY . .
+# Copy application code into a package directory so `backend.main:app`
+COPY . ./backend
 
 # Expose FastAPI port
 EXPOSE 8000
