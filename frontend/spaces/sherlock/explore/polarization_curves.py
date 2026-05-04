@@ -118,11 +118,17 @@ layout = dmc.Container(
                         ),
                     ],
                 ),
-                # Filters and download
                 dmc.Paper(
                     withBorder=True,
                     p="md",
                     radius="md",
+                    style={
+                        "display": "flex",
+                        "flexDirection": "column",
+                        "flex": "1 1 0",
+                        "minHeight": 0,
+                        "overflow": "hidden",
+                    },
                     children=[
                         dmc.Group(
                             gap="md",
@@ -198,25 +204,13 @@ layout = dmc.Container(
                             fw=600,
                             style={"display": "none"},
                         ),
-                    ],
-                ),
-                # Plot
-                dmc.SimpleGrid(
-                    cols=1,
-                    spacing="md",
-                    verticalSpacing="md",
-                    style={"flex": 1, "minHeight": 0},
-                    children=[
-                        dmc.Paper(
-                            withBorder=True,
-                            p="md",
-                            radius="md",
+                        dmc.Divider(size="xs", my="sm"),
+                        dmc.Box(
                             style={
                                 "display": "flex",
                                 "flexDirection": "column",
-                                "flex": 1,
+                                "flex": "1 1 0",
                                 "minHeight": 0,
-                                "overflow": "hidden",
                             },
                             children=[
                                 dmc.Box(
