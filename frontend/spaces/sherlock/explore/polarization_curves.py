@@ -639,6 +639,10 @@ def update_polcurve_plot(data, theme, tSp, pCtSp, is_rising):
             x="jStck",
             y="uCell",
             color=color_col,
+            labels={
+                "jStck": "Current Density [A/cm^2]",
+                "uCell": "Cell Voltage [V]",
+            },
             template=plotly_template,
         )
         return fig, ""
