@@ -52,8 +52,8 @@ def _apply_local_polcurve_filters(df, tSp_range, pCtSp_range, filter_type):
     if "tAndeIn" in df.columns and tSp_range and len(tSp_range) == 2:
         t_numeric = pd.to_numeric(df["tAndeIn"], errors="coerce")
         df = df[(t_numeric >= tSp_range[0]) & (t_numeric <= tSp_range[1])]
-    if "pCtSp" in df.columns and pCtSp_range and len(pCtSp_range) == 2:
-        p_numeric = pd.to_numeric(df["pCtSp"], errors="coerce")
+    if "pCtdeOut" in df.columns and pCtSp_range and len(pCtSp_range) == 2:
+        p_numeric = pd.to_numeric(df["pCtdeOut"], errors="coerce")
         df = df[(p_numeric >= pCtSp_range[0]) & (p_numeric <= pCtSp_range[1])]
     if "is_rising" in df.columns:
         if filter_type == "rising":
@@ -235,7 +235,7 @@ layout = dmc.Container(
                                             style={"flex": 1, "minWidth": "260px"},
                                             children=[
                                                 dmc.Text(
-                                                    "Pressure Setpoint",
+                                                    "Cathode Outlet Pressure",
                                                     fw=500,
                                                     size="sm",
                                                 ),
@@ -257,6 +257,7 @@ layout = dmc.Container(
                                                 data=["Both", "Rising", "Falling"],
                                                 value="Both",
                                                 fullWidth=True,
+                                                orientation="vertical",
                                             ),
                                             label="Direction",
                                             htmlFor="polcurve-is-rising-filter",
@@ -595,11 +596,11 @@ def populate_data_driven_filter_options(data, is_rising):
     df = _apply_local_polcurve_filters(df, None, None, (is_rising or "both").lower())
     # Keep slider marks simple (endpoints only) and render detailed distribution below.
     t_min, t_max, t_value, _ = _get_slider_config(df, "tAndeIn")
-    p_min, p_max, p_value, _ = _get_slider_config(df, "pCtSp")
+    p_min, p_max, p_value, _ = _get_slider_config(df, "pCtdeOut")
 
     temp_bubble_data, temp_bubble_range = _build_bubble_distribution(df.get("tAndeIn"))
     pressure_bubble_data, pressure_bubble_range = _build_bubble_distribution(
-        df.get("pCtSp")
+        df.get("pCtdeOut")
     )
 
     return (
