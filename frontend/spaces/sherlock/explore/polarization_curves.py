@@ -66,10 +66,18 @@ def _apply_local_polcurve_filters(df, tSp_range, pCtSp_range, filter_type):
 
 layout = dmc.Container(
     size="xl",
-    py="md",
+    p=0,
+    style={
+        "height": "calc(100dvh - var(--app-shell-header-offset, 0rem))",
+        "maxHeight": "calc(100dvh - var(--app-shell-header-offset, 0rem))",
+        "minHeight": 0,
+        "overflow": "hidden",
+        "display": "flex",
+    },
     children=[
         dmc.Stack(
             gap="md",
+            style={"flex": 1, "minHeight": 0, "padding": "1rem"},
             children=[
                 # Title and info
                 dmc.Stack(
@@ -197,11 +205,19 @@ layout = dmc.Container(
                     cols=1,
                     spacing="md",
                     verticalSpacing="md",
+                    style={"flex": 1, "minHeight": 0},
                     children=[
                         dmc.Paper(
                             withBorder=True,
                             p="md",
                             radius="md",
+                            style={
+                                "display": "flex",
+                                "flexDirection": "column",
+                                "flex": 1,
+                                "minHeight": 0,
+                                "overflow": "hidden",
+                            },
                             children=[
                                 dmc.Box(
                                     mb="sm",
@@ -338,7 +354,7 @@ layout = dmc.Container(
                                 dcc.Graph(
                                     id="polcurve-plot",
                                     config={"responsive": True},
-                                    style={"height": 500},
+                                    style={"height": "100%", "flex": 1, "minHeight": 0},
                                 ),
                             ],
                         ),
