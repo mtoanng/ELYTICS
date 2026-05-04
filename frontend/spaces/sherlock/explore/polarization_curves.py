@@ -10,7 +10,6 @@ from dash import (
     clientside_callback,
 )
 import dash_mantine_components as dmc
-import dash_ag_grid as dag
 from dash_iconify import DashIconify
 import pandas as pd
 from services.backend_service import get_metadata, get_tabular
@@ -24,7 +23,7 @@ register_page(
 USAGE_BLOCKQUOTE_TEXT = [
     "This page allows you to explore polarization curve data.",
     "Select at least one filter to load and plot data.",
-    "Download the table as CSV using the Download CSV button below the filters.",
+    "Download the data as CSV using the Download CSV button below the filters.",
 ]
 
 
@@ -193,7 +192,7 @@ layout = dmc.Container(
                         ),
                     ],
                 ),
-                # Plot and table
+                # Plot
                 dmc.SimpleGrid(
                     cols=1,
                     spacing="md",
@@ -340,40 +339,6 @@ layout = dmc.Container(
                                     id="polcurve-plot",
                                     config={"responsive": True},
                                     style={"height": 500},
-                                ),
-                            ],
-                        ),
-                        dmc.Paper(
-                            withBorder=True,
-                            p="xs",
-                            radius="md",
-                            children=[
-                                dmc.Text("Table", fw=600, size="sm"),
-                                dcc.Store(id="polcurve-table-store"),
-                                dcc.Loading(
-                                    id="polcurve-table-loading",
-                                    type="default",
-                                    children=[
-                                        dag.AgGrid(
-                                            id="polcurve-table",
-                                            columnDefs=[],  # Will be set by callback
-                                            rowData=[],
-                                            defaultColDef={
-                                                "resizable": True,
-                                                "sortable": True,
-                                                "filter": True,
-                                                "minWidth": 110,
-                                            },
-                                            dashGridOptions={
-                                                "pagination": True,
-                                                "paginationPageSize": 20,
-                                                "animateRows": True,
-                                                "floatingFilter": True,
-                                                "groupDisplayType": "multipleColumns",
-                                            },
-                                            style={"height": 350, "width": "100%"},
-                                        )
-                                    ],
                                 ),
                             ],
                         ),
@@ -594,30 +559,6 @@ def populate_data_driven_filter_options(data, is_rising):
         pressure_bubble_data,
         pressure_bubble_range,
     )
-
-
-# ========== TABLE RENDERING ==========
-
-
-@callback(
-    Output("polcurve-table", "columnDefs"),
-    Output("polcurve-table", "rowData"),
-    Input("polcurve-data-store", "data"),
-    Input("polcurve-temp-set-filter", "value"),
-    Input("polcurve-pressure-set-filter", "value"),
-    Input("polcurve-is-rising-filter", "value"),
-)
-def render_polcurve_table(data, tSp, pCtSp, is_rising):
-    if not data:
-        return [], []
-    df = pd.DataFrame(data)
-    df = _apply_local_polcurve_filters(df, tSp, pCtSp, (is_rising or "both").lower())
-    columns = df.columns.tolist()
-    columnDefs = []
-    for col in columns:
-        col_type = "numeric" if pd.api.types.is_numeric_dtype(df[col]) else "text"
-        columnDefs.append({"headerName": col, "field": col, "type": col_type})
-    return columnDefs, df.to_dict("records")
 
 
 # ========== THEME SYNC CALLBACKS ==========
