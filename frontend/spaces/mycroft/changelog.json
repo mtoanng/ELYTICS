@@ -29,6 +29,11 @@
       "pr": 823,
       "title": "feat(mycroft): Migrated queries and added backend routes",
       "date": "2026-04-29"
+    },
+    {
+      "pr": 832,
+      "title": "feat(mycroft): Migrated and cleaned up all pages from sub-space",
+      "date": "2026-05-04"
     }
   ],
   "releases": {}
