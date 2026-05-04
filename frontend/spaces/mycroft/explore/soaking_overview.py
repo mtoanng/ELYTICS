@@ -303,6 +303,7 @@ layout = dmc.Container(
                                 ),
                             ],
                         ),
+                        dmc.Divider(size="xs", my="sm"),
                         dcc.Graph(id="myc-soaking-trend", style={"height": "100%", "width": "100%", "minHeight": 0, "flex": "1 1 0"}),
                     ],
                 ),
