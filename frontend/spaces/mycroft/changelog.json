@@ -34,6 +34,11 @@
       "pr": 832,
       "title": "feat(mycroft): Migrated and cleaned up all pages from sub-space",
       "date": "2026-05-04"
+    },
+    {
+      "pr": 840,
+      "title": "fix(mycroft): Fixed stack data table",
+      "date": "2026-05-05"
     }
   ],
   "releases": {}
