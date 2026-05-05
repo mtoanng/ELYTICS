@@ -129,6 +129,11 @@
       "pr": 836,
       "title": "feat(sherlock): Disable track record, state of health & V-Lite",
       "date": "2026-05-05"
+    },
+    {
+      "pr": 701,
+      "title": "feat(sherlock): Migrate management track record page",
+      "date": "2026-05-05"
     }
   ],
   "releases": {}
