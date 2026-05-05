@@ -10,7 +10,6 @@ from dash import (
     clientside_callback,
 )
 import dash_mantine_components as dmc
-import dash_ag_grid as dag
 from dash_iconify import DashIconify
 import pandas as pd
 from services.backend_service import get_metadata, get_tabular
@@ -24,7 +23,7 @@ register_page(
 USAGE_BLOCKQUOTE_TEXT = [
     "This page allows you to explore polarization curve data.",
     "Select at least one filter to load and plot data.",
-    "Download the table as CSV using the Download CSV button below the filters.",
+    "Download the data as CSV using the Download CSV button below the filters.",
 ]
 
 
@@ -35,25 +34,25 @@ def _get_slider_config(df, col):
     if numeric.empty:
         return 0, 1, [0, 1], {0: "0", 1: "1"}
 
-    min_v = float(numeric.min())
-    max_v = float(numeric.max())
+    min_v = round(float(numeric.min()), 2)
+    max_v = round(float(numeric.max()), 2)
     if min_v == max_v:
-        return min_v, max_v, [min_v, max_v], {min_v: f"{min_v:g}"}
+        return min_v, max_v, [min_v, max_v], {min_v: f"{min_v:.2f}"}
 
     return (
         min_v,
         max_v,
         [min_v, max_v],
-        {min_v: f"{min_v:g}", max_v: f"{max_v:g}"},
+        {min_v: f"{min_v:.2f}", max_v: f"{max_v:.2f}"},
     )
 
 
 def _apply_local_polcurve_filters(df, tSp_range, pCtSp_range, filter_type):
-    if "tSp" in df.columns and tSp_range and len(tSp_range) == 2:
-        t_numeric = pd.to_numeric(df["tSp"], errors="coerce")
+    if "tAndeIn" in df.columns and tSp_range and len(tSp_range) == 2:
+        t_numeric = pd.to_numeric(df["tAndeIn"], errors="coerce")
         df = df[(t_numeric >= tSp_range[0]) & (t_numeric <= tSp_range[1])]
-    if "pCtSp" in df.columns and pCtSp_range and len(pCtSp_range) == 2:
-        p_numeric = pd.to_numeric(df["pCtSp"], errors="coerce")
+    if "pCtdeOut" in df.columns and pCtSp_range and len(pCtSp_range) == 2:
+        p_numeric = pd.to_numeric(df["pCtdeOut"], errors="coerce")
         df = df[(p_numeric >= pCtSp_range[0]) & (p_numeric <= pCtSp_range[1])]
     if "is_rising" in df.columns:
         if filter_type == "rising":
@@ -68,9 +67,16 @@ def _apply_local_polcurve_filters(df, tSp_range, pCtSp_range, filter_type):
 layout = dmc.Container(
     size="xl",
     py="md",
+    style={
+        "height": "calc(100dvh - var(--app-shell-header-offset, 0rem))",
+        "display": "flex",
+        "flexDirection": "column",
+        "minHeight": 0,
+    },
     children=[
         dmc.Stack(
             gap="md",
+            style={"flex":  "1 1 0", "minHeight": 0},
             children=[
                 # Title and info
                 dmc.Stack(
@@ -111,11 +117,17 @@ layout = dmc.Container(
                         ),
                     ],
                 ),
-                # Filters and download
                 dmc.Paper(
                     withBorder=True,
                     p="md",
                     radius="md",
+                    style={
+                        "flex": "1 1 0",
+                        "minHeight": 0,
+                        "display": "flex",
+                        "flexDirection": "column",
+                        "overflow": "hidden",
+                    },
                     children=[
                         dmc.Group(
                             gap="md",
@@ -191,77 +203,140 @@ layout = dmc.Container(
                             fw=600,
                             style={"display": "none"},
                         ),
-                    ],
-                ),
-                # Plot and table
-                dmc.SimpleGrid(
-                    cols=1,
-                    spacing="md",
-                    verticalSpacing="md",
-                    children=[
-                        dmc.Paper(
-                            withBorder=True,
-                            p="md",
-                            radius="md",
+                        dmc.Divider(size="xs", my="sm"),
+                        dmc.Box(
+                            style={
+                                "display": "flex",
+                                "flexDirection": "column",
+                                "flex": "1 1 0",
+                                "minHeight": 0,
+                            },
                             children=[
-                                dmc.Group(
+                                dmc.Box(
                                     mb="sm",
-                                    align="flex-end",
-                                    style={"flexWrap": "wrap"},
+                                    style={
+                                        "display": "grid",
+                                        "gridTemplateColumns": "minmax(260px, 1fr) minmax(260px, 1fr) minmax(80px, 100px)",
+                                        "gap": "16px",
+                                        "alignItems": "stretch",
+                                        "width": "100%",
+                                    },
                                     children=[
-                                        dmc.InputWrapper(
-                                            dcc.RangeSlider(
-                                                id="polcurve-temp-set-filter",
-                                                min=0,
-                                                max=1,
-                                                value=[0, 1],
-                                                marks={},
-                                                allowCross=False,
-                                                tooltip={
-                                                    "placement": "top",
-                                                    "always_visible": False,
-                                                },
-                                            ),
-                                            label="Temperature Setpoint",
-                                            htmlFor="polcurve-temp-set-filter",
-                                            className="dmc",
-                                            styles={"label": {"marginBottom": "6px"}},
-                                            style={"flex": 1, "minWidth": "260px"},
-                                        ),
-                                        dmc.InputWrapper(
-                                            dcc.RangeSlider(
-                                                id="polcurve-pressure-set-filter",
-                                                min=0,
-                                                max=1,
-                                                value=[0, 1],
-                                                marks={},
-                                                allowCross=False,
-                                                tooltip={
-                                                    "placement": "top",
-                                                    "always_visible": False,
-                                                },
-                                            ),
-                                            label="Pressure Setpoint",
-                                            htmlFor="polcurve-pressure-set-filter",
-                                            className="dmc",
-                                            styles={"label": {"marginBottom": "6px"}},
-                                            style={"flex": 1, "minWidth": "260px"},
-                                        ),
-                                        dmc.InputWrapper(
-                                            dmc.SegmentedControl(
-                                                id="polcurve-is-rising-filter",
-                                                data=["Both", "Rising", "Falling"],
-                                                value="Both",
-                                                fullWidth=True,
-                                            ),
-                                            label="Direction",
-                                            htmlFor="polcurve-is-rising-filter",
-                                            className="dmc",
-                                            styles={"label": {"marginBottom": "6px"}},
+                                        dmc.Stack(
+                                            gap=4,
                                             style={
-                                                "flex": "0 1 280px",
-                                                "minWidth": "220px",
+                                                "width": "100%",
                                             },
+                                            children=[
+                                                dmc.Text(
+                                                    "Anode Inlet Temperature",
+                                                    fw=500,
+                                                    size="sm",
+                                                ),
+                                                dmc.RangeSlider(
+                                                    id="polcurve-temp-set-filter",
+                                                    min=0,
+                                                    max=1,
+                                                    value=[0, 1],
+                                                    step=0.01,
+                                                    minRange=0,
+                                                    marks=[],
+                                                    thumbSize=16,
+                                                    size="sm",
+                                                ),
+                                                html.Div(
+                                                    style={},
+                                                    children=dmc.BubbleChart(
+                                                        id="polcurve-temp-distribution-chart",
+                                                        h=70,
+                                                        data=[],
+                                                        range=[10, 30],
+                                                        color="blue.6",
+                                                        dataKey={
+                                                            "x": "bucket",
+                                                            "y": "row",
+                                                            "z": "count",
+                                                        },
+                                                        yAxisProps={"hide": True},
+                                                        xAxisProps={
+                                                            "interval": "preserveStartEnd"
+                                                        },
+                                                        style={
+                                                            "width": "100%",
+                                                            "overflow": "hidden",
+                                                        },
+                                                        withTooltip=True,
+                                                    ),
+                                                ),
+                                            ],
+                                        ),
+                                        dmc.Stack(
+                                            gap=4,
+                                            style={
+                                                "width": "100%",
+                                            },
+                                            children=[
+                                                dmc.Text(
+                                                    "Cathode Outlet Pressure",
+                                                    fw=500,
+                                                    size="sm",
+                                                ),
+                                                dmc.RangeSlider(
+                                                    id="polcurve-pressure-set-filter",
+                                                    min=0,
+                                                    max=1,
+                                                    value=[0, 1],
+                                                    step=0.01,
+                                                    minRange=0,
+                                                    marks=[],
+                                                    thumbSize=16,
+                                                    size="sm",
+                                                ),
+                                                html.Div(
+                                                    style={},
+                                                    children=dmc.BubbleChart(
+                                                        id="polcurve-pressure-distribution-chart",
+                                                        h=70,
+                                                        data=[],
+                                                        range=[10, 30],
+                                                        color="teal.6",
+                                                        dataKey={
+                                                            "x": "bucket",
+                                                            "y": "row",
+                                                            "z": "count",
+                                                        },
+                                                        yAxisProps={"hide": True},
+                                                        xAxisProps={
+                                                            "interval": "preserveStartEnd"
+                                                        },
+                                                        style={
+                                                            "width": "100%",
+                                                            "overflow": "hidden",
+                                                        },
+                                                        withTooltip=True,
+                                                    ),
+                                                ),
+                                            ],
+                                        ),
+                                        dmc.Stack(
+                                            gap=4,
+                                            style={
+                                                "width": "100%",
+                                                "height": "100%",
+                                            },
+                                            children=[
+                                                dmc.Text(
+                                                    "Direction", fw=500, size="sm"
+                                                ),
+                                                dmc.SegmentedControl(
+                                                    id="polcurve-is-rising-filter",
+                                                    data=["Both", "Rising", "Falling"],
+                                                    value="Both",
+                                                    orientation="vertical",
+                                                    fullWidth=True,
+                                                    style={"flex": 1},
+                                                ),
+                                            ],
                                         ),
                                     ],
                                 ),
@@ -274,41 +349,7 @@ layout = dmc.Container(
                                 dcc.Graph(
                                     id="polcurve-plot",
                                     config={"responsive": True},
-                                    style={"height": 500},
-                                ),
-                            ],
-                        ),
-                        dmc.Paper(
-                            withBorder=True,
-                            p="xs",
-                            radius="md",
-                            children=[
-                                dmc.Text("Table", fw=600, size="sm"),
-                                dcc.Store(id="polcurve-table-store"),
-                                dcc.Loading(
-                                    id="polcurve-table-loading",
-                                    type="default",
-                                    children=[
-                                        dag.AgGrid(
-                                            id="polcurve-table",
-                                            columnDefs=[],  # Will be set by callback
-                                            rowData=[],
-                                            defaultColDef={
-                                                "resizable": True,
-                                                "sortable": True,
-                                                "filter": True,
-                                                "minWidth": 110,
-                                            },
-                                            dashGridOptions={
-                                                "pagination": True,
-                                                "paginationPageSize": 20,
-                                                "animateRows": True,
-                                                "floatingFilter": True,
-                                                "groupDisplayType": "multipleColumns",
-                                            },
-                                            style={"height": 350, "width": "100%"},
-                                        )
-                                    ],
+                                    style={"height": "100%", "flex": 1, "minHeight": 0},
                                 ),
                             ],
                         ),
@@ -318,7 +359,7 @@ layout = dmc.Container(
                 dcc.Store(id="polcurve-data-store"),
                 dcc.Store(id="polcurve-usage-open", data=False),
                 dcc.Store(id="polcurve-theme-store"),
-                html.Div(id="polcurve-theme-dummy"),
+                html.Div(id="polcurve-theme-dummy", style={"display": "none"}),
             ],
         )
     ],
@@ -456,10 +497,13 @@ def fetch_polcurve_data(order_id, sample_name, testrig_id):
     df = get_tabular("sherlock", "polcurve", filters=filters)
     if df.empty:
         return [], "No data found for selected filters.", {"display": "block"}
+    else:
+        df["event_short_id"] = df.apply(
+            lambda row: f"{row['sample_name']}_{row['order_id']}_{str(row['event_id']).split('_')[-1]}",
+            axis=1,
+        )
+
     return df.to_dict("records"), "", {"display": "none"}
-
-
-# ========== TABLE RENDERING ==========
 
 
 # ========== DATA-DRIVEN LOCAL FILTER CONFIG ==========
@@ -469,11 +513,13 @@ def fetch_polcurve_data(order_id, sample_name, testrig_id):
     Output("polcurve-temp-set-filter", "min"),
     Output("polcurve-temp-set-filter", "max"),
     Output("polcurve-temp-set-filter", "value"),
-    Output("polcurve-temp-set-filter", "marks"),
     Output("polcurve-pressure-set-filter", "min"),
     Output("polcurve-pressure-set-filter", "max"),
     Output("polcurve-pressure-set-filter", "value"),
-    Output("polcurve-pressure-set-filter", "marks"),
+    Output("polcurve-temp-distribution-chart", "data"),
+    Output("polcurve-temp-distribution-chart", "range"),
+    Output("polcurve-pressure-distribution-chart", "data"),
+    Output("polcurve-pressure-distribution-chart", "range"),
     Input("polcurve-data-store", "data"),
     Input("polcurve-is-rising-filter", "value"),  # <-- add this
 )
@@ -481,55 +527,51 @@ def populate_data_driven_filter_options(data, is_rising):
     import numpy as np
 
     if not data:
-        return 0, 1, [0, 1], {}, 0, 1, [0, 1], {}
+        return 0, 1, [0, 1], 0, 1, [0, 1], [], [10, 30], [], [10, 30]
     df = pd.DataFrame(data)
+
+    def _build_bubble_distribution(series, bins=10):
+        numeric = pd.to_numeric(series, errors="coerce").dropna()
+        if numeric.empty:
+            return [], [10, 30]
+
+        counts, bin_edges = np.histogram(numeric, bins=bins)
+        bubble_data = []
+        for i in range(len(counts)):
+            count = int(counts[i])
+            if count <= 0:
+                continue
+            center = round(float((bin_edges[i] + bin_edges[i + 1]) / 2), 2)
+            bubble_data.append({"bucket": f"{center:.2f}", "row": 1, "count": count})
+
+        if not bubble_data:
+            return [], [10, 30]
+
+        max_count = max(item["count"] for item in bubble_data)
+        return bubble_data, [10, max(18, min(40, 10 + max_count * 2))]
+
     # Apply direction filter
     df = _apply_local_polcurve_filters(df, None, None, (is_rising or "both").lower())
-    # Temperature marks
-    t_min, t_max, t_value, _ = _get_slider_config(df, "tSp")
-    t_marks = {}
-    if "tSp" in df and not df["tSp"].dropna().empty:
-        counts, bin_edges = np.histogram(df["tSp"].dropna(), bins=10)
-        for i, edge in enumerate(bin_edges[:-1]):
-            if counts[i] > 0:
-                center = (edge + bin_edges[i + 1]) / 2
-                bar = "|" * max(1, int(counts[i] / counts.max() * 5))
-                t_marks[round(center, 2)] = bar
-    # Pressure marks
-    p_min, p_max, p_value, _ = _get_slider_config(df, "pCtSp")
-    p_marks = {}
-    if "pCtSp" in df and not df["pCtSp"].dropna().empty:
-        counts, bin_edges = np.histogram(df["pCtSp"].dropna(), bins=10)
-        for i, edge in enumerate(bin_edges[:-1]):
-            if counts[i] > 0:
-                center = (edge + bin_edges[i + 1]) / 2
-                bar = "|" * max(1, int(counts[i] / counts.max() * 5))
-                p_marks[round(center, 2)] = bar
-    return t_min, t_max, t_value, t_marks, p_min, p_max, p_value, p_marks
+    t_min, t_max, t_value, _ = _get_slider_config(df, "tAndeIn")
+    p_min, p_max, p_value, _ = _get_slider_config(df, "pCtdeOut")
 
+    temp_bubble_data, temp_bubble_range = _build_bubble_distribution(df.get("tAndeIn"))
+    pressure_bubble_data, pressure_bubble_range = _build_bubble_distribution(
+        df.get("pCtdeOut")
+    )
 
-# ========== TABLE RENDERING ==========
-
-
-@callback(
-    Output("polcurve-table", "columnDefs"),
-    Output("polcurve-table", "rowData"),
-    Input("polcurve-data-store", "data"),
-    Input("polcurve-temp-set-filter", "value"),
-    Input("polcurve-pressure-set-filter", "value"),
-    Input("polcurve-is-rising-filter", "value"),
-)
-def render_polcurve_table(data, tSp, pCtSp, is_rising):
-    if not data:
-        return [], []
-    df = pd.DataFrame(data)
-    df = _apply_local_polcurve_filters(df, tSp, pCtSp, (is_rising or "both").lower())
-    columns = df.columns.tolist()
-    columnDefs = []
-    for col in columns:
-        col_type = "numeric" if pd.api.types.is_numeric_dtype(df[col]) else "text"
-        columnDefs.append({"headerName": col, "field": col, "type": col_type})
-    return columnDefs, df.to_dict("records")
+    return (
+        t_min,
+        t_max,
+        t_value,
+        p_min,
+        p_max,
+        p_value,
+        temp_bubble_data,
+        temp_bubble_range,
+        pressure_bubble_data,
+        pressure_bubble_range,
+    )
 
 
 # ========== THEME SYNC CALLBACKS ==========
@@ -577,7 +619,7 @@ def update_polcurve_plot(data, theme, tSp, pCtSp, is_rising):
     df = pd.DataFrame(data)
     df = _apply_local_polcurve_filters(df, tSp, pCtSp, (is_rising or "both").lower())
     if "uCell" in df and "jStck" in df:
-        color_col = "event_id" if "event_id" in df else None
+        color_col = "event_short_id" if "event_short_id" in df else None
         plot_df = df.dropna(subset=["uCell", "jStck"])
         if plot_df.empty:
             return {}, "No plot available for selected data."
@@ -591,6 +633,10 @@ def update_polcurve_plot(data, theme, tSp, pCtSp, is_rising):
             x="jStck",
             y="uCell",
             color=color_col,
+            labels={
+                "jStck": "Current Density [A/cm^2]",
+                "uCell": "Cell Voltage [V]",
+            },
             template=plotly_template,
         )
         return fig, ""

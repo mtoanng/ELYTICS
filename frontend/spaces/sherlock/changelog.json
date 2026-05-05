@@ -119,6 +119,11 @@
       "pr": 819,
       "title": "fix(sherlock): Changed info box default to closed",
       "date": "2026-04-28"
+    },
+    {
+      "pr": 837,
+      "title": "feat(sherlock): Migrate polcurve viewer page",
+      "date": "2026-05-05"
     }
   ],
   "releases": {}

@@ -29,6 +29,3 @@ components/__pycache__/footer.cpython-313.pyc
 azure_cli_cert.pem
 root_ca.pem
 backend/gunicorn.ctl
-
-# data folder
-dummydata/
