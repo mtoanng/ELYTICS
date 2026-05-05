@@ -29,3 +29,4 @@ components/__pycache__/footer.cpython-313.pyc
 azure_cli_cert.pem
 root_ca.pem
 backend/gunicorn.ctl
+dummydata/Sherlock_track_record.csv
