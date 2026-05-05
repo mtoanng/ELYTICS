@@ -1,7 +1,6 @@
 import dash_mantine_components as dmc
 from pathlib import Path
 import json
-from typing import Any
 
 SIDEBAR_STRUCTURE = {
     "mycroft": {
@@ -9,7 +8,7 @@ SIDEBAR_STRUCTURE = {
         "Management": {
             "path": "management",
             "pages": [
-                {"path": "production-overview", "label": "Production Overview", "preview": True},
+                {"path": "production-overview", "label": "Production Overview", "preview": True, "tooltip": "This page is currently a proof of concept, data should still be validated."},
             ],
         },
         "Data Exploration": {
@@ -35,7 +34,7 @@ SIDEBAR_STRUCTURE = {
             "pages": [
                 {"path": "test-rig-statistics", "label": "Test Rig Statistics"},
                 {"path": "test-rig-activity", "label": "Test Rig Activity"},
-                {"path": "track-record", "label": "Track Record", "preview": True},
+                {"path": "track-record", "label": "Track Record", "disabled": True, "tooltip": "Will be implemented once data model 4.0 is released."},
             ],
         },
         "Data Exploration": {
@@ -50,13 +49,13 @@ SIDEBAR_STRUCTURE = {
         "Data Analysis": {
             "path": "data-analysis",
             "pages": [
-                {"path": "vlite", "label": "Polarization Curves - V-lite", "preview": True},
+                {"path": "vlite", "label": "Polarization Curves - V-lite", "disabled": True, "tooltip": "Currently being investigated outside of Holmes."},
             ],
         },
         "AI/ML": {
             "path": "ai-ml",
             "pages": [
-                {"path": "soh", "label": "State of Health", "preview": True},
+                {"path": "soh", "label": "State of Health", "disabled": True, "tooltip": "Currently being investigated outside of Holmes."},
             ],
         },
     },
@@ -74,49 +73,107 @@ def get_space_from_path(pathname: str | None) -> str | None:
     parts = [p for p in pathname.split("/") if p]
     return parts[0] if parts else None
 
-# definition to include a "preview" badge next to nav links that are marked as preview ("preview":True ) in the structure
-def nav_label(page: dict):
-    children: list[Any] = [dmc.Text(page["label"], size="sm")]
-    if page.get("preview", False):
-        children.append(
-            dmc.Tooltip(
+def _status_badge(page: dict):
+    children = [
+        dmc.Box(
+            dmc.Text(page["label"], size="sm"),
+            style={
+                "display": "flex",
+                "alignItems": "center",
+                "lineHeight": 1,
+                "minHeight": "100%",
+            },
+        )
+    ]
+
+    status_label = None
+    status_color = None
+    if page.get("disabled", False):
+        status_label = "Disabled"
+        status_color = "gray"
+    elif page.get("preview", False):
+        status_label = "Preview"
+        status_color = "blue"
+
+    if status_label and status_color:
+        badge = dmc.Badge(
+            status_label,
+            size="xs",
+            radius="xl",
+            variant="filled",
+            color=status_color,
+            styles={
+                "root": {
+                    "display": "flex",
+                    "alignItems": "center",
+                    "justifyContent": "center",
+                    "fontSize": "10px",
+                    "padding": "2px 6px",
+                    "fontWeight": 600,
+                    "lineHeight": 1,
+                    "textTransform": "none",
+                    "cursor": "inherit",
+                    "pointerEvents": "none",
+                }
+            },
+        )
+        if page.get("tooltip"):
+            badge = dmc.Tooltip(
                 multiline=True,
-                w=220,
-                label="This page is currently a proof of "
-                "concept, data should still be validated.",
+                w=260,
+                label=page["tooltip"],
                 position="right",
-                children=[
-                    dmc.Badge(
-                        "Preview",
-                        size="xs",
-                        radius="xl",
-                        variant="filled",
-                        color="blue",
-                        styles={
-                            "root": {
-                                "fontSize": "10px",
-                                "padding": "2px 6px",
-                                "fontWeight": 600,
-                                "textTransform": "none",
-                                "cursor": "inherit",
-                                "pointerEvents": "none",
-                            }
-                        },
-                    )
-                ],
+                withArrow=True,
+                children=[badge],
+            )
+        children.append(
+            dmc.Box(
+                badge,
+                style={
+                    "marginLeft": "auto",
+                    "display": "flex",
+                    "alignItems": "center",
+                    "justifyContent": "flex-end",
+                    "flex": "0 0 auto",
+                    "alignSelf": "center",
+                    "minHeight": "100%",
+                },
             )
         )
 
-    return dmc.Group(
-        children=children,
-        gap=6,
-        wrap="nowrap",
-        justify="space-between",
-        style={"width": "100%"},
+    return dmc.Box(
+        children,
+        style={
+            "display": "flex",
+            "alignItems": "center",
+            "gap": "6px",
+            "width": "100%",
+            "height": "100%",
+            "minWidth": 0,
+        },
     )
 
 def create_content(space: str, groups: dict, latest_version: str):
     body = []
+
+    def _nav_link(page: dict, href: str, *, h: int, pl: int, description: str | None = None):
+        disabled = bool(page.get("disabled"))
+        link = dmc.NavLink(
+            label=_status_badge(page),
+            description=description,
+            href=None if disabled else href,
+            active=False if disabled else "exact",
+            className="navbar-link",
+            h=h,
+            pl=pl,
+            style={
+                "opacity": 0.65,
+                "cursor": "default",
+            }
+            if disabled
+            else None,
+        )
+        return link
 
     # Version + Home as main NavLink
     if None in groups:
@@ -135,16 +192,7 @@ def create_content(space: str, groups: dict, latest_version: str):
         
         # Add remaining ungrouped pages (if any)
         for page in groups[None][1:]:
-            body.append(
-                dmc.NavLink(
-                    label=nav_label(page),
-                    href=f"/{space}/{page['path']}",
-                    active="exact",
-                    className="navbar-link",
-                    h=32,
-                    pl=8,
-                )
-            )
+            body.append(_nav_link(page, f"/{space}/{page['path']}", h=32, pl=8))
 
     # Grouped pages
     for group, group_data in groups.items():
@@ -165,16 +213,7 @@ def create_content(space: str, groups: dict, latest_version: str):
         )
 
         for page in pages:
-            body.append(
-                dmc.NavLink(
-                    label=nav_label(page),
-                    href=f"/{space}/{group_path}/{page['path']}",
-                    active="exact",
-                    className="navbar-link",
-                    h=32,
-                    pl=18,
-                )
-            )
+            body.append(_nav_link(page, f"/{space}/{group_path}/{page['path']}", h=32, pl=18))
 
     return dmc.Stack(
         gap=0,
