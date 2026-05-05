@@ -104,6 +104,7 @@ layout = dmc.Container(
                                 color="blue",
                             ),
                             id="statistics-usage-collapse",
+                            opened=False,
                         ),
                     ],
                 ),
@@ -241,7 +242,7 @@ layout = dmc.Container(
                     },
                 ),
                 dcc.Store(id="teststat-raw-store"),
-                dcc.Store(id="statistics-usage-open", data=True)
+                dcc.Store(id="statistics-usage-open", data=False)
             ],
         )
     ],

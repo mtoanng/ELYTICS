@@ -1,0 +1,36 @@
+.appshell-page-content {
+    width: 100%;
+}
+
+.appshell-page-content .mantine-Container-root {
+    max-width: none;
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+}
+
+.appshell-root.chrome-hidden {
+    --app-shell-header-height: 0rem;
+    --app-shell-header-offset: 0rem;
+    --app-shell-navbar-width: 0rem;
+    --app-shell-navbar-offset: 0rem;
+}
+
+.appshell-root.chrome-hidden .mantine-AppShell-header,
+.appshell-root.chrome-hidden .mantine-AppShell-navbar {
+    display: none;
+}
+
+.appshell-root.chrome-hidden #sidebar-container,
+.appshell-root.chrome-hidden header {
+    display: none !important;
+}
+
+.appshell-root.chrome-hidden .mantine-AppShell-main {
+    padding-top: 0 !important;
+    padding-inline-start: 0 !important;
+}
+
+.header-logo-right.invert-logo {
+    filter: brightness(0) invert(1);
+}

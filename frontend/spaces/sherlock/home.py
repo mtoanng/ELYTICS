@@ -12,8 +12,10 @@ def sherlock_layout():
 
     return dmc.Container(
         size="md",
+        pt="md",
+        pb="xl",
         children=[
-            dmc.Title("Welcome to Sherlock Home", order=1, mt="lg"),
+            dmc.Title("Welcome to Sherlock Home", order=1),
             dmc.Text(
                 "Sherlock is your unified workspace for battery test data management, "
                 "exploration, and advanced analytics. Here you can monitor test rigs, "
@@ -55,7 +57,6 @@ def sherlock_layout():
                 mt="xl",
             ),
         ],
-        py="xl",
     )
 
 layout = sherlock_layout

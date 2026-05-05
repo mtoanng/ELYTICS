@@ -1,10 +1,11 @@
+import logging
 from collections import defaultdict
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from backend.internal.auth import require_groups
 from backend.internal.config_types import TabularConfig
-from backend.internal.util import fully_qualified_view, get_query_result
+from backend.internal.util import get_query_result, resolve_query_source
 
 import backend.config.sherlock as sherlock
 import backend.config.watson as watson
@@ -12,6 +13,7 @@ import backend.config.enola as enola
 import backend.config.mycroft as mycroft
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 SPACE_TABULAR_MAP: dict[str, list[TabularConfig]] = {
     "sherlock": sherlock.TABULAR_CONFIG,
@@ -49,16 +51,23 @@ def _bind_route(space: str, cfg: TabularConfig) -> None:
         for required in cfg.required_filters:
             if required not in filters:
                 raise HTTPException(status_code=400, detail=f"Missing required filter '{required}'")
-        view_name = fully_qualified_view(space=space, data_kind="data", table_name=cfg.table_name)
-        data = get_query_result(
-            view_name=view_name,
-            space=space,
-            table=cfg.table_name,
-            filters=filters,
-            sort_by=sort_by,
-            sort_dir=sort_dir.lower(),
-            ttl=cfg.ttl,
-        )
+        try:
+            query_source, cache_source = resolve_query_source(space=space, data_kind="data", table_name=cfg.table_name)
+            data = get_query_result(
+                view_name=query_source,
+                space=space,
+                table=cfg.table_name,
+                filters=filters,
+                sort_by=sort_by,
+                sort_dir=sort_dir.lower(),
+                ttl=cfg.ttl,
+                cache_source_name=cache_source,
+            )
+        except HTTPException:
+            raise
+        except Exception as exc:
+            logger.exception("tabular query failed [space=%s table=%s]", space, cfg.table_name)
+            raise HTTPException(status_code=500, detail=str(exc))
         return {"data": data}
 
     router.add_api_route(
