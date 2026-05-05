@@ -23,3 +23,4 @@ WHERE
     AND batch LIKE 'P1_1250_%'
 ORDER BY
     stack_short_nr, result_date_utc
+-- comment to trigger pipeline
