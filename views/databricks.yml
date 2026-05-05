@@ -31,7 +31,7 @@ variables:
 
 job_settings_create_views: &job_settings_create_views
   permissions:
-    - group_name: "idm2bcd_dssi03prod_pemely_data"
+    - group_name: "idm2bcd_dssi03prod_pemely_dev"
       level: "CAN_MANAGE"
   email_notifications:
     on_failure: ${var.notification_recipients}
