@@ -6,6 +6,7 @@ from dash import (
     State,
     register_page,
     no_update,
+    callback_context,
 )
 import dash_mantine_components as dmc
 from dash_iconify import DashIconify
@@ -383,6 +384,8 @@ def build_detail_plot(
     theme: str,
     margin_bottom: int = 0,
     yaxis_range: list | None = None,
+    xaxis_range: list | None = None,
+    xaxis_autorange: bool = False,
     y_multiplier: float = 1.0,
 ) -> go.Figure:
     """Build a detail plot with multiple traces, one per order_id, each with its own color."""
@@ -466,6 +469,10 @@ def build_detail_plot(
     if yaxis_range is not None:
         layout_dict["yaxis"] = dict(range=yaxis_range)
     fig.update_layout(**layout_dict)
+    if xaxis_range is not None:
+        fig.update_xaxes(range=xaxis_range, autorange=False)
+    elif xaxis_autorange:
+        fig.update_xaxes(autorange=True)
     return apply_theme(fig, theme)
 
 
@@ -573,8 +580,22 @@ def update_top_charts(meta_rows, theme):
     Input("trackrecord-sample-filter", "value"),
     Input("trackrecord-x-axis-mode", "value"),
     Input("theme-store", "data"),
+    Input("trackrecord-uCell-plot", "relayoutData"),
+    Input("trackrecord-concO2H2-plot", "relayoutData"),
+    Input("trackrecord-concH2O2-plot", "relayoutData"),
 )
-def update_detail_plots(sample_name, x_axis_mode, theme):
+def update_detail_plots(sample_name, x_axis_mode, theme, ucell_relayout, conco2h2_relayout, conch2o2_relayout):
+    xaxis_range = None
+    xaxis_autorange = False
+
+    ctx = callback_context
+    if ctx.triggered and "relayoutData" in ctx.triggered[0]["prop_id"]:
+        relayout = ctx.triggered[0]["value"] or {}
+        if "xaxis.range[0]" in relayout and "xaxis.range[1]" in relayout:
+            xaxis_range = [relayout["xaxis.range[0]"], relayout["xaxis.range[1]"]]
+        elif relayout.get("xaxis.autorange") is True:
+            xaxis_autorange = True
+
     if not sample_name:
         df = pd.DataFrame(columns=DETAIL_COLS)
     else:
@@ -599,6 +620,8 @@ def update_detail_plots(sample_name, x_axis_mode, theme):
         x_axis_mode=x_axis_mode,
         theme=theme,
         margin_bottom=0,
+        xaxis_range=xaxis_range,
+        xaxis_autorange=xaxis_autorange,
     )
     concO2H2_fig = build_detail_plot(
         df=df,
@@ -608,6 +631,8 @@ def update_detail_plots(sample_name, x_axis_mode, theme):
         x_axis_mode=x_axis_mode,
         theme=theme,
         margin_bottom=0,
+        xaxis_range=xaxis_range,
+        xaxis_autorange=xaxis_autorange,
     )
     concH2O2_fig = build_detail_plot(
         df=df,
@@ -617,5 +642,7 @@ def update_detail_plots(sample_name, x_axis_mode, theme):
         x_axis_mode=x_axis_mode,
         theme=theme,
         margin_bottom=20,
+        xaxis_range=xaxis_range,
+        xaxis_autorange=xaxis_autorange,
     )
     return uCell_fig, concO2H2_fig, concH2O2_fig
