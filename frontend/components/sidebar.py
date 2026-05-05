@@ -43,7 +43,7 @@ SIDEBAR_STRUCTURE = {
                     "path": "track-record",
                     "label": "Track Record",
                     "preview": True,
-                    "tooltip": "Full timeseries (1hr) is used for detail plots instead of data from conditioning phase.",
+                    "tooltip": "Data sources are work in progress. Full timeseries (1hr) is used for detail plots instead of data from conditioning phase.",
                 },
             ],
         },
