@@ -124,6 +124,11 @@
       "pr": 823,
       "title": "feat(mycroft): Migrated queries and added backend routes",
       "date": "2026-04-29"
+    },
+    {
+      "pr": 836,
+      "title": "feat(sherlock): Disable track record, state of health & V-Lite",
+      "date": "2026-05-05"
     }
   ],
   "releases": {}
