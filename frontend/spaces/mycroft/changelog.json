@@ -39,6 +39,11 @@
       "pr": 840,
       "title": "fix(mycroft): Fixed stack data table",
       "date": "2026-05-05"
+    },
+    {
+      "pr": 843,
+      "title": "fix(mycroft): Temporarily disabled stack overview",
+      "date": "2026-05-05"
     }
   ],
   "releases": {}

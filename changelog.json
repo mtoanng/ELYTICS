@@ -139,6 +139,11 @@
       "pr": 839,
       "title": "feat(enola): Created sidebar & file structure",
       "date": "2026-05-05"
+    },
+    {
+      "pr": 843,
+      "title": "fix(mycroft): Temporarily disabled stack overview",
+      "date": "2026-05-05"
     }
   ],
   "releases": {}
