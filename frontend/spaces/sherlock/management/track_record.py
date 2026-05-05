@@ -15,7 +15,6 @@ from typing import List
 
 from services.backend_service import get_metadata, get_tabular
 
-
 register_page(
     __name__,
     path="/sherlock/management/track-record",
@@ -38,6 +37,15 @@ PLOT_HOVER_COLS = [
     "gdl_name",
     "active_area_per_cell",
     "leepa_number",
+]
+
+USAGE_BLOCKQUOTE_TEXT = [
+    "The top chart shows total runtime for GEN 1 Proto 1 stacks from column run_hours.",
+    "Each bar corresponds to one sample_name.",
+    "Hover on a bar to inspect runtime and stack metadata.",
+    "Select a sample name below to load detailed uCell, concO2H2, and concH2O2 data from track_record tabular data.",
+    "Use the x-axis toggle to switch the lower charts between runtime hours and date when a time column is available.",
+    "NOTE: Current in-depth plots show the full timeseries (1hr) data. The conditioning events are not yet available in the data sources.",
 ]
 
 
@@ -102,14 +110,6 @@ def _default_sample_from_rank(meta_rows) -> str | None:
     rank_df = rank_df.sort_values(["rn", "sample_name"], ascending=[True, True])
     return str(rank_df.iloc[0]["sample_name"])
 
-
-USAGE_BLOCKQUOTE_TEXT = [
-    "The top chart shows total runtime for GEN 1 Proto 1 stacks from column run_hours.",
-    "Each bar corresponds to one sample_name.",
-    "Hover on a bar to inspect runtime and stack metadata.",
-    "Select a sample name below to load detailed uCell, concO2H2, and concH2O2 data from track_record tabular data.",
-    "Use the x-axis toggle to switch the lower charts between runtime hours and date when a time column is available.",
-]
 
 fig_runtime = go.Figure(go.Bar(x=[], y=[], marker_color="#1f77b4"))
 fig_runtime.update_layout(

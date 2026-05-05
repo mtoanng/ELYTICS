@@ -8,7 +8,12 @@ SIDEBAR_STRUCTURE = {
         "Management": {
             "path": "management",
             "pages": [
-                {"path": "production-overview", "label": "Production Overview", "preview": True, "tooltip": "This page is currently a proof of concept, data should still be validated."},
+                {
+                    "path": "production-overview",
+                    "label": "Production Overview",
+                    "preview": True,
+                    "tooltip": "This page is currently a proof of concept, data should still be validated.",
+                },
             ],
         },
         "Data Exploration": {
@@ -34,7 +39,12 @@ SIDEBAR_STRUCTURE = {
             "pages": [
                 {"path": "test-rig-statistics", "label": "Test Rig Statistics"},
                 {"path": "test-rig-activity", "label": "Test Rig Activity"},
-                {"path": "track-record", "label": "Track Record", "disabled": True, "tooltip": "Will be implemented once data model 4.0 is released."},
+                {
+                    "path": "track-record",
+                    "label": "Track Record",
+                    "preview": True,
+                    "tooltip": "Full timeseries (1hr) is used for detail plots instead of data from conditioning phase.",
+                },
             ],
         },
         "Data Exploration": {
@@ -49,13 +59,23 @@ SIDEBAR_STRUCTURE = {
         "Data Analysis": {
             "path": "data-analysis",
             "pages": [
-                {"path": "vlite", "label": "Polarization Curves - V-lite", "disabled": True, "tooltip": "Currently being investigated outside of Holmes."},
+                {
+                    "path": "vlite",
+                    "label": "Polarization Curves - V-lite",
+                    "disabled": True,
+                    "tooltip": "Currently being investigated outside of Holmes.",
+                },
             ],
         },
         "AI/ML": {
             "path": "ai-ml",
             "pages": [
-                {"path": "soh", "label": "State of Health", "disabled": True, "tooltip": "Currently being investigated outside of Holmes."},
+                {
+                    "path": "soh",
+                    "label": "State of Health",
+                    "disabled": True,
+                    "tooltip": "Currently being investigated outside of Holmes.",
+                },
             ],
         },
     },
@@ -67,11 +87,13 @@ SIDEBAR_STRUCTURE = {
     },
 }
 
+
 def get_space_from_path(pathname: str | None) -> str | None:
     if not pathname:
         return None
     parts = [p for p in pathname.split("/") if p]
     return parts[0] if parts else None
+
 
 def _status_badge(page: dict):
     children = [
@@ -153,10 +175,13 @@ def _status_badge(page: dict):
         },
     )
 
+
 def create_content(space: str, groups: dict, latest_version: str):
     body = []
 
-    def _nav_link(page: dict, href: str, *, h: int, pl: int, description: str | None = None):
+    def _nav_link(
+        page: dict, href: str, *, h: int, pl: int, description: str | None = None
+    ):
         disabled = bool(page.get("disabled"))
         link = dmc.NavLink(
             label=_status_badge(page),
@@ -166,12 +191,14 @@ def create_content(space: str, groups: dict, latest_version: str):
             className="navbar-link",
             h=h,
             pl=pl,
-            style={
-                "opacity": 0.65,
-                "cursor": "default",
-            }
-            if disabled
-            else None,
+            style=(
+                {
+                    "opacity": 0.65,
+                    "cursor": "default",
+                }
+                if disabled
+                else None
+            ),
         )
         return link
 
@@ -189,7 +216,7 @@ def create_content(space: str, groups: dict, latest_version: str):
                 pl=8,
             )
         )
-        
+
         # Add remaining ungrouped pages (if any)
         for page in groups[None][1:]:
             body.append(_nav_link(page, f"/{space}/{page['path']}", h=32, pl=8))
@@ -213,7 +240,9 @@ def create_content(space: str, groups: dict, latest_version: str):
         )
 
         for page in pages:
-            body.append(_nav_link(page, f"/{space}/{group_path}/{page['path']}", h=32, pl=18))
+            body.append(
+                _nav_link(page, f"/{space}/{group_path}/{page['path']}", h=32, pl=18)
+            )
 
     return dmc.Stack(
         gap=0,
@@ -245,6 +274,7 @@ def create_content(space: str, groups: dict, latest_version: str):
         style={"height": "100%"},
     )
 
+
 def get_latest_version_from_changelog(changelog_path: Path) -> str:
     """Read the latest released version from a JSON changelog file."""
     try:
@@ -259,13 +289,16 @@ def get_latest_version_from_changelog(changelog_path: Path) -> str:
         pass
     return "0.0.0"
 
+
 def sidebar_layout(pathname: str | None = None):
     space = get_space_from_path(pathname)
-    
+
     # Get the changelog path for the space
     latest_version = "0.0.0"
     if space:
-        changelog_path = Path(__file__).resolve().parents[1] / "spaces" / space / "changelog.json"
+        changelog_path = (
+            Path(__file__).resolve().parents[1] / "spaces" / space / "changelog.json"
+        )
         latest_version = get_latest_version_from_changelog(changelog_path)
 
     if space and space in SIDEBAR_STRUCTURE:
@@ -274,5 +307,6 @@ def sidebar_layout(pathname: str | None = None):
         groups = {}
 
     return create_content(space, groups, latest_version) if space else dmc.Text("")
+
 
 layout = sidebar_layout
