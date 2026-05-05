@@ -4,19 +4,19 @@ SELECT
     number_of_cells,
     part_attribute_description,
     location_result_uid,
-    location_result_state_description,
+    NULL as location_result_state_description,
     componentclass,
     componentidentifier,
     component_type,
     component_type_number,
-    line,
-    state_description,
+    NULL as line,
+    NULL as state_description,
     batch,
     result_date_utc,
     location_result_state,
     uniquepart_part_attribute  
 FROM
-    ps_xplatform_prod.mas.mfg_streaming_components_sql components
+    ps_xplatform_prod.mas.mfg_db_quality_components_raw_sql components
 INNER JOIN
     (
         SELECT
