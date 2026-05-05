@@ -66,18 +66,17 @@ def _apply_local_polcurve_filters(df, tSp_range, pCtSp_range, filter_type):
 
 layout = dmc.Container(
     size="xl",
-    p=0,
+    py="md",
     style={
         "height": "calc(100dvh - var(--app-shell-header-offset, 0rem))",
-        "maxHeight": "calc(100dvh - var(--app-shell-header-offset, 0rem))",
-        "minHeight": 0,
-        "overflow": "hidden",
         "display": "flex",
+        "flexDirection": "column",
+        "minHeight": 0,
     },
     children=[
         dmc.Stack(
             gap="md",
-            style={"flex": 1, "minHeight": 0, "padding": "1rem"},
+            style={"flex":  "1 1 0", "minHeight": 0},
             children=[
                 # Title and info
                 dmc.Stack(
@@ -123,10 +122,10 @@ layout = dmc.Container(
                     p="md",
                     radius="md",
                     style={
-                        "display": "flex",
-                        "flexDirection": "column",
                         "flex": "1 1 0",
                         "minHeight": 0,
+                        "display": "flex",
+                        "flexDirection": "column",
                         "overflow": "hidden",
                     },
                     children=[
@@ -240,6 +239,7 @@ layout = dmc.Container(
                                                     max=1,
                                                     value=[0, 1],
                                                     step=0.01,
+                                                    minRange=0,
                                                     marks=[],
                                                     thumbSize=16,
                                                     size="sm",
@@ -287,6 +287,7 @@ layout = dmc.Container(
                                                     max=1,
                                                     value=[0, 1],
                                                     step=0.01,
+                                                    minRange=0,
                                                     marks=[],
                                                     thumbSize=16,
                                                     size="sm",
@@ -358,7 +359,7 @@ layout = dmc.Container(
                 dcc.Store(id="polcurve-data-store"),
                 dcc.Store(id="polcurve-usage-open", data=False),
                 dcc.Store(id="polcurve-theme-store"),
-                html.Div(id="polcurve-theme-dummy"),
+                html.Div(id="polcurve-theme-dummy", style={"display": "none"}),
             ],
         )
     ],
@@ -551,7 +552,6 @@ def populate_data_driven_filter_options(data, is_rising):
 
     # Apply direction filter
     df = _apply_local_polcurve_filters(df, None, None, (is_rising or "both").lower())
-    # Keep slider marks simple (endpoints only) and render detailed distribution below.
     t_min, t_max, t_value, _ = _get_slider_config(df, "tAndeIn")
     p_min, p_max, p_value, _ = _get_slider_config(df, "pCtdeOut")
 
