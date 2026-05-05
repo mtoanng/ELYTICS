@@ -81,6 +81,20 @@ SIDEBAR_STRUCTURE = {
     },
     "enola": {
         None: [{"path": "home", "label": "Home"}],
+        "Internal": {
+            "path": "internal",
+            "pages": [
+                {"path": "test-rig-statistics", "label": "Test Rig Statistics"},
+                {"path": "test-rig-activity", "label": "Test Rig Activity"},
+                {"path": "track-record", "label": "Track Record", "preview": True, "tooltip": "Data sources are work in progress."},
+            ]
+        },
+        "Customer": {
+            "path": "customer",
+            "pages": [
+                {"path": "customer-overview", "label": "Customer Overview"},
+            ]
+        }
     },
     "watson": {
         None: [{"path": "home", "label": "Home"}],
