@@ -19,7 +19,7 @@ SIDEBAR_STRUCTURE = {
         "Data Exploration": {
             "path": "data-exploration",
             "pages": [
-                {"path": "stack-overview", "label": "Stack Overview"},
+                {"path": "stack-overview", "label": "Stack Overview", "disabled": True, "tooltip": "Query is currently broken."},
                 {"path": "soaking-overview", "label": "Soaking Overview"},
                 {"path": "cvm-overview", "label": "CVM Overview"},
                 {"path": "eol-polcurve", "label": "EOL Polarization Curve"},
