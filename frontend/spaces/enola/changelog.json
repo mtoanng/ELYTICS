@@ -19,6 +19,11 @@
       "pr": 791,
       "title": "feat(core): Added fullscreen functionality",
       "date": "2026-04-21"
+    },
+    {
+      "pr": 839,
+      "title": "feat(enola): Created sidebar & file structure",
+      "date": "2026-05-05"
     }
   ],
   "releases": {}

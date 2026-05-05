@@ -134,6 +134,11 @@
       "pr": 701,
       "title": "feat(sherlock): Migrate management track record page",
       "date": "2026-05-05"
+    },
+    {
+      "pr": 839,
+      "title": "feat(enola): Created sidebar & file structure",
+      "date": "2026-05-05"
     }
   ],
   "releases": {}
