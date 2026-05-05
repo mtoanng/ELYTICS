@@ -1,9 +1,11 @@
 from dash import register_page
-import dash_mantine_components as dmc
+from spaces.shared.test_rig_statistics import create_test_rig_statistics_page
 
-register_page(__name__, path="/enola/internal/test-rig-statistics", title="HOLMES - Enola - Test Rig Statistics")
+register_page(
+    __name__,
+    path="/enola/internal/test-rig-statistics",
+    title="HOLMES - Enola - Test Rig Statistics",
+    name="HOLMES - Enola - Test Rig Statistics",
+)
 
-def test_rig_statistics_layout():    
-    return dmc.Text("Placeholder content for Enola test rig statistics")
-    
-layout = test_rig_statistics_layout
+layout = create_test_rig_statistics_page(ns="enola")

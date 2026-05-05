@@ -1,9 +1,11 @@
 from dash import register_page
-import dash_mantine_components as dmc
+from spaces.shared.track_record import create_track_record_page
 
-register_page(__name__, path="/enola/internal/track-record", title="HOLMES - Enola - Track Record")
+register_page(
+    __name__,
+    path="/enola/internal/track-record",
+    title="HOLMES - Enola - Track Record",
+    name="HOLMES - Enola - Track Record",
+)
 
-def track_record_layout():    
-    return dmc.Text("Placeholder content for Enola track record")
-    
-layout = track_record_layout
+layout = create_track_record_page(ns="enola")
