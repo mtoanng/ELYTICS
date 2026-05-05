@@ -6,7 +6,7 @@ from dash import (
     State,
     register_page,
     no_update,
-    callback_context,
+    clientside_callback,
 )
 import dash_mantine_components as dmc
 from dash_iconify import DashIconify
@@ -195,6 +195,7 @@ def track_record_layout():
                         ],
                     ),
                     dcc.Store(id="trackrecord-usage-open", data=False),
+                    dcc.Store(id="trackrecord-detail-data", data=[]),
                     dmc.Stack(
                         gap="md",
                         style={"width": "100%"},
@@ -382,10 +383,9 @@ def build_detail_plot(
     hover_label: str,
     x_axis_mode: str,
     theme: str,
+    uirevision: str,
     margin_bottom: int = 0,
     yaxis_range: list | None = None,
-    xaxis_range: list | None = None,
-    xaxis_autorange: bool = False,
     y_multiplier: float = 1.0,
 ) -> go.Figure:
     """Build a detail plot with multiple traces, one per order_id, each with its own color."""
@@ -453,6 +453,7 @@ def build_detail_plot(
         yaxis_title=yaxis_title,
         margin=dict(l=40, r=20, t=12, b=margin_bottom),
         showlegend=True,
+        uirevision=uirevision,
         legend=dict(
             x=0.98,
             y=0.98,
@@ -469,10 +470,6 @@ def build_detail_plot(
     if yaxis_range is not None:
         layout_dict["yaxis"] = dict(range=yaxis_range)
     fig.update_layout(**layout_dict)
-    if xaxis_range is not None:
-        fig.update_xaxes(range=xaxis_range, autorange=False)
-    elif xaxis_autorange:
-        fig.update_xaxes(autorange=True)
     return apply_theme(fig, theme)
 
 
@@ -574,43 +571,40 @@ def update_top_charts(meta_rows, theme):
 
 
 @callback(
+    Output("trackrecord-detail-data", "data"),
+    Input("trackrecord-sample-filter", "value"),
+)
+def load_detail_data(sample_name):
+    if not sample_name:
+        return []
+
+    try:
+        df = get_tabular(
+            "sherlock",
+            "track_record",
+            filters={"sample_name": sample_name},
+            sort_by="hours_run",
+            sort_dir="asc",
+        )
+    except Exception:
+        return []
+
+    df = _ensure_columns(df, DETAIL_COLS)
+    return df.to_dict("records")
+
+
+@callback(
     Output("trackrecord-uCell-plot", "figure"),
     Output("trackrecord-concO2H2-plot", "figure"),
     Output("trackrecord-concH2O2-plot", "figure"),
+    Input("trackrecord-detail-data", "data"),
     Input("trackrecord-sample-filter", "value"),
     Input("trackrecord-x-axis-mode", "value"),
     Input("theme-store", "data"),
-    Input("trackrecord-uCell-plot", "relayoutData"),
-    Input("trackrecord-concO2H2-plot", "relayoutData"),
-    Input("trackrecord-concH2O2-plot", "relayoutData"),
 )
-def update_detail_plots(sample_name, x_axis_mode, theme, ucell_relayout, conco2h2_relayout, conch2o2_relayout):
-    xaxis_range = None
-    xaxis_autorange = False
-
-    ctx = callback_context
-    if ctx.triggered and "relayoutData" in ctx.triggered[0]["prop_id"]:
-        relayout = ctx.triggered[0]["value"] or {}
-        if "xaxis.range[0]" in relayout and "xaxis.range[1]" in relayout:
-            xaxis_range = [relayout["xaxis.range[0]"], relayout["xaxis.range[1]"]]
-        elif relayout.get("xaxis.autorange") is True:
-            xaxis_autorange = True
-
-    if not sample_name:
-        df = pd.DataFrame(columns=DETAIL_COLS)
-    else:
-        try:
-            df = get_tabular(
-                "sherlock",
-                "track_record",
-                filters={"sample_name": sample_name},
-                sort_by="hours_run",
-                sort_dir="asc",
-            )
-        except Exception:
-            df = pd.DataFrame(columns=DETAIL_COLS)
-
-    df = _ensure_columns(df, DETAIL_COLS)
+def update_detail_plots(detail_rows, sample_name, x_axis_mode, theme):
+    df = _ensure_columns(pd.DataFrame(detail_rows or []), DETAIL_COLS)
+    uirevision = f"trackrecord-{sample_name or 'none'}-{x_axis_mode}"
 
     uCell_fig = build_detail_plot(
         df=df,
@@ -619,9 +613,8 @@ def update_detail_plots(sample_name, x_axis_mode, theme, ucell_relayout, conco2h
         hover_label="uCell",
         x_axis_mode=x_axis_mode,
         theme=theme,
+        uirevision=uirevision,
         margin_bottom=0,
-        xaxis_range=xaxis_range,
-        xaxis_autorange=xaxis_autorange,
     )
     concO2H2_fig = build_detail_plot(
         df=df,
@@ -630,9 +623,8 @@ def update_detail_plots(sample_name, x_axis_mode, theme, ucell_relayout, conco2h
         hover_label="concO2H2",
         x_axis_mode=x_axis_mode,
         theme=theme,
+        uirevision=uirevision,
         margin_bottom=0,
-        xaxis_range=xaxis_range,
-        xaxis_autorange=xaxis_autorange,
     )
     concH2O2_fig = build_detail_plot(
         df=df,
@@ -641,8 +633,84 @@ def update_detail_plots(sample_name, x_axis_mode, theme, ucell_relayout, conco2h
         hover_label="concH2O2",
         x_axis_mode=x_axis_mode,
         theme=theme,
+        uirevision=uirevision,
         margin_bottom=20,
-        xaxis_range=xaxis_range,
-        xaxis_autorange=xaxis_autorange,
     )
     return uCell_fig, concO2H2_fig, concH2O2_fig
+
+
+clientside_callback(
+    """
+    function(uRelayout, oRelayout, hRelayout, uFigure, oFigure, hFigure) {
+        const triggered = window.dash_clientside.callback_context.triggered;
+        if (!triggered || !triggered.length) {
+            return [
+                window.dash_clientside.no_update,
+                window.dash_clientside.no_update,
+                window.dash_clientside.no_update
+            ];
+        }
+
+        const propId = triggered[0].prop_id || "";
+        if (propId.indexOf("relayoutData") === -1) {
+            return [
+                window.dash_clientside.no_update,
+                window.dash_clientside.no_update,
+                window.dash_clientside.no_update
+            ];
+        }
+
+        const relayout = triggered[0].value || {};
+        let xRange = null;
+        let resetAutorange = false;
+
+        if (Array.isArray(relayout["xaxis.range"]) && relayout["xaxis.range"].length === 2) {
+            xRange = relayout["xaxis.range"];
+        } else if (relayout["xaxis.range[0]"] !== undefined && relayout["xaxis.range[1]"] !== undefined) {
+            xRange = [relayout["xaxis.range[0]"], relayout["xaxis.range[1]"]];
+        } else if (relayout["xaxis.autorange"] === true) {
+            resetAutorange = true;
+        }
+
+        if (!xRange && !resetAutorange) {
+            return [
+                window.dash_clientside.no_update,
+                window.dash_clientside.no_update,
+                window.dash_clientside.no_update
+            ];
+        }
+
+        function syncFigure(fig) {
+            if (!fig) {
+                return window.dash_clientside.no_update;
+            }
+
+            const nextFig = JSON.parse(JSON.stringify(fig));
+            nextFig.layout = nextFig.layout || {};
+            nextFig.layout.xaxis = nextFig.layout.xaxis || {};
+
+            if (xRange) {
+                nextFig.layout.xaxis.range = xRange;
+                nextFig.layout.xaxis.autorange = false;
+            } else {
+                delete nextFig.layout.xaxis.range;
+                nextFig.layout.xaxis.autorange = true;
+            }
+
+            return nextFig;
+        }
+
+        return [syncFigure(uFigure), syncFigure(oFigure), syncFigure(hFigure)];
+    }
+    """,
+    Output("trackrecord-uCell-plot", "figure", allow_duplicate=True),
+    Output("trackrecord-concO2H2-plot", "figure", allow_duplicate=True),
+    Output("trackrecord-concH2O2-plot", "figure", allow_duplicate=True),
+    Input("trackrecord-uCell-plot", "relayoutData"),
+    Input("trackrecord-concO2H2-plot", "relayoutData"),
+    Input("trackrecord-concH2O2-plot", "relayoutData"),
+    State("trackrecord-uCell-plot", "figure"),
+    State("trackrecord-concO2H2-plot", "figure"),
+    State("trackrecord-concH2O2-plot", "figure"),
+    prevent_initial_call=True,
+)
