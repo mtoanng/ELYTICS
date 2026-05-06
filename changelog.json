@@ -159,6 +159,11 @@
       "pr": 847,
       "title": "fix(core): Removed old import",
       "date": "2026-05-06"
+    },
+    {
+      "pr": 848,
+      "title": "fix(core): Increase page content width",
+      "date": "2026-05-06"
     }
   ],
   "releases": {}
