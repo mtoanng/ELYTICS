@@ -54,7 +54,6 @@ app.include_router(tabular_router)
 app.include_router(metadata_router)
 app.include_router(timeseries_router)
 app.include_router(download_router)
-app.include_router(system_router)
 
 if os.getenv("ENVIRONMENT") == "development":
     app.add_middleware(
