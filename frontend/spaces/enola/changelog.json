@@ -24,6 +24,11 @@
       "pr": 839,
       "title": "feat(enola): Created sidebar & file structure",
       "date": "2026-05-05"
+    },
+    {
+      "pr": 844,
+      "title": "feat(core): Introduced shared pages",
+      "date": "2026-05-06"
     }
   ],
   "releases": {}

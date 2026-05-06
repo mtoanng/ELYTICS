@@ -129,6 +129,11 @@
       "pr": 701,
       "title": "feat(sherlock): Migrate management track record page",
       "date": "2026-05-05"
+    },
+    {
+      "pr": 844,
+      "title": "feat(core): Introduced shared pages",
+      "date": "2026-05-06"
     }
   ],
   "releases": {}

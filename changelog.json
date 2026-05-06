@@ -144,6 +144,11 @@
       "pr": 843,
       "title": "fix(mycroft): Temporarily disabled stack overview",
       "date": "2026-05-05"
+    },
+    {
+      "pr": 844,
+      "title": "feat(core): Introduced shared pages",
+      "date": "2026-05-06"
     }
   ],
   "releases": {}
