@@ -73,8 +73,6 @@ SIDEBAR_STRUCTURE = {
                 {
                     "path": "soh",
                     "label": "State of Health",
-                    "disabled": True,
-                    "tooltip": "Currently being investigated outside of Holmes.",
                 },
             ],
         },
