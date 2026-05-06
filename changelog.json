@@ -154,6 +154,11 @@
       "pr": 845,
       "title": "fix(core): Removed old dependency",
       "date": "2026-05-06"
+    },
+    {
+      "pr": 847,
+      "title": "fix(core): Removed old import",
+      "date": "2026-05-06"
     }
   ],
   "releases": {}
