@@ -56,7 +56,7 @@ def _chrome_toggle_button(chrome_hidden: bool, visible: bool = True):
 
 
 def _page_content(children, chrome_hidden: bool, show_toggle: bool = True, constrained: bool = False):
-    content_style = {"maxWidth": "1200px", "margin": "0 auto"} if constrained else None
+    content_style = {"maxWidth": "1300px", "margin": "0 auto"} if constrained else None
     return dmc.Box(
         [
             _chrome_toggle_button(chrome_hidden, visible=show_toggle),
