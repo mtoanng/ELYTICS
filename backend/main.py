@@ -19,7 +19,6 @@ from backend.routers.tabular import router as tabular_router
 from backend.routers.metadata import router as metadata_router
 from backend.routers.timeseries import router as timeseries_router
 from backend.routers.download import router as download_router
-from backend.routers.system import router as system_router
 
 import backend.config.sherlock as sherlock
 import backend.config.watson as watson
