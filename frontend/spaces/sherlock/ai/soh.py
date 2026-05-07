@@ -3,7 +3,6 @@ import logging
 from dash import Input, Output, State, callback, dcc, html, no_update, register_page
 from dash.dcc.express import send_data_frame
 from dash.exceptions import PreventUpdate
-import dash_ag_grid as dag
 import dash_mantine_components as dmc
 from dash_iconify import DashIconify
 import pandas as pd
@@ -27,7 +26,7 @@ register_page(
 USAGE_BLOCKQUOTE_TEXT = [
     "Explore SOH trends with lazy-loaded fleet and stack datasets.",
     "Select a sample to unlock stack-level detail plots.",
-    "Download the filtered fleet table as CSV.",
+    "Download the currently relevant SOH dataset as CSV.",
 ]
 
 
@@ -379,36 +378,6 @@ layout = dmc.Container(
                                         ),
                                     ],
                                 ),
-                                _section_panel(
-                                    "⑤ SOH CSV DATA",
-                                    [
-                                        dmc.Box(
-                                            style={"height": "320px", "width": "100%"},
-                                            children=[
-                                                dag.AgGrid(
-                                                    id="soh-table",
-                                                    columnDefs=[],
-                                                    rowData=[],
-                                                    defaultColDef={
-                                                        "resizable": True,
-                                                        "sortable": True,
-                                                        "filter": True,
-                                                        "minWidth": 90,
-                                                        "flex": 1,
-                                                        "wrapText": False,
-                                                    },
-                                                    dashGridOptions={
-                                                        "pagination": True,
-                                                        "paginationPageSize": 12,
-                                                        "domLayout": "normal",
-                                                    },
-                                                    className="ag-theme-alpine",
-                                                    style={"height": "100%", "width": "100%"},
-                                                )
-                                            ],
-                                        )
-                                    ],
-                                ),
                             ],
                         ),
                     ],
@@ -599,8 +568,6 @@ def load_stack_data(sample_name, number_of_cells, ccm_type, is_rising):
     Output("soh-plot-message", "children"),
     Output("soh-view-label", "children"),
     Output("soh-color-by-container", "style"),
-    Output("soh-table", "rowData"),
-    Output("soh-table", "columnDefs"),
     Input("soh-fleet-data-store", "data"),
     Input("soh-stack-data-store", "data"),
     Input("soh-stack-load-status", "data"),
@@ -624,7 +591,7 @@ def update_soh_outputs(
 ):
     empty_fig = _empty_figure(theme_data)
     if not fleet_data:
-        return empty_fig, empty_fig, empty_fig, empty_fig, "", "", {"display": "none"}, [], []
+        return empty_fig, empty_fig, empty_fig, empty_fig, "", "", {"display": "none"}
 
     df_fleet = pd.DataFrame(fleet_data)
     df_stack = pd.DataFrame(stack_data) if stack_data else pd.DataFrame()
@@ -676,11 +643,6 @@ def update_soh_outputs(
         fit_coeffs if plot_df is df_fleet else None,
     )
 
-    table_df = df_fleet.copy()
-    table_df = table_df.sort_values([c for c in ["sample_name", "runtime_hours"] if c in table_df.columns])
-    row_data = table_df.to_dict("records")
-    col_defs = soh_layout_service.make_column_defs(table_df)
-
     title_parts = []
     if sample_name:
         title_parts.append(f"Sample: {sample_name}")
@@ -718,8 +680,6 @@ def update_soh_outputs(
         detail_msg,
         view_label,
         color_by_style,
-        row_data,
-        col_defs,
     )
 
 
@@ -915,21 +875,29 @@ def update_cell_based_soh_across_height_plot(
 
 
 @callback(
-    Output("soh-table", "className"),
-    Input("soh-theme-store", "data"),
-)
-def update_table_theme(theme_data):
-    return "ag-theme-alpine-dark" if theme_data == "dark" else "ag-theme-alpine"
-
-
-@callback(
     Output("soh-download-csv", "data"),
     Input("soh-download-btn", "n_clicks"),
-    State("soh-table", "rowData"),
+    State("soh-fleet-data-store", "data"),
+    State("soh-stack-data-store", "data"),
+    State("soh-sample-name-filter", "value"),
     prevent_initial_call=True,
 )
-def download_soh_table(n_clicks, table_data):
-    if not n_clicks or not table_data:
+def download_soh_table(n_clicks, fleet_data, stack_data, sample_name):
+    if not n_clicks:
         raise PreventUpdate
-    df = pd.DataFrame(table_data)
-    return send_data_frame(df.to_csv, "soh_table.csv", index=False)
+
+    use_stack = bool(sample_name and stack_data)
+    selected_data = stack_data if use_stack else fleet_data
+    if not selected_data:
+        raise PreventUpdate
+
+    df = pd.DataFrame(selected_data)
+    if df.empty:
+        raise PreventUpdate
+
+    sort_cols = [c for c in ["sample_name", "runtime_hours", "IVnumber"] if c in df.columns]
+    if sort_cols:
+        df = df.sort_values(sort_cols)
+
+    csv_name = "soh_stack.csv" if use_stack else "soh_fleet.csv"
+    return send_data_frame(df.to_csv, csv_name, index=False)
