@@ -65,12 +65,17 @@ def _filter_stack_dataframe(
 
 
 def _section_panel(title: str, children: list) -> dmc.AccordionItem:
-    """Returns an AccordionItem with title as first child, content as rest."""
     return dmc.AccordionItem(
         value=title,
         children=[
             dmc.AccordionControl(title),
-            dmc.AccordionPanel(dmc.Box(p="md", children=children)),
+            dmc.AccordionPanel(
+                dmc.Box(
+                    p="md",
+                    children=children,
+                    style={"overflow": "hidden"},
+                )
+            ),
         ],
     )
 
@@ -243,6 +248,7 @@ layout = dmc.Container(
                         ),
                         dmc.Divider(size="xs", my="sm"),
                         dmc.Accordion(
+                            id="soh-accordion",
                             multiple=True,
                             value=["① FLEET INFO: STACK SOH (AS OVERPOTENTIAL)"],
                             children=[
@@ -281,8 +287,16 @@ layout = dmc.Container(
                                                         "gap": "16px",
                                                     },
                                                     children=[
-                                                        dcc.Graph(id="soh-overpotential-all-in-one", config={"responsive": True}),
-                                                        dcc.Graph(id="soh-decomp-plot", config={"responsive": True}),
+                                                        dcc.Graph(
+                                                            id="soh-overpotential-all-in-one",
+                                                            config={"responsive": True},
+                                                            style={"height": "420px"},
+                                                        ),
+                                                        dcc.Graph(
+                                                            id="soh-decomp-plot",
+                                                            config={"responsive": True},
+                                                            style={"height": "420px"},
+                                                        ),
                                                     ],
                                                 ),
                                                 dmc.Space(h="xs"),
@@ -297,7 +311,11 @@ layout = dmc.Container(
                                                     tooltip={"placement": "bottom", "always_visible": True},
                                                 ),
                                                 dmc.Space(h="md"),
-                                                dcc.Graph(id="soh-load-cycle-plots", config={"responsive": True}),
+                                                dcc.Graph(
+                                                    id="soh-load-cycle-plots",
+                                                    config={"responsive": True},
+                                                    style={"height": "480px"},
+                                                ),
                                             ],
                                         ),
                                     ],
@@ -376,6 +394,7 @@ layout = dmc.Container(
                 dcc.Store(id="soh-usage-open", data=False),
                 dcc.Store(id="soh-theme-store"),
                 dcc.Store(id="soh-cell-plot-click-store", data=None),
+                dcc.Store(id="soh-plot-resize-store")
             ],
         )
     ],
@@ -384,9 +403,9 @@ layout = dmc.Container(
 
 clientside_callback(
     """
-    function(sampleValue, stackData, themeData) {
+    function(sampleValue, stackData, themeData, decompFig, allInOneFig, loadCycleFig, accordionValue, decompStyle) {
         if (!window.Plotly) return null;
-        // After Accordion animation (~400ms), trigger Plotly resize on all graphs
+
         const graphIds = [
             "soh-overpotential-plots",
             "soh-overpotential-lin-vs-kin-plot",
@@ -398,26 +417,41 @@ clientside_callback(
             "soh-fleet-stack-soh-plot",
             "soh-fleet-lin-vs-lin-plot"
         ];
-        const triggerResize = () => {
-            graphIds.forEach(id => {
+
+        const isVisible = (el) =>
+            !!el && el.offsetParent !== null && el.clientWidth > 20 && el.clientHeight > 20;
+
+        const resizeVisible = () => {
+            graphIds.forEach((id) => {
                 const el = document.getElementById(id);
-                if (el) {
-                    try {
-                        window.Plotly.Plots.resize(id);
-                    } catch (e) {}
+                if (!isVisible(el)) return;
+                try {
+                    window.Plotly.Plots.resize(el);
+                } catch (e) {
+                    console.warn("Plot resize failed:", id, e);
                 }
             });
         };
-        // Trigger immediately and again after animation completes
-        triggerResize();
-        setTimeout(triggerResize, 450);
-        return null;
+
+        // Let accordion + plot DOM settle first
+        requestAnimationFrame(() => {
+            requestAnimationFrame(resizeVisible);
+        });
+        setTimeout(resizeVisible, 220);
+        setTimeout(resizeVisible, 480);
+
+        return Date.now();
     }
     """,
     Output("soh-plot-resize-store", "data"),
     Input("soh-sample-name-filter", "value"),
     Input("soh-stack-data-store", "data"),
     Input("soh-theme-store", "data"),
+    Input("soh-decomp-plot", "figure"),
+    Input("soh-overpotential-all-in-one", "figure"),
+    Input("soh-load-cycle-plots", "figure"),
+    Input("soh-accordion", "value"),
+    Input("soh-decomp-plot-container", "style"),
 )
 
 

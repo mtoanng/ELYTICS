@@ -151,7 +151,7 @@ def make_soh_colored_subplot(template, sample_name, xaxis_col, color_label_name)
     fig.update_layout(
         template=template,
         showlegend=True,
-        title=dict(text=f"{sample_name}: Stack SOH colored by {color_label_name}", x=0.5, xanchor="center"),
+        title=dict(text=f"Stack SOH colored by {color_label_name}", x=0.5, xanchor="center"),
         legend=dict(orientation="v", yanchor="top", y=1, xanchor="left", x=0.98),
         margin=dict(l=40, r=120, t=60, b=40),
         height=None,
@@ -398,11 +398,10 @@ def create_fleet_soh_plot(df_soh, dff, sample_name, xaxis_col, plotly_template):
 
     xaxis_label = "Runtime [h]" if xaxis_col == "runtime_hours" else "Timestamp"
     title_suffix = "Runtime Hours" if xaxis_col == "runtime_hours" else "Timestamp"
-    title_prefix = f"{sample_name}: " if sample_name else ""
     fig.update_layout(
         template=plotly_template,
         showlegend=len(dff["sample_name"].unique()) > 1,
-        title=dict(text=f"{title_prefix}SOH over {title_suffix}", x=0.5, xanchor="center"),
+        title=dict(text=f"SOH over {title_suffix}", x=0.5, xanchor="center"),
         margin=dict(l=40, r=20, t=40, b=40),
         legend=dict(orientation="v", yanchor="top", y=1, xanchor="left", x=1, font=dict(size=10)),
         autosize=True,
@@ -448,7 +447,7 @@ def create_lin_vs_kin_plot(dff, df_soh, plotly_template, sample_name):
                 line=dict(color=selected_color, width=3, dash="dash"), # Thicker line
                 hoverinfo="skip", showlegend=False
             ))
-        title = f"{sample_name}: SOH Trendline"
+        title = f"SOH Trendline"
     else: # no sample name selected
         for other_sample in dff["sample_name"].unique():
             sample_data = dff[dff["sample_name"] == other_sample]
@@ -606,7 +605,7 @@ def create_polcurve_decomp_plot(dff, valid_ivs, slider_value, plotly_template, s
 
     fig_soh_split.update_layout(
         template=plotly_template,
-        title=dict(text=f"{sample_name}: Pol Curve Change (@Ref OpCons) Related to Ageing", x=0.5, xanchor="center"),
+        title=dict(text=f"Pol Curve Change (@Ref OpCons) Related to Ageing", x=0.5, xanchor="center"),
         xaxis_title="Current Density [A/cm²]",
         yaxis_title="Cell Voltage [V]",
         margin=dict(l=40, r=40, t=60, b=80),
@@ -736,10 +735,9 @@ def create_overpotential_plots(df_soh, dff, xaxis_col, theme_data, sample_name):
                 ), row=3, col=1)
 
     xaxis_label = "Runtime [h]" if xaxis_col == "runtime_hours" else "Timestamp"
-    title_prefix = f"{sample_name}: " if sample_name else ""
     fig.update_layout(
         template=plotly_template,
-        title=dict(text=f"{title_prefix}Additional Overpotential (due to Ageing) over Time (@Ref OpCons)", x=0.5, xanchor="center"),
+        title=dict(text=f"Additional Overpotential (due to Ageing) over Time (@Ref OpCons)", x=0.5, xanchor="center"),
         margin=dict(l=40, r=20, t=60, b=40),
         autosize=True,
         height=None,
@@ -812,7 +810,7 @@ def create_overpotential_lin_vs_kin_plot(dff, df_soh, plotly_template, sample_na
                         marker=dict(symbol="triangle-up", size=18, color=selected_color),
                         showlegend=False, hoverinfo="skip"
                     ))
-        title = f"{sample_name}: Overpotential Trendline"
+        title = f"Overpotential Trendline"
     else: # no sample name selected
         for other_sample in dff["sample_name"].unique():
             sample_data = dff[dff["sample_name"] == other_sample]
@@ -1002,10 +1000,9 @@ def create_overpotential_plot_all_in_one(df_soh, dff, xaxis_col, theme_data, sam
     ))
 
     xaxis_label = "Runtime [h]" if xaxis_col == "runtime_hours" else "Timestamp"
-    title_prefix = f"{sample_name}: " if sample_name else ""
     fig.update_layout(
         template=plotly_template,
-        title=dict(text=f"{title_prefix}Additional Overpotential (due to Ageing) over Time (@Ref OpCons)", x=0.5, xanchor="center"),
+        title=dict(text=f"Additional Overpotential (due to Ageing) over Time (@Ref OpCons)", x=0.5, xanchor="center"),
         margin=dict(l=40, r=20, t=60, b=40),
         autosize=True,
         height=None,
@@ -1164,7 +1161,7 @@ def create_cell_based_soh_time_plot(dff, xaxis_col, click_data, theme_data, samp
     fig_soh_cells_time.update_layout(
         template=plotly_template,
         showlegend=True,
-        title=dict(text=f"{sample_name}: Cell-based Overpotential over Time (@Ref OpCons)", x=0.5, xanchor="center"),
+        title=dict(text=f"Cell-based Overpotential over Time (@Ref OpCons)", x=0.5, xanchor="center"),
         legend=dict(orientation="v", yanchor="top", y=1, xanchor="left", x=1, font=dict(size=10)),
         margin=dict(l=40, r=20, t=80, b=40),
         height=None
@@ -1333,7 +1330,7 @@ def create_cell_based_soh_across_height_plot(fig_soh_cells_across, dff, click_da
             
         fig_soh_cells_across.update_layout(
             template=plotly_template, showlegend=False,
-            title=dict(text=f"{sample_name}: SOH Across Cells", x=0.5, xanchor="center"),
+            title=dict(text=f"SOH Across Cells", x=0.5, xanchor="center"),
             margin=dict(l=40, r=40, t=80, b=40),
             annotations=[dict(
                 text=annotation_text, xref="paper", yref="paper", x=0.5, y=1.02,
@@ -1556,11 +1553,10 @@ def create_load_cycle_plots(dff, theme_data, sample_name, slider_value, valid_iv
                 row=row, col=col,
             )
 
-    title_prefix = f"{sample_name}: " if sample_name else ""
     fig.update_layout(
         template=plotly_template,
         title=dict(
-            text=f"{title_prefix}Load Cycle Histograms (IV {int(iv_0)} @ {rt_0:.0f}h → IV {int(iv_1)} @ {rt_1:.0f}h)",
+            text=f"Load Cycle Histograms (IV {int(iv_0)} @ {rt_0:.0f}h → IV {int(iv_1)} @ {rt_1:.0f}h)",
             x=0.5, xanchor="center",
         ),
         margin=dict(l=40, r=20, t=80, b=40),
