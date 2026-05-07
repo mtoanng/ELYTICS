@@ -262,8 +262,8 @@ layout = dmc.Container(
                                                 "gap": "16px",
                                             },
                                             children=[
-                                                dcc.Graph(id="soh-overpotential-plots", config={"responsive": True}),
-                                                dcc.Graph(id="soh-overpotential-lin-vs-kin-plot", config={"responsive": True}),
+                                                dcc.Graph(id="soh-overpotential-plots", config={"responsive": True}, style={"height": "600px"}),
+                                                dcc.Graph(id="soh-overpotential-lin-vs-kin-plot", config={"responsive": True}, style={"height": "600px"}),
                                             ],
                                         )
                                     ],
@@ -290,12 +290,12 @@ layout = dmc.Container(
                                                         dcc.Graph(
                                                             id="soh-overpotential-all-in-one",
                                                             config={"responsive": True},
-                                                            style={"height": "420px"},
+                                                            style={"height": "480px"},
                                                         ),
                                                         dcc.Graph(
                                                             id="soh-decomp-plot",
                                                             config={"responsive": True},
-                                                            style={"height": "420px"},
+                                                            style={"height": "480px"},
                                                         ),
                                                     ],
                                                 ),
@@ -339,8 +339,8 @@ layout = dmc.Container(
                                                         "gap": "16px",
                                                     },
                                                     children=[
-                                                        dcc.Graph(id="soh-cells-time-plot", config={"responsive": True}),
-                                                        dcc.Graph(id="soh-cells-across-plot", config={"responsive": True}),
+                                                        dcc.Graph(id="soh-cells-time-plot", config={"responsive": True},style={"height": "600px"}),
+                                                        dcc.Graph(id="soh-cells-across-plot", config={"responsive": True},style={"height": "600px"}),
                                                     ],
                                                 )
                                             ],
@@ -377,8 +377,8 @@ layout = dmc.Container(
                                                 "gap": "16px",
                                             },
                                             children=[
-                                                dcc.Graph(id="soh-fleet-stack-soh-plot", config={"responsive": True}),
-                                                dcc.Graph(id="soh-fleet-lin-vs-lin-plot", config={"responsive": True}),
+                                                dcc.Graph(id="soh-fleet-stack-soh-plot", config={"responsive": True},style={"height": "600px"}),
+                                                dcc.Graph(id="soh-fleet-lin-vs-lin-plot", config={"responsive": True},style={"height": "600px"}),
                                             ],
                                         ),
                                     ],
@@ -626,7 +626,6 @@ def load_stack_data(sample_name, number_of_cells, ccm_type, is_rising):
     Output("soh-overpotential-plots", "figure"),
     Output("soh-overpotential-lin-vs-kin-plot", "figure"),
     Output("soh-plot-message", "children"),
-    Output("soh-view-label", "children"),
     Output("soh-color-by-container", "style"),
     Input("soh-fleet-data-store", "data"),
     Input("soh-stack-data-store", "data"),
@@ -703,15 +702,6 @@ def update_soh_outputs(
         fit_coeffs if plot_df is df_fleet else None,
     )
 
-    title_parts = []
-    if sample_name:
-        title_parts.append(f"Sample: {sample_name}")
-    if ccm_type:
-        title_parts.append(f"CCM Type: {ccm_type}")
-    if number_of_cells:
-        title_parts.append(f"{number_of_cells} Cells")
-    view_label = " | ".join(title_parts) if title_parts else "Fleet Overview"
-
     color_by_style = {"display": "block", "maxWidth": "340px", "marginBottom": "12px"}
     if not sample_name:
         color_by_style = {"display": "none"}
@@ -738,7 +728,6 @@ def update_soh_outputs(
         overpotential_fig,
         overpotential_lin_vs_kin_fig,
         detail_msg,
-        view_label,
         color_by_style,
     )
 

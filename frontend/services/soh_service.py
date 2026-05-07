@@ -867,8 +867,7 @@ def create_overpotential_lin_vs_kin_plot(dff, df_soh, plotly_template, sample_na
         width=None,
         xaxis_title="Δη<sub>kin</sub> [mV]",
         yaxis_title="Δη<sub>lin</sub> [mV]",
-        showlegend=True,
-        legend=dict(orientation="h", yanchor="top", y=-0.15, xanchor="center", x=0.5, font=dict(size=10)),
+        showlegend=False,
     )
     return fig_lin_vs_lin
 
