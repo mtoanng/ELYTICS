@@ -113,10 +113,12 @@ def get_polyfit_smooth(x_vals, y_vals, degree=3, n_points=200):
     """
     is_datetime = pd.api.types.is_datetime64_any_dtype(x_vals) or pd.api.types.is_string_dtype(x_vals)
     if is_datetime:
-        x_numeric = pd.to_datetime(x_vals, errors='coerce').astype(np.int64)
+        parsed = pd.to_datetime(x_vals, format="mixed", errors="coerce", utc=True)
+        # Convert to float64 so NaT becomes np.nan (int64 iNaT is not NaN)
+        x_numeric = np.where(parsed.isna(), np.nan, parsed.astype(np.int64).astype(float))
     else:
-        x_numeric = np.asarray(x_vals)
-    y_numeric = np.asarray(y_vals)
+        x_numeric = np.asarray(x_vals, dtype=float)
+    y_numeric = np.asarray(y_vals, dtype=float)
 
     valid_mask = ~np.isnan(y_numeric) & ~np.isnan(x_numeric)
     
@@ -173,6 +175,19 @@ def sci_fmt_interval(interval):
     closed = interval.closed
     return f"({left},{right}{']' if closed == 'right' else ')'}"
 
+def _filter_valid_timestamps(dff, xaxis_col, min_date="2024-01-01"):
+    """
+    Drop rows with timestamps before min_date when in timestamp mode.
+    This prevents garbage timestamps (e.g. year 1700) from distorting polynomial
+    trendlines, which would otherwise extrapolate to ±10,000 on the y-axis.
+    """
+    if xaxis_col == "runtime_hours" or xaxis_col not in dff.columns:
+        return dff
+    parsed = pd.to_datetime(dff[xaxis_col], format="mixed", errors="coerce", utc=True)
+    min_bound = pd.Timestamp(min_date, tz="UTC")
+    return dff[parsed.ge(min_bound).fillna(False)]
+
+
 def _add_degradation_rate_fill(fig, dff, xaxis_col, rate_uv_per_h=3.0, row=None, col=None):
     """
     Add a degradation rate reference line (y = rate_uv_per_h / 1000 * runtime_hours [mV])
@@ -194,7 +209,16 @@ def _add_degradation_rate_fill(fig, dff, xaxis_col, rate_uv_per_h=3.0, row=None,
         ts = dff.sort_values("runtime_hours")[["runtime_hours", xaxis_col]].dropna()
         if ts.empty:
             return
-        x_plot = np.interp(x_line, ts["runtime_hours"].values, pd.to_datetime(ts[xaxis_col]).astype(np.int64))
+        ts = ts.copy()
+        ts[xaxis_col] = pd.to_datetime(ts[xaxis_col], format="mixed", errors="coerce")
+        ts = ts.dropna(subset=[xaxis_col])
+        if ts.empty:
+            return
+        x_plot = np.interp(
+            x_line,
+            ts["runtime_hours"].values,
+            ts[xaxis_col].astype(np.int64).values,
+        )
         x_plot = pd.to_datetime(x_plot)
 
     # Set y-ceiling to 10% above the largest y-value already in the figure
@@ -207,8 +231,6 @@ def _add_degradation_rate_fill(fig, dff, xaxis_col, rate_uv_per_h=3.0, row=None,
                     y_max_data = max(y_max_data, max(vals))
             except (TypeError, ValueError):
                 pass
-    y_ceil = max(y_max_data * 1.1, float(y_line[-1]) * 1.1)
-
     row_col = dict(row=row, col=col) if row is not None else {}
     # Reference line
     label = f"{rate_uv_per_h} µV/h"
@@ -323,6 +345,7 @@ def create_fleet_soh_plot(df_soh, dff, sample_name, xaxis_col, plotly_template):
     """
     Create a standard SOH plot for fleet overview.
     """
+    dff = _filter_valid_timestamps(dff, xaxis_col)
     fig = make_subplots(
         rows=2, cols=1, 
         row_heights=[0.5, 0.5], 
@@ -447,7 +470,7 @@ def create_lin_vs_kin_plot(dff, df_soh, plotly_template, sample_name):
                 line=dict(color=selected_color, width=3, dash="dash"), # Thicker line
                 hoverinfo="skip", showlegend=False
             ))
-        title = f"SOH Trendline"
+        title = "SOH Trendline"
     else: # no sample name selected
         for other_sample in dff["sample_name"].unique():
             sample_data = dff[dff["sample_name"] == other_sample]
@@ -617,6 +640,7 @@ def create_polcurve_decomp_plot(dff, valid_ivs, slider_value, plotly_template, s
 
 def create_overpotential_plots(df_soh, dff, xaxis_col, theme_data, sample_name):
     plotly_template = get_plotly_template(theme_data)
+    dff = _filter_valid_timestamps(dff, xaxis_col)
     fig = make_subplots(rows=3, cols=1, row_heights=[0.33, 0.33, 0.33], vertical_spacing=0.08)
 
     # Define color map for consistent colors across samples
@@ -810,7 +834,7 @@ def create_overpotential_lin_vs_kin_plot(dff, df_soh, plotly_template, sample_na
                         marker=dict(symbol="triangle-up", size=18, color=selected_color),
                         showlegend=False, hoverinfo="skip"
                     ))
-        title = f"Overpotential Trendline"
+        title = "Overpotential Trendline"
     else: # no sample name selected
         for other_sample in dff["sample_name"].unique():
             sample_data = dff[dff["sample_name"] == other_sample]
@@ -873,6 +897,7 @@ def create_overpotential_lin_vs_kin_plot(dff, df_soh, plotly_template, sample_na
 
 def create_overpotential_plot_all_in_one(df_soh, dff, xaxis_col, theme_data, sample_name, slider_value=None, valid_ivs=None):
     plotly_template = get_plotly_template(theme_data)
+    dff = _filter_valid_timestamps(dff, xaxis_col)
     fig = go.Figure().update_layout(template=plotly_template)
 
     # Define color map for consistent colors across samples
@@ -1066,6 +1091,7 @@ def create_cell_based_soh_time_plot(dff, xaxis_col, click_data, theme_data, samp
         fig = go.Figure().update_layout(template=plotly_template)
         return fig
 
+    dff = _filter_valid_timestamps(dff, xaxis_col)
     fig_soh_cells_time = make_subplots(
         rows=3, cols=1,
         row_heights=[0.33, 0.33, 0.33],
@@ -1217,11 +1243,15 @@ def create_cell_based_soh_across_height_plot(fig_soh_cells_across, dff, click_da
         if closest_row is not None:
             actual_time = closest_row[xaxis_col]
         
-        iv_number = closest_row.get("IVnumber")
+        iv_number = closest_row.get("IVnumber") if closest_row is not None else None
 
-        pc_val = closest_row["model_uCellAvg_pc_3-0_stack"] if "model_uCellAvg_pc_3-0_stack" in closest_row else None
-        bol_kin_vals = closest_row["model_uCellAvg_BoL-kin_ref_jStck-3-0pAndeOut-2-5pCtdeOut-40tAndeIn-70vfAndeIn-5-2ECSA-1_cells"] if "model_uCellAvg_BoL-kin_ref_jStck-3-0pAndeOut-2-5pCtdeOut-40tAndeIn-70vfAndeIn-5-2ECSA-1_cells" in closest_row else None
-        bol_lin_vals = closest_row["model_uCellAvg_BoL-lin_ref_jStck-3-0pAndeOut-2-5pCtdeOut-40tAndeIn-70vfAndeIn-5-2delta_Rohm-0_cells"] if "model_uCellAvg_BoL-lin_ref_jStck-3-0pAndeOut-2-5pCtdeOut-40tAndeIn-70vfAndeIn-5-2delta_Rohm-0_cells" in closest_row else None
+        # Use BoL reference columns for Δη calculation (per-cell, as in time plot)
+        col_bol_lin_cells = "model_uCellAvg_BoL-lin_ref_jStck-3-0pAndeOut-2-5pCtdeOut-40tAndeIn-70vfAndeIn-5-2delta_Rohm-0_cells"
+        col_bol_kin_cells = "model_uCellAvg_BoL-kin_ref_jStck-3-0pAndeOut-2-5pCtdeOut-40tAndeIn-70vfAndeIn-5-2ECSA-1_cells"
+        col_pc = "model_uCellAvg_pc_3-0_stack"
+        pc_val = closest_row.get(col_pc) if closest_row is not None else None
+        bol_kin_vals = closest_row.get(col_bol_kin_cells) if closest_row is not None else None
+        bol_lin_vals = closest_row.get(col_bol_lin_cells) if closest_row is not None else None
 
         # Calculate overpotentials for each cell
         if (
@@ -1229,95 +1259,70 @@ def create_cell_based_soh_across_height_plot(fig_soh_cells_across, dff, click_da
             and bol_kin_vals is not None and len(bol_kin_vals) > 0
             and bol_lin_vals is not None and len(bol_lin_vals) > 0
         ):
-            if selected_time is not None:
-                # Find the specific row of data corresponding to the click
-                if xaxis_col == 'runtime_hours':
-                    time_diff = abs(dff[xaxis_col] - selected_time)
-                    closest_idx = time_diff.idxmin()
-                    closest_row = dff.loc[closest_idx]
-                else:
-                    closest_row_df = dff[dff[xaxis_col] == selected_time]
-                    if not closest_row_df.empty:
-                        closest_row = closest_row_df.iloc[0]
-                    else:
-                        closest_row = None
+            if closest_row is not None:
 
-                actual_time = None
-                iv_number = None
-                if closest_row is not None:
-                    actual_time = closest_row[xaxis_col]
-                    iv_number = closest_row.get("IVnumber")
-
-                    # Use BoL reference columns for Δη calculation (per-cell, as in time plot)
-                    col_bol_lin_cells = "model_uCellAvg_BoL-lin_ref_jStck-3-0pAndeOut-2-5pCtdeOut-40tAndeIn-70vfAndeIn-5-2delta_Rohm-0_cells"
-                    col_bol_kin_cells = "model_uCellAvg_BoL-kin_ref_jStck-3-0pAndeOut-2-5pCtdeOut-40tAndeIn-70vfAndeIn-5-2ECSA-1_cells"
-                    col_pc = "model_uCellAvg_pc_3-0_stack"
-                    bol_kin_vals = closest_row.get(col_bol_kin_cells)
-                    bol_lin_vals = closest_row.get(col_bol_lin_cells)
-                    pc_val = closest_row.get(col_pc)
-
-                    eta_tot_cells = []
-                    eta_kin_cells = []
-                    eta_lin_cells = []
-                    y_cells = []
-                    if bol_kin_vals is not None and bol_lin_vals is not None and pc_val is not None:
-                        for cell_idx in range(num_cells):
-                            bol_kin = get_array_element(bol_kin_vals, cell_idx)
-                            bol_lin = get_array_element(bol_lin_vals, cell_idx)
-                            if bol_kin is not None and bol_lin is not None and pd.notna(bol_kin) and pd.notna(bol_lin):
-                                eta_tot = 1000 * (-bol_lin - bol_kin + 2 * pc_val)
-                                eta_kin = 1000 * (-bol_kin + pc_val)
-                                eta_lin = 1000 * (-bol_lin + pc_val)
-                                eta_tot_cells.append(eta_tot)
-                                eta_kin_cells.append(eta_kin)
-                                eta_lin_cells.append(eta_lin)
-                                y_cells.append(cell_idx + 1)
-                    # Plotting code
-                    if y_cells:
+                eta_tot_cells = []
+                eta_kin_cells = []
+                eta_lin_cells = []
+                y_cells = []
+                if bol_kin_vals is not None and bol_lin_vals is not None and pc_val is not None:
+                    for cell_idx in range(num_cells):
+                        bol_kin = get_array_element(bol_kin_vals, cell_idx)
+                        bol_lin = get_array_element(bol_lin_vals, cell_idx)
+                        if bol_kin is not None and bol_lin is not None and pd.notna(bol_kin) and pd.notna(bol_lin):
+                            eta_tot = 1000 * (-bol_lin - bol_kin + 2 * pc_val)
+                            eta_kin = 1000 * (-bol_kin + pc_val)
+                            eta_lin = 1000 * (-bol_lin + pc_val)
+                            eta_tot_cells.append(eta_tot)
+                            eta_kin_cells.append(eta_kin)
+                            eta_lin_cells.append(eta_lin)
+                            y_cells.append(cell_idx + 1)
+                # Plotting code
+                if y_cells:
+                    fig_soh_cells_across.add_trace(go.Scatter(
+                        x=eta_tot_cells, y=y_cells, mode="markers",
+                        marker=dict(size=10, color="#e6b522"), name="Δη Total",
+                        hovertemplate="<b>Cell %{y}</b><br>Δη Total: %{x:.3f} mV<extra></extra>",
+                        showlegend=False
+                    ), row=1, col=1)
+                    if clicked_cell and clicked_cell in y_cells:
+                        idx = y_cells.index(clicked_cell)
                         fig_soh_cells_across.add_trace(go.Scatter(
-                            x=eta_tot_cells, y=y_cells, mode="markers",
-                            marker=dict(size=10, color="#e6b522"), name="Δη Total",
-                            hovertemplate="<b>Cell %{y}</b><br>Δη Total: %{x:.3f} mV<extra></extra>",
+                            x=[eta_tot_cells[idx]], y=[clicked_cell], mode="markers",
+                            marker=dict(size=16, color="#e74c3c", line=dict(width=3, color="#c0392b")),
+                            hovertemplate=f"<b>Cell {clicked_cell} (Selected)</b><br>Δη Total: %{{x:.3f}} mV<extra></extra>",
                             showlegend=False
                         ), row=1, col=1)
-                        if clicked_cell and clicked_cell in y_cells:
-                            idx = y_cells.index(clicked_cell)
-                            fig_soh_cells_across.add_trace(go.Scatter(
-                                x=[eta_tot_cells[idx]], y=[clicked_cell], mode="markers",
-                                marker=dict(size=16, color="#e74c3c", line=dict(width=3, color="#c0392b")),
-                                hovertemplate=f"<b>Cell {clicked_cell} (Selected)</b><br>Δη Total: %{{x:.3f}} mV<extra></extra>",
-                                showlegend=False
-                            ), row=1, col=1)
 
+                    fig_soh_cells_across.add_trace(go.Scatter(
+                        x=eta_lin_cells, y=y_cells, mode="markers",
+                        marker=dict(size=10, color="#3498db"), name="Δη Linear",
+                        hovertemplate="<b>Cell %{y}</b><br>Δη Linear: %{x:.3f} mV<extra></extra>",
+                        showlegend=False
+                    ), row=1, col=2)
+                    if clicked_cell and clicked_cell in y_cells:
+                        idx = y_cells.index(clicked_cell)
                         fig_soh_cells_across.add_trace(go.Scatter(
-                            x=eta_lin_cells, y=y_cells, mode="markers",
-                            marker=dict(size=10, color="#3498db"), name="Δη Linear",
-                            hovertemplate="<b>Cell %{y}</b><br>Δη Linear: %{x:.3f} mV<extra></extra>",
+                            x=[eta_lin_cells[idx]], y=[clicked_cell], mode="markers",
+                            marker=dict(size=16, color="#e74c3c", line=dict(width=3, color="#c0392b")),
+                            hovertemplate=f"<b>Cell {clicked_cell} (Selected)</b><br>Δη Linear: %{{x:.3f}} mV<extra></extra>",
                             showlegend=False
                         ), row=1, col=2)
-                        if clicked_cell and clicked_cell in y_cells:
-                            idx = y_cells.index(clicked_cell)
-                            fig_soh_cells_across.add_trace(go.Scatter(
-                                x=[eta_lin_cells[idx]], y=[clicked_cell], mode="markers",
-                                marker=dict(size=16, color="#e74c3c", line=dict(width=3, color="#c0392b")),
-                                hovertemplate=f"<b>Cell {clicked_cell} (Selected)</b><br>Δη Linear: %{{x:.3f}} mV<extra></extra>",
-                                showlegend=False
-                            ), row=1, col=2)
 
+                    fig_soh_cells_across.add_trace(go.Scatter(
+                        x=eta_kin_cells, y=y_cells, mode="markers",
+                        marker=dict(size=10, color="#2ecc71"), name="Δη Kinetic",
+                        hovertemplate="<b>Cell %{y}</b><br>Δη Kinetic: %{x:.3f} mV<extra></extra>",
+                        showlegend=False
+                    ), row=1, col=3)
+                    if clicked_cell and clicked_cell in y_cells:
+                        idx = y_cells.index(clicked_cell)
                         fig_soh_cells_across.add_trace(go.Scatter(
-                            x=eta_kin_cells, y=y_cells, mode="markers",
-                            marker=dict(size=10, color="#2ecc71"), name="Δη Kinetic",
-                            hovertemplate="<b>Cell %{y}</b><br>Δη Kinetic: %{x:.3f} mV<extra></extra>",
+                            x=[eta_kin_cells[idx]], y=[clicked_cell], mode="markers",
+                            marker=dict(size=16, color="#e74c3c", line=dict(width=3, color="#c0392b")),
+                            hovertemplate=f"<b>Cell {clicked_cell} (Selected)</b><br>Δη Kinetic: %{{x:.3f}} mV<extra></extra>",
                             showlegend=False
                         ), row=1, col=3)
-                        if clicked_cell and clicked_cell in y_cells:
-                            idx = y_cells.index(clicked_cell)
-                            fig_soh_cells_across.add_trace(go.Scatter(
-                                x=[eta_kin_cells[idx]], y=[clicked_cell], mode="markers",
-                                marker=dict(size=16, color="#e74c3c", line=dict(width=3, color="#c0392b")),
-                                hovertemplate=f"<b>Cell {clicked_cell} (Selected)</b><br>Δη Kinetic: %{{x:.3f}} mV<extra></extra>",
-                                showlegend=False
-                            ), row=1, col=3)
 
         # Add annotation and update layout
         if xaxis_col == 'runtime_hours':
@@ -1372,6 +1377,7 @@ def create_cell_based_soh_across_height_plot(fig_soh_cells_across, dff, click_da
 
 def create_colored_soh_plot(df_soh, dff, xaxis_col, color_by, theme_data, sample_name):
     plotly_template = get_plotly_template(theme_data)
+    dff = _filter_valid_timestamps(dff, xaxis_col)
     fig_colored_soh = go.Figure().update_layout(template=plotly_template)
 
     if color_by == "fitting_error_binned" and "model_min_obj_stack" in dff.columns:
