@@ -74,7 +74,3 @@ SELECT
     `model_uCellAvg_BoL-kin_ref_jStck-3-0pAndeOut-2-5pCtdeOut-40tAndeIn-70vfAndeIn-5-2ECSA-1_cells`,
     `model_uCellAvg_BoL-lin_ref_jStck-3-0pAndeOut-2-5pCtdeOut-40tAndeIn-70vfAndeIn-5-2delta_Rohm-0_cells`
 FROM ps_xplatform_dev.pemely_dev.gold_virtual_sensor_soh_cr_sherlock
-ORDER BY
-    sample_name,
-    sensor_type,
-    runtime_hours;

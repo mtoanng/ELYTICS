@@ -1,3 +1,5 @@
+import logging
+
 from dash import Input, Output, State, callback, dcc, html, no_update, register_page
 from dash.dcc.express import send_data_frame
 from dash.exceptions import PreventUpdate
@@ -10,6 +12,9 @@ import plotly.graph_objs as go
 from services.backend_service import get_metadata, get_tabular
 from services import soh_service
 from services import soh_layout_service
+
+
+logger = logging.getLogger(__name__)
 
 
 register_page(
@@ -38,14 +43,58 @@ def _normalize_bool_filter(selection: str | None) -> bool | None:
     return None
 
 
+def _filter_stack_dataframe(
+    df: pd.DataFrame,
+    is_rising: str | None,
+) -> pd.DataFrame:
+    if df.empty:
+        return df
+
+    filtered = df
+
+    rising_value = _normalize_bool_filter(is_rising)
+    if rising_value is not None and "is_rising" in filtered.columns:
+        lowered = filtered["is_rising"].astype(str).str.strip().str.lower()
+        truthy = {"true", "1", "yes"}
+        falsy = {"false", "0", "no"}
+        filtered = filtered.loc[
+            filtered["is_rising"].eq(rising_value)
+            | lowered.isin(truthy if rising_value else falsy)
+        ]
+
+    return filtered
+
+
+def _section_panel(title: str, children: list) -> html.Details:
+    return html.Details(
+        open=True,
+        style={
+            "border": "1px solid var(--mantine-color-gray-3)",
+            "borderRadius": "12px",
+            "background": "var(--mantine-color-body)",
+        },
+        children=[
+            html.Summary(
+                title,
+                style={
+                    "cursor": "pointer",
+                    "padding": "14px 16px",
+                    "fontWeight": 700,
+                    "listStyle": "none",
+                },
+            ),
+            dmc.Box(p="md", pt=0, children=children),
+        ],
+    )
+
+
 layout = dmc.Container(
     size="xl",
     py="md",
     style={
-        "height": "calc(100dvh - var(--app-shell-header-offset, 0rem))",
+        "minHeight": "calc(100dvh - var(--app-shell-header-offset, 0rem))",
         "display": "flex",
         "flexDirection": "column",
-        "minHeight": 0,
     },
     children=[
         dmc.Stack(
@@ -90,11 +139,9 @@ layout = dmc.Container(
                     p="md",
                     radius="md",
                     style={
-                        "flex": "1 1 0",
-                        "minHeight": 0,
                         "display": "flex",
                         "flexDirection": "column",
-                        "overflow": "hidden",
+                        "overflow": "visible",
                     },
                     children=[
                         dmc.Group(
@@ -155,20 +202,6 @@ layout = dmc.Container(
                                     styles={"label": {"marginBottom": "6px"}},
                                     style={"flex": 1, "minWidth": "170px"},
                                 ),
-                                dmc.InputWrapper(
-                                    dcc.Dropdown(
-                                        id="soh-color-by",
-                                        options=soh_layout_service.COLOR_BY_OPTIONS,
-                                        value="none",
-                                        clearable=False,
-                                        style={"width": "100%"},
-                                    ),
-                                    label="Color SOH By",
-                                    htmlFor="soh-color-by",
-                                    className="dmc",
-                                    styles={"label": {"marginBottom": "6px"}},
-                                    style={"flex": 1, "minWidth": "220px"},
-                                ),
                                 dmc.Stack(
                                     gap=4,
                                     style={"minWidth": "180px"},
@@ -215,106 +248,167 @@ layout = dmc.Container(
                             fw=600,
                             style={"textAlign": "center"},
                         ),
-                        dmc.Divider(size="xs", my="sm"),
-                        dmc.Box(
-                            style={
-                                "display": "grid",
-                                "gridTemplateColumns": "repeat(2, minmax(300px, 1fr))",
-                                "gap": "16px",
-                                "minHeight": "420px",
-                            },
-                            children=[
-                                dcc.Graph(id="soh-fleet-stack-soh-plot", config={"responsive": True}),
-                                dcc.Graph(id="soh-fleet-lin-vs-lin-plot", config={"responsive": True}),
-                                dcc.Graph(id="soh-overpotential-plots", config={"responsive": True}),
-                                dcc.Graph(id="soh-overpotential-lin-vs-kin-plot", config={"responsive": True}),
-                            ],
-                        ),
-                        dmc.Space(h="md"),
-                        dmc.Box(
-                            style={"height": "320px", "width": "100%"},
-                            children=[
-                                dag.AgGrid(
-                                    id="soh-table",
-                                    columnDefs=[],
-                                    rowData=[],
-                                    defaultColDef={
-                                        "resizable": True,
-                                        "sortable": True,
-                                        "filter": True,
-                                        "minWidth": 90,
-                                        "flex": 1,
-                                        "wrapText": False,
-                                    },
-                                    dashGridOptions={
-                                        "pagination": True,
-                                        "paginationPageSize": 12,
-                                        "domLayout": "normal",
-                                    },
-                                    className="ag-theme-alpine",
-                                    style={"height": "100%", "width": "100%"},
-                                )
-                            ],
-                        ),
-                        dmc.Space(h="md"),
                         dmc.Text(
-                            id="soh-decomp-message",
-                            c="yellow",
-                            fw=600,
+                            id="soh-view-label",
+                            c="dimmed",
+                            fw=500,
                             style={"textAlign": "center"},
                         ),
-                        dmc.Box(
-                            id="soh-decomp-plot-container",
-                            style={"display": "none"},
+                        dmc.Space(h="sm"),
+                        dmc.Stack(
+                            gap="md",
                             children=[
-                                dmc.Box(
-                                    style={
-                                        "display": "grid",
-                                        "gridTemplateColumns": "repeat(2, minmax(300px, 1fr))",
-                                        "gap": "16px",
-                                    },
-                                    children=[
-                                        dcc.Graph(id="soh-overpotential-all-in-one", config={"responsive": True}),
-                                        dcc.Graph(id="soh-decomp-plot", config={"responsive": True}),
+                                _section_panel(
+                                    "① FLEET INFO: STACK SOH (AS OVERPOTENTIAL)",
+                                    [
+                                        dmc.Box(
+                                            style={
+                                                "display": "grid",
+                                                "gridTemplateColumns": "minmax(320px, 7fr) minmax(280px, 3fr)",
+                                                "gap": "16px",
+                                            },
+                                            children=[
+                                                dcc.Graph(id="soh-overpotential-plots", config={"responsive": True}),
+                                                dcc.Graph(id="soh-overpotential-lin-vs-kin-plot", config={"responsive": True}),
+                                            ],
+                                        )
                                     ],
                                 ),
-                                dmc.Space(h="xs"),
-                                dmc.Text("Select IV Pair (by Runtime)", fw=500, size="sm"),
-                                dcc.RangeSlider(
-                                    id="soh-decomp-diff-range-slider",
-                                    min=0,
-                                    max=1,
-                                    step=1,
-                                    value=[0, 1],
-                                    marks={},
-                                    tooltip={"placement": "bottom", "always_visible": True},
-                                ),
-                                dmc.Space(h="md"),
-                                dcc.Graph(id="soh-load-cycle-plots", config={"responsive": True}),
-                            ],
-                        ),
-                        dmc.Space(h="md"),
-                        dmc.Text(
-                            id="soh-cells-message",
-                            c="yellow",
-                            fw=600,
-                            style={"textAlign": "center"},
-                        ),
-                        dmc.Box(
-                            id="soh-cells-container",
-                            style={"display": "none"},
-                            children=[
-                                dmc.Box(
-                                    style={
-                                        "display": "grid",
-                                        "gridTemplateColumns": "minmax(360px, 3fr) minmax(300px, 2fr)",
-                                        "gap": "16px",
-                                    },
-                                    children=[
-                                        dcc.Graph(id="soh-cells-time-plot", config={"responsive": True}),
-                                        dcc.Graph(id="soh-cells-across-plot", config={"responsive": True}),
+                                _section_panel(
+                                    "② STACK SOH & LOAD CYCLES",
+                                    [
+                                        dmc.Text(
+                                            id="soh-decomp-message",
+                                            c="yellow",
+                                            fw=600,
+                                            style={"textAlign": "center"},
+                                        ),
+                                        dmc.Box(
+                                            id="soh-decomp-plot-container",
+                                            style={"display": "none"},
+                                            children=[
+                                                dmc.Box(
+                                                    style={
+                                                        "display": "grid",
+                                                        "gridTemplateColumns": "repeat(2, minmax(300px, 1fr))",
+                                                        "gap": "16px",
+                                                    },
+                                                    children=[
+                                                        dcc.Graph(id="soh-overpotential-all-in-one", config={"responsive": True}),
+                                                        dcc.Graph(id="soh-decomp-plot", config={"responsive": True}),
+                                                    ],
+                                                ),
+                                                dmc.Space(h="xs"),
+                                                dmc.Text("Select IV Pair (by Runtime)", fw=500, size="sm"),
+                                                dcc.RangeSlider(
+                                                    id="soh-decomp-diff-range-slider",
+                                                    min=0,
+                                                    max=1,
+                                                    step=1,
+                                                    value=[0, 1],
+                                                    marks={},
+                                                    tooltip={"placement": "bottom", "always_visible": True},
+                                                ),
+                                                dmc.Space(h="md"),
+                                                dcc.Graph(id="soh-load-cycle-plots", config={"responsive": True}),
+                                            ],
+                                        ),
                                     ],
-                                )
+                                ),
+                                _section_panel(
+                                    "③ CELL-BASED SOH (AS OVERPOTENTIAL)",
+                                    [
+                                        dmc.Text(
+                                            id="soh-cells-message",
+                                            c="yellow",
+                                            fw=600,
+                                            style={"textAlign": "center"},
+                                        ),
+                                        dmc.Box(
+                                            id="soh-cells-container",
+                                            style={"display": "none"},
+                                            children=[
+                                                dmc.Box(
+                                                    style={
+                                                        "display": "grid",
+                                                        "gridTemplateColumns": "minmax(360px, 3fr) minmax(300px, 2fr)",
+                                                        "gap": "16px",
+                                                    },
+                                                    children=[
+                                                        dcc.Graph(id="soh-cells-time-plot", config={"responsive": True}),
+                                                        dcc.Graph(id="soh-cells-across-plot", config={"responsive": True}),
+                                                    ],
+                                                )
+                                            ],
+                                        ),
+                                    ],
+                                ),
+                                _section_panel(
+                                    "④ STACK SOH VALUES (ORIG: SOH_KIN vs SOH_LIN)",
+                                    [
+                                        dmc.Box(
+                                            id="soh-color-by-container",
+                                            style={"display": "none", "maxWidth": "340px", "marginBottom": "12px"},
+                                            children=[
+                                                dmc.InputWrapper(
+                                                    dcc.Dropdown(
+                                                        id="soh-color-by",
+                                                        options=soh_layout_service.COLOR_BY_OPTIONS,
+                                                        value="none",
+                                                        clearable=False,
+                                                        style={"width": "100%"},
+                                                    ),
+                                                    label="Color SOH By",
+                                                    htmlFor="soh-color-by",
+                                                    className="dmc",
+                                                    styles={"label": {"marginBottom": "6px"}},
+                                                )
+                                            ],
+                                        ),
+                                        dmc.Box(
+                                            id="soh-fleet-stack-plot-container",
+                                            style={
+                                                "display": "grid",
+                                                "gridTemplateColumns": "minmax(320px, 7fr) minmax(280px, 3fr)",
+                                                "gap": "16px",
+                                            },
+                                            children=[
+                                                dcc.Graph(id="soh-fleet-stack-soh-plot", config={"responsive": True}),
+                                                dcc.Graph(id="soh-fleet-lin-vs-lin-plot", config={"responsive": True}),
+                                            ],
+                                        ),
+                                    ],
+                                ),
+                                _section_panel(
+                                    "⑤ SOH CSV DATA",
+                                    [
+                                        dmc.Box(
+                                            style={"height": "320px", "width": "100%"},
+                                            children=[
+                                                dag.AgGrid(
+                                                    id="soh-table",
+                                                    columnDefs=[],
+                                                    rowData=[],
+                                                    defaultColDef={
+                                                        "resizable": True,
+                                                        "sortable": True,
+                                                        "filter": True,
+                                                        "minWidth": 90,
+                                                        "flex": 1,
+                                                        "wrapText": False,
+                                                    },
+                                                    dashGridOptions={
+                                                        "pagination": True,
+                                                        "paginationPageSize": 12,
+                                                        "domLayout": "normal",
+                                                    },
+                                                    className="ag-theme-alpine",
+                                                    style={"height": "100%", "width": "100%"},
+                                                )
+                                            ],
+                                        )
+                                    ],
+                                ),
                             ],
                         ),
                     ],
@@ -322,6 +416,7 @@ layout = dmc.Container(
                 dcc.Store(id="soh-metadata-store"),
                 dcc.Store(id="soh-fleet-data-store"),
                 dcc.Store(id="soh-stack-data-store"),
+                dcc.Store(id="soh-stack-load-status", data={"state": "idle"}),
                 dcc.Store(id="soh-usage-open", data=False),
                 dcc.Store(id="soh-theme-store"),
                 dcc.Store(id="soh-cell-plot-click-store", data=None),
@@ -450,26 +545,50 @@ def load_fleet_data(sample_name, number_of_cells, ccm_type, is_rising):
 
 @callback(
     Output("soh-stack-data-store", "data"),
+    Output("soh-stack-load-status", "data"),
     Input("soh-sample-name-filter", "value"),
     Input("soh-number-of-cells-filter", "value"),
     Input("soh-ccm-type-filter", "value"),
     Input("soh-is-rising-filter", "value"),
 )
 def load_stack_data(sample_name, number_of_cells, ccm_type, is_rising):
+    _ = number_of_cells, ccm_type
     if not sample_name:
-        return []
+        return [], {"state": "idle"}
 
-    filters = {"sample_name": sample_name}
-    if number_of_cells is not None:
-        filters["number_of_cells"] = str(number_of_cells)
-    if ccm_type:
-        filters["ccm_type"] = ccm_type
-    rising_value = _normalize_bool_filter(is_rising)
-    if rising_value is not None:
-        filters["is_rising"] = rising_value
+    primary_error = None
+    try:
+        df = get_tabular(
+            "sherlock",
+            "soh_stack",
+            filters={"sample_name": sample_name},
+            sort_by="runtime_hours",
+        )
+    except Exception as exc:
+        primary_error = exc
+        logger.exception("Failed stack SOH request with backend sorting for sample %s", sample_name)
+        try:
+            # Retry without backend sorting; some deployed views reject runtime_hours sort.
+            df = get_tabular(
+                "sherlock",
+                "soh_stack",
+                filters={"sample_name": sample_name},
+            )
+            if "runtime_hours" in df.columns:
+                df = df.sort_values("runtime_hours")
+        except Exception as retry_exc:
+            logger.exception("Failed stack SOH request without backend sorting for sample %s", sample_name)
+            return [], {
+                "state": "error",
+                "message": f"Stack data request failed. sorted={primary_error}; unsorted={retry_exc}",
+                "sample_name": sample_name,
+            }
 
-    df = get_tabular("sherlock", "soh_stack", filters=filters, sort_by="runtime_hours")
-    return df.to_dict("records") if not df.empty else []
+    df = _filter_stack_dataframe(df, is_rising)
+    if df.empty:
+        return [], {"state": "empty", "sample_name": sample_name}
+    records = df.to_dict("records")
+    return records, {"state": "ok", "sample_name": sample_name, "rows": len(records)}
 
 
 @callback(
@@ -478,23 +597,39 @@ def load_stack_data(sample_name, number_of_cells, ccm_type, is_rising):
     Output("soh-overpotential-plots", "figure"),
     Output("soh-overpotential-lin-vs-kin-plot", "figure"),
     Output("soh-plot-message", "children"),
+    Output("soh-view-label", "children"),
+    Output("soh-color-by-container", "style"),
     Output("soh-table", "rowData"),
     Output("soh-table", "columnDefs"),
     Input("soh-fleet-data-store", "data"),
     Input("soh-stack-data-store", "data"),
+    Input("soh-stack-load-status", "data"),
     Input("soh-sample-name-filter", "value"),
+    Input("soh-number-of-cells-filter", "value"),
+    Input("soh-ccm-type-filter", "value"),
     Input("soh-xaxis-filter", "value"),
     Input("soh-color-by", "value"),
     Input("soh-theme-store", "data"),
 )
-def update_soh_outputs(fleet_data, stack_data, sample_name, xaxis_col, color_by, theme_data):
+def update_soh_outputs(
+    fleet_data,
+    stack_data,
+    stack_load_status,
+    sample_name,
+    number_of_cells,
+    ccm_type,
+    xaxis_col,
+    color_by,
+    theme_data,
+):
     empty_fig = _empty_figure(theme_data)
     if not fleet_data:
-        return empty_fig, empty_fig, empty_fig, empty_fig, "", [], []
+        return empty_fig, empty_fig, empty_fig, empty_fig, "", "", {"display": "none"}, [], []
 
     df_fleet = pd.DataFrame(fleet_data)
     df_stack = pd.DataFrame(stack_data) if stack_data else pd.DataFrame()
     plot_df = df_stack if sample_name and not df_stack.empty else df_fleet
+    fleet_plot_df = df_fleet
 
     if xaxis_col not in plot_df.columns:
         xaxis_col = "runtime_hours"
@@ -520,7 +655,12 @@ def update_soh_outputs(fleet_data, stack_data, sample_name, xaxis_col, color_by,
         fleet_fig = soh_service.create_fleet_soh_plot(df_fleet, plot_df, sample_name, xaxis_col, plotly_template)
         plot_message = ""
 
-    lin_vs_kin_fig = soh_service.create_lin_vs_kin_plot(plot_df, df_fleet, plotly_template, sample_name)
+    lin_vs_kin_fig = soh_service.create_lin_vs_kin_plot(
+        fleet_plot_df,
+        df_fleet,
+        plotly_template,
+        sample_name,
+    )
     overpotential_fig, fit_coeffs = soh_service.create_overpotential_plots(
         df_fleet,
         plot_df,
@@ -529,11 +669,11 @@ def update_soh_outputs(fleet_data, stack_data, sample_name, xaxis_col, color_by,
         sample_name,
     )
     overpotential_lin_vs_kin_fig = soh_service.create_overpotential_lin_vs_kin_plot(
-        plot_df,
+        fleet_plot_df,
         df_fleet,
         plotly_template,
         sample_name,
-        fit_coeffs,
+        fit_coeffs if plot_df is df_fleet else None,
     )
 
     table_df = df_fleet.copy()
@@ -541,9 +681,32 @@ def update_soh_outputs(fleet_data, stack_data, sample_name, xaxis_col, color_by,
     row_data = table_df.to_dict("records")
     col_defs = soh_layout_service.make_column_defs(table_df)
 
+    title_parts = []
+    if sample_name:
+        title_parts.append(f"Sample: {sample_name}")
+    if ccm_type:
+        title_parts.append(f"CCM Type: {ccm_type}")
+    if number_of_cells:
+        title_parts.append(f"{number_of_cells} Cells")
+    view_label = " | ".join(title_parts) if title_parts else "Fleet Overview"
+
+    color_by_style = {"display": "block", "maxWidth": "340px", "marginBottom": "12px"}
+    if not sample_name:
+        color_by_style = {"display": "none"}
+
     detail_msg = ""
+    stack_state = (stack_load_status or {}).get("state")
     if sample_name and df_stack.empty:
-        detail_msg = "No stack-level data returned for selected sample; detailed plots use fleet-level data."
+        if stack_state == "error":
+            err_text = str((stack_load_status or {}).get("message", "")).strip()
+            detail_msg = (
+                "Stack data endpoint failed for the selected sample; detailed plots are unavailable and fleet-level data is shown. "
+                + (f"Details: {err_text}" if err_text else "")
+            )
+        elif stack_state == "empty":
+            detail_msg = "No stack-level rows found for the selected sample; detailed plots use fleet-level data."
+        else:
+            detail_msg = "No stack-level data returned for selected sample; detailed plots use fleet-level data."
     if plot_message:
         detail_msg = plot_message
 
@@ -553,6 +716,8 @@ def update_soh_outputs(fleet_data, stack_data, sample_name, xaxis_col, color_by,
         overpotential_fig,
         overpotential_lin_vs_kin_fig,
         detail_msg,
+        view_label,
+        color_by_style,
         row_data,
         col_defs,
     )
@@ -679,8 +844,6 @@ def update_cell_based_soh_time_plot(stack_data, xaxis_col, sample_name, click_da
         return empty_fig, "", {"display": "none"}
 
     df = pd.DataFrame(stack_data)
-    if df.empty:
-        return empty_fig, "", {"display": "none"}
     fig = soh_service.create_cell_based_soh_time_plot(
         df,
         xaxis_col,
