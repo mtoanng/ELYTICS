@@ -73,6 +73,8 @@ SIDEBAR_STRUCTURE = {
                 {
                     "path": "soh",
                     "label": "State of Health",
+                    "preview": True,
+                    "tooltip": "Model is currently in early stages of development, results should be considered preliminary.",
                 },
             ],
         },

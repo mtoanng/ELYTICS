@@ -1,6 +1,6 @@
 import logging
 
-from dash import Input, Output, State, callback, dcc, html, no_update, register_page
+from dash import Input, Output, State, callback, clientside_callback, dcc, html, no_update, register_page
 from dash.dcc.express import send_data_frame
 from dash.exceptions import PreventUpdate
 import dash_mantine_components as dmc
@@ -64,25 +64,13 @@ def _filter_stack_dataframe(
     return filtered
 
 
-def _section_panel(title: str, children: list) -> html.Details:
-    return html.Details(
-        open=True,
-        style={
-            "border": "1px solid var(--mantine-color-gray-3)",
-            "borderRadius": "12px",
-            "background": "var(--mantine-color-body)",
-        },
+def _section_panel(title: str, children: list) -> dmc.AccordionItem:
+    """Returns an AccordionItem with title as first child, content as rest."""
+    return dmc.AccordionItem(
+        value=title,
         children=[
-            html.Summary(
-                title,
-                style={
-                    "cursor": "pointer",
-                    "padding": "14px 16px",
-                    "fontWeight": 700,
-                    "listStyle": "none",
-                },
-            ),
-            dmc.Box(p="md", pt=0, children=children),
+            dmc.AccordionControl(title),
+            dmc.AccordionPanel(dmc.Box(p="md", children=children)),
         ],
     )
 
@@ -253,9 +241,10 @@ layout = dmc.Container(
                             fw=500,
                             style={"textAlign": "center"},
                         ),
-                        dmc.Space(h="sm"),
-                        dmc.Stack(
-                            gap="md",
+                        dmc.Divider(size="xs", my="sm"),
+                        dmc.Accordion(
+                            multiple=True,
+                            value=["① FLEET INFO: STACK SOH (AS OVERPOTENTIAL)"],
                             children=[
                                 _section_panel(
                                     "① FLEET INFO: STACK SOH (AS OVERPOTENTIAL)",
@@ -284,7 +273,6 @@ layout = dmc.Container(
                                         ),
                                         dmc.Box(
                                             id="soh-decomp-plot-container",
-                                            style={"display": "none"},
                                             children=[
                                                 dmc.Box(
                                                     style={
@@ -325,7 +313,6 @@ layout = dmc.Container(
                                         ),
                                         dmc.Box(
                                             id="soh-cells-container",
-                                            style={"display": "none"},
                                             children=[
                                                 dmc.Box(
                                                     style={
@@ -392,6 +379,45 @@ layout = dmc.Container(
             ],
         )
     ],
+)
+
+
+clientside_callback(
+    """
+    function(sampleValue, stackData, themeData) {
+        if (!window.Plotly) return null;
+        // After Accordion animation (~400ms), trigger Plotly resize on all graphs
+        const graphIds = [
+            "soh-overpotential-plots",
+            "soh-overpotential-lin-vs-kin-plot",
+            "soh-decomp-plot",
+            "soh-overpotential-all-in-one",
+            "soh-load-cycle-plots",
+            "soh-cells-time-plot",
+            "soh-cells-across-plot",
+            "soh-fleet-stack-soh-plot",
+            "soh-fleet-lin-vs-lin-plot"
+        ];
+        const triggerResize = () => {
+            graphIds.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    try {
+                        window.Plotly.Plots.resize(id);
+                    } catch (e) {}
+                }
+            });
+        };
+        // Trigger immediately and again after animation completes
+        triggerResize();
+        setTimeout(triggerResize, 450);
+        return null;
+    }
+    """,
+    Output("soh-plot-resize-store", "data"),
+    Input("soh-sample-name-filter", "value"),
+    Input("soh-stack-data-store", "data"),
+    Input("soh-theme-store", "data"),
 )
 
 
