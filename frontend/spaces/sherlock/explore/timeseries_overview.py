@@ -625,6 +625,97 @@ def _build_figure(
     return fig
 
 
+def _build_normalized_figure(
+    df: pd.DataFrame,
+    signals: list[str],
+    theme: str,
+    metric: str = "avg",
+    viewport_start: str | None = None,
+    viewport_end: str | None = None,
+    bucket_seconds: int | None = None,
+) -> go.Figure:
+    if df.empty:
+        return _empty_figure(theme, "No data for selected filters")
+
+    if PLOT_TIME_COLUMN not in df.columns:
+        return _empty_figure(theme, "The response does not contain a time column")
+
+    resolved_metric = "avg" if metric == "all" else metric
+    is_dark = theme == "dark"
+    template = "plotly_dark" if is_dark else "plotly"
+    plot_bg = PLOT_BG_DARK if is_dark else PLOT_BG_LIGHT
+
+    plot_df = df.copy()
+    plot_df[PLOT_TIME_COLUMN] = pd.to_datetime(plot_df[PLOT_TIME_COLUMN], errors="coerce")
+    plot_df = plot_df.dropna(subset=[PLOT_TIME_COLUMN]).sort_values(PLOT_TIME_COLUMN)
+    if plot_df.empty:
+        return _empty_figure(theme, "No data for selected filters")
+
+    safe_signals: list[tuple[str, str]] = []
+    for signal in signals:
+        value_col = _resolve_metric_column(plot_df, signal, resolved_metric)
+        if _series_has_data(plot_df, value_col):
+            safe_signals.append((signal, value_col))
+
+    if not safe_signals:
+        return _empty_figure(theme, "No plottable data for selected signals")
+
+    gap_positions = _compute_gap_positions(
+        plot_df[PLOT_TIME_COLUMN],
+        2 * bucket_seconds if bucket_seconds else None,
+    )
+    x_with_gaps = _insert_gap_markers(plot_df[PLOT_TIME_COLUMN].tolist(), gap_positions)
+
+    fig = go.Figure()
+    for idx, (signal, value_col) in enumerate(safe_signals):
+        series = pd.to_numeric(plot_df[value_col], errors="coerce")
+        min_value = series.min(skipna=True)
+        max_value = series.max(skipna=True)
+        if pd.isna(min_value) or pd.isna(max_value):
+            continue
+        if max_value == min_value:
+            normalized = series.apply(lambda value: 0.5 if pd.notna(value) else None)
+        else:
+            normalized = (series - min_value) / (max_value - min_value)
+
+        color = _PLOT_COLORS[idx % len(_PLOT_COLORS)]
+        fig.add_trace(
+            go.Scatter(
+                x=x_with_gaps,
+                y=_insert_gap_markers(normalized.tolist(), gap_positions),
+                mode="lines",
+                name=SENSOR_TITLES.get(signal, signal),
+                line=dict(width=1.8, color=color),
+                showlegend=True,
+            )
+        )
+
+    if not fig.data:
+        return _empty_figure(theme, "No plottable data for selected signals")
+
+    fig.update_layout(
+        template=template,
+        paper_bgcolor=PAPER_BG_TRANSPARENT,
+        plot_bgcolor=plot_bg,
+        height=360,
+        margin=dict(t=40, l=80, r=30, b=60),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        yaxis=dict(range=[-0.02, 1.02]),
+    )
+    fig.update_yaxes(
+        title_text="Normalized value",
+        gridcolor="rgba(255,255,255,0.15)" if is_dark else "rgba(0,0,0,0.08)",
+    )
+    x_axis_kwargs = {
+        "title_text": "",
+        "gridcolor": "rgba(255,255,255,0.15)" if is_dark else "rgba(0,0,0,0.08)",
+    }
+    if viewport_start and viewport_end:
+        x_axis_kwargs["range"] = [viewport_start, viewport_end]
+    fig.update_xaxes(**x_axis_kwargs)
+    return fig
+
+
 def _resolve_time_column(df: pd.DataFrame) -> str | None:
     for candidate in ("bucket_start", "time", "ts"):
         if candidate in df.columns:
@@ -974,6 +1065,37 @@ def timeseries_overview_layout():
                                     ),
                                 ],
                             ),
+                            dmc.Divider(size="xs", my="sm"),
+                            dmc.Box(
+                                children=[
+                                    dmc.Text(
+                                        "Normalized Overlay",
+                                        fw=600,
+                                        size="sm",
+                                        mb=4,
+                                    ),
+                                    dmc.Text(
+                                        "Selected signals are min-max normalized to a 0-1 range and overlaid on a shared axis.",
+                                        size="xs",
+                                        c="dimmed",
+                                        mb="sm",
+                                    ),
+                                    dcc.Graph(
+                                        id="timeseries-normalized-graph",
+                                        figure=_empty_figure(
+                                            "light", "Loading metadata..."
+                                        ),
+                                        config={
+                                            "responsive": True,
+                                            "displaylogo": False,
+                                        },
+                                        style={
+                                            "width": "100%",
+                                            "minHeight": "360px",
+                                        },
+                                    ),
+                                ]
+                            ),
                         ],
                     ),
                 ],
@@ -1152,10 +1274,16 @@ def sync_stateful_filters(
 @callback(
     Output("timeseries-viewport-store", "data"),
     Input("timeseries-graph", "relayoutData"),
+    Input("timeseries-normalized-graph", "relayoutData"),
     State("timeseries-viewport-store", "data"),
     prevent_initial_call=True,
 )
-def update_viewport_store(relayout_data, current):
+def update_viewport_store(main_relayout_data, normalized_relayout_data, current):
+    relayout_data = None
+    for candidate in (normalized_relayout_data, main_relayout_data):
+        if isinstance(candidate, dict):
+            relayout_data = candidate
+            break
     if not isinstance(relayout_data, dict):
         raise PreventUpdate
     if not any(
@@ -1314,6 +1442,7 @@ def sync_signal_selector(data, metric, current_selection):
 
 @callback(
     Output("timeseries-graph", "figure"),
+    Output("timeseries-normalized-graph", "figure"),
     Output("timeseries-status-text", "children"),
     Output("timeseries-meta-badge", "children"),
     Input("timeseries-data-store", "data"),
@@ -1335,7 +1464,7 @@ def render_timeseries(data, selected_signals, metric, plot_mode, theme):
     error_message = data.get("error")
     if error_message:
         fig = _empty_figure(theme, error_message)
-        return fig, data.get("status", "No data"), data.get("badge", "Request error")
+        return fig, fig, data.get("status", "No data"), data.get("badge", "Request error")
 
     records = data.get("records") or []
     signals = data.get("signals") or []
@@ -1349,7 +1478,7 @@ def render_timeseries(data, selected_signals, metric, plot_mode, theme):
 
     if not active_signals:
         fig = _empty_figure(theme, "No signals selected")
-        return fig, data.get("status", "No data"), data.get("badge", "")
+        return fig, fig, data.get("status", "No data"), data.get("badge", "")
 
     plot_df = pd.DataFrame(records)
     resolved_signals = [
@@ -1367,4 +1496,14 @@ def render_timeseries(data, selected_signals, metric, plot_mode, theme):
         bucket_seconds=bucket_seconds,
     )
 
-    return fig, data.get("status", "No data"), data.get("badge", "")
+    normalized_fig = _build_normalized_figure(
+        plot_df,
+        resolved_signals,
+        theme,
+        metric=metric,
+        viewport_start=viewport.get("start"),
+        viewport_end=viewport.get("end"),
+        bucket_seconds=bucket_seconds,
+    )
+
+    return fig, normalized_fig, data.get("status", "No data"), data.get("badge", "")
