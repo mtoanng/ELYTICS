@@ -4,7 +4,7 @@ from backend.internal.config_types import (
     TimeseriesConfig,
 )
 
-_USER = ["IdM2BCD_holmes_pemely_user"]
+_USER = ["IdM2BCD_holmes_pemely_user", "IdM2BCD_holmes_pemely_development"]
 _TABULAR_TTL = 3600
 _META_TTL = 7200
 _TS_TTL = 1800
