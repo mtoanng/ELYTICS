@@ -62,8 +62,8 @@ SIDEBAR_STRUCTURE = {
                 {
                     "path": "vlite",
                     "label": "Polarization Curves - V-lite",
-                    "disabled": True,
-                    "tooltip": "Currently being investigated outside of Holmes.",
+                    "preview": True,
+                    "tooltip": "Model validation in progress.",
                 },
             ],
         },
@@ -86,15 +86,20 @@ SIDEBAR_STRUCTURE = {
             "pages": [
                 {"path": "test-rig-statistics", "label": "Test Rig Statistics"},
                 {"path": "test-rig-activity", "label": "Test Rig Activity"},
-                {"path": "track-record", "label": "Track Record", "preview": True, "tooltip": "Data sources are work in progress."},
-            ]
+                {
+                    "path": "track-record",
+                    "label": "Track Record",
+                    "preview": True,
+                    "tooltip": "Data sources are work in progress.",
+                },
+            ],
         },
         "Customer": {
             "path": "customer",
             "pages": [
                 {"path": "customer-overview", "label": "Customer Overview"},
-            ]
-        }
+            ],
+        },
     },
     "watson": {
         None: [{"path": "home", "label": "Home"}],
