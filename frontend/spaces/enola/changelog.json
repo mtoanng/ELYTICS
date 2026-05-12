@@ -29,6 +29,11 @@
       "pr": 844,
       "title": "feat(core): Introduced shared pages",
       "date": "2026-05-06"
+    },
+    {
+      "pr": 859,
+      "title": "feat(enola): Migrated customer overview page",
+      "date": "2026-05-12"
     }
   ],
   "releases": {}
