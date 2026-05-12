@@ -45,7 +45,7 @@ TIMESERIES_CONFIG: list[TimeseriesConfig] = [
         route_name="timeseries_exp",
         auth_groups=_USER,
         ttl=_TS_TTL,
-        required_filters=["order_id"],
+        required_filters=["order_id", "testrig_id", "sample_name"],
     ),
 ]
 
