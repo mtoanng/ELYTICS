@@ -1152,11 +1152,10 @@ def populate_order_filter(metadata_rows):
         if "order_id" in df.columns
         else []
     )
-    first_order = order_values[0] if order_values else None
 
     return (
         _to_options(order_values),
-        first_order,
+        None,
     )
 
 
@@ -1242,16 +1241,10 @@ def sync_stateful_filters(
     selected_testrig = (
         preferred_testrig if preferred_testrig in testrig_values else None
     )
-    if selected_testrig is None and testrig_values:
-        selected_testrig = testrig_values[0]
 
     selected_sample = preferred_sample if preferred_sample in sample_values else None
-    if selected_sample is None and sample_values:
-        selected_sample = sample_values[0]
 
     selected_cells = preferred_cells if preferred_cells in cell_values else None
-    if selected_cells is None and cell_values:
-        selected_cells = cell_values[0]
 
     next_state = {
         "order_id": order_id,
@@ -1329,10 +1322,11 @@ def load_timeseries_data(
     extra_signals,
     viewport,
 ):
-    if order_id in (None, ""):
+    has_required_filter = any(f not in (None, "") for f in [order_id, testrig_id, sample_name])
+    if not has_required_filter:
         return {
-            "error": "No order ID available",
-            "status": "No order selected",
+            "error": "Please select either Order ID, Testrig ID, or Sample Name to view data",
+            "status": "Awaiting filter selection",
             "badge": "No request yet",
             "signals": [],
             "records": [],
@@ -1345,7 +1339,9 @@ def load_timeseries_data(
     start_value = viewport.get("start")
     end_value = viewport.get("end")
 
-    filters = {"order_id": order_id}
+    filters = {}
+    if order_id not in (None, ""):
+        filters["order_id"] = order_id
     if testrig_id not in (None, ""):
         filters["testrig_id"] = testrig_id
     if sample_name not in (None, ""):
@@ -1433,10 +1429,12 @@ def sync_signal_selector(data, metric, current_selection):
     if not signals:
         return [], []
 
-    if current_selection is None:
+    if not current_selection:
         return options, selectable_signals
 
     selected = [signal for signal in current_selection if signal in selectable_signals]
+    if not selected:
+        return options, selectable_signals
     return options, selected
 
 

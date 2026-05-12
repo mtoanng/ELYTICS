@@ -48,9 +48,12 @@ def _bind_route(space: str, cfg: TabularConfig) -> None:
         if sort_dir.lower() not in {"asc", "desc"}:
             raise HTTPException(status_code=400, detail="sort_dir must be 'asc' or 'desc'")
         filters = _parse_filters(request)
-        for required in cfg.required_filters:
-            if required not in filters:
-                raise HTTPException(status_code=400, detail=f"Missing required filter '{required}'")
+        if cfg.required_filters:  # If there are any required filters
+            if not any(required in filters for required in cfg.required_filters):
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"At least one of these filters is required: {', '.join(cfg.required_filters)}"
+                )        
         try:
             query_source, cache_source = resolve_query_source(space=space, data_kind="data", table_name=cfg.table_name)
             data = get_query_result(
