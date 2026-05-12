@@ -134,6 +134,11 @@
       "pr": 844,
       "title": "feat(core): Introduced shared pages",
       "date": "2026-05-06"
+    },
+    {
+      "pr": 860,
+      "title": "feat(sherlock): Added min-max normalized plot to timeseries page",
+      "date": "2026-05-12"
     }
   ],
   "releases": {}
