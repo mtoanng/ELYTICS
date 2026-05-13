@@ -17,7 +17,8 @@ TABULAR_CONFIG: list[TabularConfig] = [
     TabularConfig(table_name="polcurve",            route_name="polcurve",            auth_groups=_USER, ttl=_TABULAR_TTL, required_filters=["order_id"]),
     TabularConfig(table_name="polcurve_vlite",      route_name="polcurve_vlite",      auth_groups=_USER, ttl=_TABULAR_TTL, required_filters=["order_id"]),
     TabularConfig(table_name="sample",              route_name="sample",              auth_groups=_USER, ttl=_TABULAR_TTL),
-    # TabularConfig(table_name="soh",                 route_name="soh",                 auth_groups=_USER, ttl=_TABULAR_TTL, required_filters=["sample_name"]),
+    TabularConfig(table_name="soh_fleet",           route_name="soh_fleet",           auth_groups=_USER, ttl=_TABULAR_TTL),
+    TabularConfig(table_name="soh_stack",           route_name="soh_stack",           auth_groups=_USER, ttl=_TABULAR_TTL, required_filters=["sample_name"]),
     TabularConfig(
         table_name="testrig_activity",
         route_name="testrig_activity",
@@ -65,7 +66,7 @@ METADATA_CONFIG: list[MetadataConfig] = [
         auth_groups=_USER,
         ttl=_META_TTL,
     ),
-    # MetadataConfig(table_name="soh", route_name="soh", auth_groups=_USER, ttl=_META_TTL),
+    MetadataConfig(table_name="soh_fleet", route_name="soh", auth_groups=_USER, ttl=_META_TTL),
     MetadataConfig(
         table_name="testrig_activity",
         route_name="testrig_activity",

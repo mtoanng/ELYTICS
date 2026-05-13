@@ -46,3 +46,11 @@ def test_metadata_cache_hit(client, monkeypatch):
     response = client.get("/api/sherlock/metadata/polcurve")
     assert response.status_code == 200
     assert response.json()["data"] == cached_data
+
+
+def test_soh_metadata_route(client, monkeypatch):
+    fake_data = [{"sample_name": "sample_01", "ccm_type": "A"}]
+    monkeypatch.setattr(metadata_router, "execute_sql_query", lambda q: fake_data)
+    response = client.get("/api/sherlock/metadata/soh")
+    assert response.status_code == 200
+    assert response.json()["data"] == fake_data

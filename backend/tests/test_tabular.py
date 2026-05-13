@@ -39,3 +39,27 @@ def test_tabular_route_invalid_sort_dir(client, monkeypatch):
     monkeypatch.setattr(tabular_router, "get_query_result", lambda **_: [])
     response = client.get("/api/sherlock/tabular/order", params={"sort_dir": "sideways"})
     assert response.status_code == 400
+
+
+def test_soh_stack_requires_sample_name(client):
+    response = client.get("/api/sherlock/tabular/soh_stack")
+    assert response.status_code == 400
+    assert "sample_name" in response.json()["detail"]
+
+
+def test_soh_fleet_route_available(client, monkeypatch):
+    monkeypatch.setattr(tabular_router, "get_query_result", lambda **_: [{"sample_name": "A"}])
+    response = client.get("/api/sherlock/tabular/soh_fleet")
+    assert response.status_code == 200
+    assert response.json() == {"data": [{"sample_name": "A"}]}
+
+
+def test_soh_stack_passes_sample_filter(client, monkeypatch):
+    def fake_get_query_result(**kwargs):
+        assert kwargs["filters"]["sample_name"] == ["sample_001"]
+        return [{"sample_name": "sample_001"}]
+
+    monkeypatch.setattr(tabular_router, "get_query_result", fake_get_query_result)
+    response = client.get("/api/sherlock/tabular/soh_stack", params={"sample_name": "sample_001"})
+    assert response.status_code == 200
+    assert response.json() == {"data": [{"sample_name": "sample_001"}]}

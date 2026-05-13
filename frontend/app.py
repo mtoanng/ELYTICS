@@ -15,6 +15,7 @@ load_dotenv()
 
 pio.templates["plotly_dark"].layout.paper_bgcolor = "rgba(0,0,0,0)"
 pio.templates["plotly_dark"].layout.plot_bgcolor = "#1f1f1f"
+pio.templates["plotly"].layout.paper_bgcolor = "rgba(0,0,0,0)"
 
 app = dash.Dash(
     __name__,

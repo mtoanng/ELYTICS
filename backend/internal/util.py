@@ -1,11 +1,13 @@
 import hashlib
 import json
 import logging
+import math
 import os
 import re
 import threading
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, time as dtime, timedelta, timezone
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -252,6 +254,63 @@ def _should_reconnect(exc: Exception) -> bool:
     return any(marker in message for marker in reconnect_markers)
 
 
+def _normalize_json_value(value: Any) -> Any:
+    """Recursively normalize query values into JSON-serializable primitives."""
+    if value is None or isinstance(value, str):
+        return value
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
+    if isinstance(value, Decimal):
+        as_float = float(value)
+        return as_float if math.isfinite(as_float) else None
+    if isinstance(value, (datetime, date, dtime)):
+        return value.isoformat()
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+
+    # Numpy scalar types (e.g., np.float64) expose item().
+    item_method = getattr(value, "item", None)
+    if callable(item_method):
+        try:
+            return _normalize_json_value(item_method())
+        except Exception:
+            pass
+
+    if isinstance(value, dict):
+        return {str(k): _normalize_json_value(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_normalize_json_value(v) for v in value]
+
+    as_dict = getattr(value, "asDict", None)
+    if callable(as_dict):
+        try:
+            mapped = as_dict(recursive=False)
+        except TypeError:
+            mapped = as_dict()
+        return {str(k): _normalize_json_value(v) for k, v in mapped.items()}
+
+    as_dict = getattr(value, "_asdict", None)
+    if callable(as_dict):
+        mapped = as_dict()
+        return {str(k): _normalize_json_value(v) for k, v in mapped.items()}
+
+    if hasattr(value, "__dict__"):
+        return {
+            str(k): _normalize_json_value(v)
+            for k, v in vars(value).items()
+            if not k.startswith("_")
+        }
+
+    try:
+        return [_normalize_json_value(v) for v in value]
+    except TypeError:
+        return str(value)
+
+
 def execute_sql_query(query: str) -> list[dict[str, Any]]:
     connection = _get_or_create_connection()
     for attempt in range(2):
@@ -259,7 +318,15 @@ def execute_sql_query(query: str) -> list[dict[str, Any]]:
             with connection.cursor() as cursor:
                 cursor.execute(query)
                 columns = [desc[0] for desc in cursor.description]
-                return [dict(zip(columns, row)) for row in cursor.fetchall()]
+                result: list[dict[str, Any]] = []
+                for row in cursor.fetchall():
+                    raw_row = dict(zip(columns, row))
+                    normalized_row = {
+                        col: _normalize_json_value(raw_row.get(col))
+                        for col in columns
+                    }
+                    result.append(normalized_row)
+                return result
         except Exception as exc:
             if attempt == 0 and _should_reconnect(exc):
                 logger.warning(
