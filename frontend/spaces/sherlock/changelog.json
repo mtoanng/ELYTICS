@@ -139,6 +139,11 @@
       "pr": 860,
       "title": "feat(sherlock): Added min-max normalized plot to timeseries page",
       "date": "2026-05-12"
+    },
+    {
+      "pr": 871,
+      "title": "fix(sherlock): Fixed timeseries resampling functionality",
+      "date": "2026-05-13"
     }
   ],
   "releases": {}
