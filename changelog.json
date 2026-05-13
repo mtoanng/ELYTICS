@@ -184,6 +184,11 @@
       "pr": 877,
       "title": "feat(sherlock): Simplified timeseries page",
       "date": "2026-05-13"
+    },
+    {
+      "pr": 866,
+      "title": "feat(sherlock): Migrate State-of-Health page to Holmes",
+      "date": "2026-05-13"
     }
   ],
   "releases": {}
