@@ -6,15 +6,8 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objs as go
 import plotly.express as px
-import plotly.io as pio
 from plotly.subplots import make_subplots
 import dash
-
-# Register a custom dark template that matches the accordion body background (#2c3035)
-_sherlock_dropdown_dark = pio.templates["plotly_dark"].to_plotly_json()
-_sherlock_dropdown_dark["layout"]["paper_bgcolor"] = "#2c3035"
-_sherlock_dropdown_dark["layout"]["plot_bgcolor"] = "#2c3035"
-pio.templates["sherlock_dropdown_dark"] = go.layout.Template(_sherlock_dropdown_dark)
 
 CELL_COLORS = [
     "#3498db", "#e74c3c", "#07b750", "#2807e3", "#b106cf",
@@ -28,7 +21,7 @@ def get_plotly_template(theme_data):
     """
     Return the Plotly template string for the given theme.
     """
-    return "sherlock_dropdown_dark" if theme_data == "dark" else "plotly_white"
+    return "plotly_dark" if theme_data == "dark" else "plotly"
 
 def adjust_color_brightness(hex_color, factor):
     """

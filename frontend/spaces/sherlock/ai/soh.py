@@ -64,11 +64,16 @@ def _filter_stack_dataframe(
     return filtered
 
 
-def _section_panel(title: str, children: list) -> dmc.AccordionItem:
+def _section_panel(title: str, children: list, icon_number: int | None = None) -> dmc.AccordionItem:
+    icon = None
+    if icon_number is not None:
+        icon = DashIconify(icon=f"mdi:numeric-{icon_number}-circle", width=20)
+    
     return dmc.AccordionItem(
         value=title,
+        variant="separated",
         children=[
-            dmc.AccordionControl(title),
+            dmc.AccordionControl(title, icon=icon),
             dmc.AccordionPanel(
                 dmc.Box(
                     p="md",
@@ -136,119 +141,115 @@ layout = dmc.Container(
                         "overflow": "visible",
                     },
                     children=[
-                        dmc.Stack(
+                        dmc.Group(
                             gap="md",
+                            align="flex-end",
+                            wrap="wrap",
+                            children=[
+                                dmc.InputWrapper(
+                                    dcc.Dropdown(
+                                        id="soh-sample-name-filter",
+                                        placeholder="Sample Name",
+                                        clearable=True,
+                                        style={"width": "100%"},
+                                    ),
+                                    label="Sample Name",
+                                    htmlFor="soh-sample-name-filter",
+                                    className="dmc",
+                                    styles={"label": {"marginBottom": "6px"}},
+                                    style={"flex": "2 1 320px", "minWidth": "260px"},
+                                ),
+                                dmc.InputWrapper(
+                                    dcc.Dropdown(
+                                        id="soh-number-of-cells-filter",
+                                        placeholder="Number of Cells",
+                                        clearable=True,
+                                        style={"width": "100%"},
+                                    ),
+                                    label="Number of Cells",
+                                    htmlFor="soh-number-of-cells-filter",
+                                    className="dmc",
+                                    styles={"label": {"marginBottom": "6px"}},
+                                    style={"flex": "1 1 180px", "minWidth": "180px"},
+                                ),
+                                dmc.InputWrapper(
+                                    dcc.Dropdown(
+                                        id="soh-ccm-type-filter",
+                                        placeholder="CCM Type",
+                                        clearable=True,
+                                        style={"width": "100%"},
+                                    ),
+                                    label="CCM Type",
+                                    htmlFor="soh-ccm-type-filter",
+                                    className="dmc",
+                                    styles={"label": {"marginBottom": "6px"}},
+                                    style={"flex": "1 1 220px", "minWidth": "200px"},
+                                ),
+                            ],
+                        ),
+                        dmc.Space(h="sm"),
+                        dmc.Divider(size="xs"),
+                        dmc.Space(h="sm"),
+                        dmc.Group(
+                            gap="md",
+                            align="flex-end",
+                            justify="space-between",
+                            wrap="wrap",
                             children=[
                                 dmc.Group(
                                     gap="md",
                                     align="flex-end",
-                                    style={"flexWrap": "wrap"},
-                                    children=[
-                                        dmc.InputWrapper(
-                                            dcc.Dropdown(
-                                                id="soh-sample-name-filter",
-                                                placeholder="Sample Name",
-                                                clearable=True,
-                                                style={"width": "100%"},
-                                            ),
-                                            label="Sample Name",
-                                            htmlFor="soh-sample-name-filter",
-                                            className="dmc",
-                                            styles={"label": {"marginBottom": "6px"}},
-                                            style={"flex": "2 1 320px", "minWidth": "260px"},
-                                        ),
-                                        dmc.InputWrapper(
-                                            dcc.Dropdown(
-                                                id="soh-number-of-cells-filter",
-                                                placeholder="Number of Cells",
-                                                clearable=True,
-                                                style={"width": "100%"},
-                                            ),
-                                            label="Number of Cells",
-                                            htmlFor="soh-number-of-cells-filter",
-                                            className="dmc",
-                                            styles={"label": {"marginBottom": "6px"}},
-                                            style={"flex": "1 1 180px", "minWidth": "180px"},
-                                        ),
-                                        dmc.InputWrapper(
-                                            dcc.Dropdown(
-                                                id="soh-ccm-type-filter",
-                                                placeholder="CCM Type",
-                                                clearable=True,
-                                                style={"width": "100%"},
-                                            ),
-                                            label="CCM Type",
-                                            htmlFor="soh-ccm-type-filter",
-                                            className="dmc",
-                                            styles={"label": {"marginBottom": "6px"}},
-                                            style={"flex": "1 1 220px", "minWidth": "200px"},
-                                        ),
-                                    ],
-                                ),
-                                dmc.Divider(size="xs", my="sm"),
-                                dmc.Group(
-                                    gap="md",
-                                    align="flex-end",
-                                    justify="space-between",
-                                    style={"flexWrap": "wrap"},
+                                    wrap="wrap",
                                     children=[
                                         dmc.Group(
-                                            gap="md",
-                                            align="flex-end",
-                                            style={"flexWrap": "wrap"},
+                                            gap="xs",
+                                            align="center",
+                                            style={"width": "fit-content"},
                                             children=[
-                                                dmc.Group(
-                                                    gap="xs",
-                                                    align="center",
+                                                dmc.Text("X-axis", fw=500, size="sm"),
+                                                dmc.SegmentedControl(
+                                                    id="soh-xaxis-filter",
+                                                    data=soh_layout_service.X_AXIS_OPTIONS,
+                                                    value="runtime_hours",
                                                     style={"width": "fit-content"},
-                                                    children=[
-                                                        dmc.Text("X-axis", fw=500, size="sm"),
-                                                        dmc.SegmentedControl(
-                                                            id="soh-xaxis-filter",
-                                                            data=soh_layout_service.X_AXIS_OPTIONS,
-                                                            value="runtime_hours",
-                                                            style={"width": "fit-content"},
-                                                        ),
-                                                    ],
-                                                ),
-                                                dmc.Group(
-                                                    gap="xs",
-                                                    align="center",
-                                                    style={"width": "fit-content"},
-                                                    children=[
-                                                        dmc.Text("Direction", fw=500, size="sm"),
-                                                        dmc.SegmentedControl(
-                                                            id="soh-is-rising-filter",
-                                                            data=soh_layout_service.IS_RISING_OPTIONS,
-                                                            value="all",
-                                                            style={"width": "fit-content"},
-                                                        ),
-                                                    ],
                                                 ),
                                             ],
                                         ),
-                                        dmc.Button(
-                                            [
-                                                html.I(
-                                                    className="bi bi-download",
-                                                    style={"marginRight": "10px", "fontSize": "1.1em"},
+                                        dmc.Group(
+                                            gap="xs",
+                                            align="center",
+                                            style={"width": "fit-content"},
+                                            children=[
+                                                dmc.Text("Direction", fw=500, size="sm"),
+                                                dmc.SegmentedControl(
+                                                    id="soh-is-rising-filter",
+                                                    data=soh_layout_service.IS_RISING_OPTIONS,
+                                                    value="all",
+                                                    style={"width": "fit-content"},
                                                 ),
-                                                "Download CSV",
                                             ],
-                                            id="soh-download-btn",
-                                            n_clicks=0,
-                                            className="download-btn",
-                                            style={
-                                                "flex": "0 0 auto",
-                                                "whiteSpace": "nowrap",
-                                                "marginLeft": "auto",
-                                            },
                                         ),
                                     ],
                                 ),
+                                dmc.Button(
+                                    [
+                                        html.I(
+                                            className="bi bi-download",
+                                            style={"marginRight": "10px", "fontSize": "1.1em"},
+                                        ),
+                                        "Download CSV",
+                                    ],
+                                    id="soh-download-btn",
+                                    n_clicks=0,
+                                    className="download-btn",
+                                    style={
+                                        "flex": "0 0 auto",
+                                        "whiteSpace": "nowrap",
+                                    },
+                                ),
+                                dcc.Download(id="soh-download-csv"),
                             ],
                         ),
-                        dcc.Download(id="soh-download-csv"),
                         dmc.Space(h="sm"),
                         dmc.Text(
                             id="soh-empty-message",
@@ -268,14 +269,15 @@ layout = dmc.Container(
                             fw=500,
                             style={"textAlign": "center"},
                         ),
-                        dmc.Divider(size="xs", my="sm"),
                         dmc.Accordion(
                             id="soh-accordion",
                             multiple=True,
-                            value=["① FLEET INFO: STACK SOH (AS OVERPOTENTIAL)"],
+                            variant="contained",
+                            radius="md",
+                            value=["Fleet Info: Stack SOH (as Overpotential)"],
                             children=[
                                 _section_panel(
-                                    "① FLEET INFO: STACK SOH (AS OVERPOTENTIAL)",
+                                    "Fleet Info: Stack SOH (as Overpotential)",
                                     [
                                         dmc.Box(
                                             style={
@@ -289,9 +291,10 @@ layout = dmc.Container(
                                             ],
                                         )
                                     ],
+                                    icon_number=1,
                                 ),
                                 _section_panel(
-                                    "② STACK SOH & LOAD CYCLES",
+                                    "Stack SOH & Load Cycles",
                                     [
                                         dmc.Text(
                                             id="soh-decomp-message",
@@ -341,9 +344,10 @@ layout = dmc.Container(
                                             ],
                                         ),
                                     ],
+                                    icon_number=2,
                                 ),
                                 _section_panel(
-                                    "③ CELL-BASED SOH (AS OVERPOTENTIAL)",
+                                    "Cell-based SOH (as Overpotential)",
                                     [
                                         dmc.Text(
                                             id="soh-cells-message",
@@ -368,9 +372,10 @@ layout = dmc.Container(
                                             ],
                                         ),
                                     ],
+                                    icon_number=3,
                                 ),
                                 _section_panel(
-                                    "④ STACK SOH VALUES (ORIG: SOH_KIN vs SOH_LIN)",
+                                    "Stack SOH Values (Orig: SOH_KIN vs SOH_LIN)",
                                     [
                                         dmc.Box(
                                             id="soh-color-by-container",
@@ -404,6 +409,7 @@ layout = dmc.Container(
                                             ],
                                         ),
                                     ],
+                                    icon_number=4,
                                 ),
                             ],
                         ),
