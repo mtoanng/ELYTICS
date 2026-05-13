@@ -54,18 +54,24 @@ class PolcurveData:
         self.aact = 0.135
         self.memH = 80
 
-        # Override with meta if available
+        # Override with meta if available; fall back to defaults for missing/zero/NaN values
         if df_meta is not None:
             try:
-                self.nrcells = int(df_meta['number_of_cells'].iloc[0])
+                val = int(df_meta['number_of_cells'].iloc[0])
+                if val and not pd.isna(val):
+                    self.nrcells = val
             except Exception:
                 pass
             try:
-                self.aact = float(df_meta['active_area_per_cell'].iloc[0])
+                val = float(df_meta['active_area_per_cell'].iloc[0])
+                if val and not pd.isna(val):
+                    self.aact = val
             except Exception:
                 pass
             try:
-                self.memH = float(df_meta['ccm_thickness'].iloc[0])
+                val = float(df_meta['ccm_thickness'].iloc[0])
+                if val and not pd.isna(val):
+                    self.memH = val
             except Exception:
                 pass
 
@@ -74,16 +80,20 @@ class PolcurveData:
         if 'event_short_id' not in df.columns and 'event_id' in df.columns and 'order_id' in df.columns:
             df = df.copy()
             df['event_short_id'] = df.apply(lambda row: f"{row['order_id']}_{str(row['event_id']).split('_')[-1]}", axis=1)
+        def _col(series):
+            """Coerce to float numpy array, converting None/mixed types to NaN."""
+            return pd.to_numeric(series, errors='coerce').to_numpy(dtype=float)
+
         self.data = {
-            'jStck': df['jStck'].to_numpy(),        # [A/cm^2]
-            'uCell': df['uCell'].to_numpy(),        # [V]
-            'tAndeIn': df['tAndeIn'].to_numpy(),    # [oC]
-            'tAndeOut': df['tAndeOut'].to_numpy(),  # [oC]
-            'pAndeIn': df['pAndeIn'].to_numpy(),    # [barg]
-            'pAndeOut': df['pAndeOut'].to_numpy(),  # [barg]
-            'pCtdeIn': df['pCtdeIn'].to_numpy(),    # [barg]
-            'pCtdeOut': df['pCtdeOut'].to_numpy(),  # [barg]
-            'vfAndeIn': df['vfAndeIn'].to_numpy(),  # [l/min]
+            'jStck': _col(df['jStck']),        # [A/cm^2]
+            'uCell': _col(df['uCell']),        # [V]
+            'tAndeIn': _col(df['tAndeIn']),    # [oC]
+            'tAndeOut': _col(df['tAndeOut']),  # [oC]
+            'pAndeIn': _col(df['pAndeIn']),    # [barg]
+            'pAndeOut': _col(df['pAndeOut']),  # [barg]
+            'pCtdeIn': _col(df['pCtdeIn']),    # [barg]
+            'pCtdeOut': _col(df['pCtdeOut']),  # [barg]
+            'vfAndeIn': _col(df['vfAndeIn']),  # [l/min]
             'event_short_id': df['event_short_id'].iloc[0] if 'event_short_id' in df.columns and len(df) > 0 else 'event_1'
         }
 
@@ -110,6 +120,39 @@ def polcurve_input_from_data(df, df_meta=None):
     testQW = testdata['vfAndeIn']        # [l/min]
     event = testdata['event_short_id']
 
+    # ── Column validation ────────────────────────────────────────────────────
+    # Critical: model cannot run at all without these
+    _critical = {'jStck': testj, 'uCell': testV, 'tAndeIn': testTWin}
+    # Degraded: only the DTW (temperature rise) plot is affected
+    _dtw_only = {'tAndeOut': testTWout, 'vfAndeIn': testQW}
+    # Informational: pressure columns with NaN fall back to 1 bar (handled below)
+    _pressure = {
+        'pAndeIn': testpWanin, 'pAndeOut': testpWanout,
+        'pCtdeIn': testpWcain, 'pCtdeOut': testpWcaout,
+    }
+
+    _critical_nan = [c for c, a in _critical.items() if np.any(np.isnan(a))]
+    _dtw_nan = [c for c, a in _dtw_only.items() if np.any(np.isnan(a))]
+    _pressure_nan = [c for c, a in _pressure.items() if np.any(np.isnan(a))]
+
+    if _critical_nan:
+        parts = [
+            f"Cannot run model: missing/NaN values in critical column(s): {', '.join(_critical_nan)}."
+        ]
+        if _dtw_nan:
+            parts.append(f"Also missing in DTW column(s): {', '.join(_dtw_nan)}.")
+        if _pressure_nan:
+            parts.append(f"Pressure column(s) with NaN will use default 1 bar: {', '.join(_pressure_nan)}.")
+        raise ValueError(" ".join(parts))
+
+    warnings = []
+    if _dtw_nan:
+        warnings.append(f"DTW column(s) with NaN (temperature rise plot will be unavailable): {', '.join(_dtw_nan)}")
+    if _pressure_nan:
+        warnings.append(f"Pressure column(s) with NaN (falling back to 1 bar): {', '.join(_pressure_nan)}")
+    # Warnings are stored on inp so the caller can surface them in the UI
+    _validation_warnings = "; ".join(warnings) if warnings else None
+
     inp = {}
     arraysz = testj.shape[0]
     inp['memH'] = memH * 1e-6              # [m], membrane thickness
@@ -132,6 +175,8 @@ def polcurve_input_from_data(df, df_meta=None):
     inp['event'] = event             # For plot title
     inp['testV'] = testV             # Tested voltage
     inp['testDTW'] = testTWout - testTWin # Tested temperature rise
+    if _validation_warnings:
+        inp['warnings'] = _validation_warnings
     return inp
 
 # --- Parameter Array Utilities ---
@@ -199,12 +244,14 @@ def func_vlite13(inp, par, phys, NT):
                         np.arcsinh(modelj_arr / (2 * out['j0']))
         out['V'] = out['Erev'] + out['etaICR'] + out['etamem'] + out['etaact']
 
-        # Water temperature increase
-        out['DTW'] = (out['V'] - phys.Vth) * modelAact_arr * modelj_arr / \
-                     (phys.rhoW * phys.cW * modelQW_arr)
+    # Water temperature increase — NaN-safe: if modelQW is NaN (vfAndeIn missing),
+    # DTW is set to 0 so temperature feedback does not corrupt V
+    raw_dtw = (out['V'] - phys.Vth) * modelAact_arr * modelj_arr / \
+          (phys.rhoW * phys.cW * modelQW_arr)
+    out['DTW'] = np.where(np.isnan(raw_dtw), 0.0, raw_dtw)
 
-        # Update T
-        out['modelTcell'] = inp['modelTW'] + out['DTW'] / 2
+    # Update T
+    out['modelTcell'] = inp['modelTW'] + out['DTW'] / 2
 
     return out
 
@@ -283,8 +330,16 @@ def run_model(df, df_meta=None):
         # LSQerrmax       = 1000*max(abs(outsol.V - inp.testV));
 
         # Convert numpy arrays to lists for Dash serialization
-        inp_serial = {k: (v.tolist() if isinstance(v, np.ndarray) else v) for k, v in inp.items()}
-        out_serial = {k: (v.tolist() if isinstance(v, np.ndarray) else v) for k, v in outsol.items()}
+        # Replace float NaN with None so dcc.Store JSON encoding does not fail
+        def _serialize(v):
+            if isinstance(v, np.ndarray):
+                return [None if (isinstance(x, float) and np.isnan(x)) else x for x in v.tolist()]
+            if isinstance(v, float) and np.isnan(v):
+                return None
+            return v
+
+        inp_serial = {k: _serialize(v) for k, v in inp.items()}
+        out_serial = {k: _serialize(v) for k, v in outsol.items()}
 
         # Include parsol items in out_serial
         for k, v in vars(parsol).items():

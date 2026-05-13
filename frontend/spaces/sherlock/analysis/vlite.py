@@ -18,7 +18,7 @@ import plotly.graph_objects as go
 from dash_iconify import DashIconify
 
 from services.backend_service import get_metadata, get_tabular
-from services.vlite_service import run_model as vlite_run_model
+from services.vlite_service import FitFix, run_model as vlite_run_model
 
 register_page(
     __name__, path="/sherlock/data-analysis/vlite", title="HOLMES - Sherlock - V-Lite"
@@ -28,9 +28,9 @@ register_page(
 
 USAGE_BLOCKQUOTE_TEXT = [
     "Select an Order ID to load polarisation curve data for that order.",
-    "Choose one or more events from the Event ID(s) dropdown, then click 'Run Model' to fit the V-lite model.",
-    "After the model runs, select an event in the Results section to see the loss stackup and DTW plots.",
-    "Download the polcurve data as CSV using the Download CSV button.",
+    "Select one or more events from the Event ID(s) dropdown, then click 'Run Model' to fit the V-lite model.",
+    "After the model runs, select an event in the Results section to see the loss stackup and temperature increase plots.",
+    "Download the polcurve data and model results as CSV using the Download CSV button.",
 ]
 
 PARAM_KEYS = [
@@ -47,15 +47,18 @@ PARAM_DISPLAY_NAMES = {
 # FitFix params (ICRress, CCMj00, CCMnval have fitfix=1 in vlite_service.FitFix)
 PARAM_FITTED = {"CCMj00", "CCMnval", "ICRress"}
 
+# Metadata columns required by the model — highlighted red when missing/zero/NaN
+METADATA_CRITICAL_COLUMNS = {"number_of_cells", "active_area_per_cell", "ccm_thickness"}
+
 METADATA_DISPLAY_COLUMNS = [
     "order_id", "name", "testrig_id", "number_of_cells",
     "active_area_per_cell", "ccm_thickness", "ccm_name",
 ]
 
 METADATA_COLUMN_WIDTHS = {
-    "order_id": 120, "name": 150, "testrig_id": 110,
-    "number_of_cells": 100, "active_area_per_cell": 160,
-    "ccm_thickness": 120, "ccm_name": 140,
+    "order_id": 130, "name": 170, "testrig_id": 120,
+    "number_of_cells": 120, "active_area_per_cell": 210,
+    "ccm_thickness": 130, "ccm_name": 170,
 }
 
 METADATA_COLUMN_LABELS = {
@@ -99,12 +102,30 @@ def _fmt_param(val) -> str:
     return str(val)
 
 
+_CELL_STYLE_INVALID = (
+    "params.value == null || params.value === 0 || params.value === '' || "
+    "(typeof params.value === 'number' && isNaN(params.value)) "
+    "? {'color': 'var(--mantine-color-red-6)', 'fontWeight': '700'} : {}"
+)
+
+
 def _metadata_column_def(col: str) -> dict:
-    return {
+    col_def = {
         "headerName": METADATA_COLUMN_LABELS.get(col, col),
         "field": col,
         "width": METADATA_COLUMN_WIDTHS.get(col, 120),
+        "wrapHeaderText": True,
+        "autoHeaderHeight": True,
+        "sortable": False,
+        "filter": False,
     }
+    if col == "active_area_per_cell":
+        col_def["valueFormatter"] = {
+            "function": "params.value == null ? '' : Number(params.value).toFixed(3)"
+        }
+    if col in METADATA_CRITICAL_COLUMNS:
+        col_def["cellStyle"] = {"function": _CELL_STYLE_INVALID}
+    return col_def
 
 
 # ── Layout ─────────────────────────────────────────────────────────────────────
@@ -113,9 +134,16 @@ def vlite_layout():
     return dmc.Container(
         size="xl",
         py="md",
+        style={
+            "height": "calc(100dvh - var(--app-shell-header-offset, 0rem))",
+            "display": "flex",
+            "flexDirection": "column",
+            "minHeight": 0,
+        },
         children=[
             dmc.Stack(
                 gap="md",
+                style={"flex": "1 1 0", "minHeight": 0},
                 children=[
                     # ── Title section ───────────────────────────────────────────
                     dmc.Stack(
@@ -169,12 +197,20 @@ def vlite_layout():
                         ],
                     ),
 
-                    # ── Filter section ──────────────────────────────────────────
+                    # ── Single main container with all content ──────────────────
                     dmc.Paper(
                         withBorder=True,
                         p="md",
                         radius="md",
+                        style={
+                            "flex": "1 1 0",
+                            "minHeight": 0,
+                            "display": "flex",
+                            "flexDirection": "column",
+                            "overflow": "hidden",
+                        },
                         children=[
+                            # ── Filter section ──────────────────────────────────
                             dmc.Group(
                                 gap="md",
                                 align="flex-end",
@@ -189,6 +225,7 @@ def vlite_layout():
                                             id="vlite-order-id-filter",
                                             multi=False,
                                             placeholder="Order ID",
+                                            className="dmc",
                                             style={"width": "100%"},
                                         ),
                                         label="Order ID",
@@ -202,6 +239,7 @@ def vlite_layout():
                                             id="vlite-event-id-filter",
                                             multi=True,
                                             placeholder="Event(s)",
+                                            className="dmc",
                                             style={"width": "100%"},
                                         ),
                                         label="Event ID(s)",
@@ -220,131 +258,134 @@ def vlite_layout():
                                         [
                                             html.I(
                                                 className="bi bi-download",
-                                                style={"marginRight": "8px", "fontSize": "1.1em"},
+                                                style={"marginRight": "10px", "fontSize": "1.1em"},
                                             ),
                                             "Download CSV",
                                         ],
                                         id="vlite-download-btn",
                                         n_clicks=0,
-                                        variant="outline",
+                                        className="download-btn",
                                         disabled=True,
                                         style={"flex": "0 0 auto", "whiteSpace": "nowrap"},
                                     ),
-                                    dcc.Download(id="vlite-download-csv"),
                                 ],
                             ),
+                            dcc.Download(id="vlite-download-csv"),
                             dmc.Space(h="sm"),
-                            dmc.Text(id="vlite-model-status", c="dimmed", size="sm"),
-                        ],
-                    ),
+                            
+                            dmc.Divider(size="xs", my="sm"),
 
-                    # ── Content cards ───────────────────────────────────────────
-                    dmc.SimpleGrid(
-                        cols=1,
-                        spacing="md",
-                        verticalSpacing="md",
-                        children=[
-                            # Card 1: Polcurve + model fit plot + order metadata
-                            dmc.Paper(
-                                withBorder=True,
-                                p="md",
-                                radius="md",
+                            # ── Content sections ────────────────────────────────
+                            dmc.Box(
+                                style={
+                                    "display": "flex",
+                                    "flexDirection": "column",
+                                    "flex": "1 1 0",
+                                    "minHeight": 0,
+                                    "gap": "16px",
+                                    "overflow": "auto",
+                                },
                                 children=[
-                                    dmc.Text("Polcurve + Model Fit", fw=600, mb="xs"),
-                                    dcc.Graph(
-                                        id="vlite-polcurve-plot",
-                                        style={"height": 420},
-                                    ),
-                                    dmc.Text("Order Metadata", fw=600, size="sm"),
-                                    dag.AgGrid(
-                                        id="vlite-metadata-table",
-                                        columnDefs=[],
-                                        rowData=[],
-                                        defaultColDef={
-                                            "resizable": True,
-                                            "sortable": True,
-                                            "filter": True,
-                                            "minWidth": 40,
-                                        },
-                                        dashGridOptions={
-                                            "pagination": False,
-                                            "domLayout": "normal",
-                                            "rowHeight": 32,
-                                            "headerHeight": 32,
-                                        },
-                                        style={"height": "64px", "width": "100%"},
-                                    ),
-                                ],
-                            ),
-
-                            # Card 2: Model result plots (event selector + stackup + DTW)
-                            dmc.Paper(
-                                withBorder=True,
-                                p="md",
-                                radius="md",
-                                children=[
-                                    dmc.Text("Polcurve Model Results Plots", fw=600, mb="xs"),
-                                    dcc.Dropdown(
-                                        id="vlite-stackup-event-dropdown",
-                                        multi=False,
-                                        placeholder="Select event for detailed plots",
-                                        style={"width": "100%"},
-                                    ),
-                                    dmc.Space(h="sm"),
-                                    dmc.SimpleGrid(
-                                        cols=2,
-                                        spacing="md",
+                                    # Section 1: Polcurve + Model Fit + Metadata
+                                    dmc.Stack(
+                                        gap="sm",
                                         children=[
-                                            dmc.Paper(
-                                                withBorder=True,
-                                                p="md",
-                                                radius="md",
-                                                children=[
-                                                    dmc.Text("Loss Stackup", fw=600, mb="xs"),
-                                                    dcc.Graph(
-                                                        id="vlite-stackup-plot",
-                                                        style={"height": 395},
-                                                    ),
-                                                ],
+                                            dmc.Text("Polcurve + Model Fit", fw=600, size="sm"),
+                                            dmc.Text(id="vlite-model-status", c="dimmed", size="sm"),
+                                            dcc.Graph(
+                                                id="vlite-polcurve-plot",
+                                                style={"height": 420},
                                             ),
-                                            dmc.Paper(
-                                                withBorder=True,
-                                                p="md",
-                                                radius="md",
+                                            dmc.Divider(size="xs", my="sm"),
+                                            dmc.Text("Order Metadata", fw=600, size="sm"),
+                                            dag.AgGrid(
+                                                id="vlite-metadata-table",
+                                                columnDefs=[],
+                                                rowData=[],
+                                                defaultColDef={
+                                                    "resizable": True,
+                                                    "sortable": True,
+                                                    "filter": True,
+                                                    "minWidth": 40,
+                                                    "wrapHeaderText": True,
+                                                    "autoHeaderHeight": True,
+                                                },
+                                                dashGridOptions={
+                                                    "pagination": False,
+                                                    "domLayout": "normal",
+                                                    "rowHeight": 40,
+                                                    "headerHeight": 44,
+                                                },
+                                                style={"height": "100px", "width": "100%"},
+                                            ),
+                                        ],
+                                    ),
+
+                                    dmc.Divider(size="xs"),
+
+                                    # Section 2: Model Results Plots
+                                    dmc.Stack(
+                                        gap="sm",
+                                        children=[
+                                            dmc.Text("Polcurve Model Results Plots", fw=600, size="sm"),
+                                            dcc.Dropdown(
+                                                id="vlite-stackup-event-dropdown",
+                                                multi=False,
+                                                placeholder="Select event for detailed plots",
+                                                className="dmc",
+                                                style={"width": "100%"},
+                                            ),
+                                            dmc.SimpleGrid(
+                                                cols=2,
+                                                spacing="md",
                                                 children=[
-                                                    dmc.Text("DTW", fw=600, mb="xs"),
-                                                    dcc.Graph(
-                                                        id="vlite-dtw-plot",
-                                                        style={"height": 395},
+                                                    dmc.Stack(
+                                                        gap="sm",
+                                                        children=[
+                                                            dmc.Text("Loss Stackup", fw=600, size="xs"),
+                                                            dcc.Graph(
+                                                                id="vlite-stackup-plot",
+                                                                style={"height": 395},
+                                                            ),
+                                                        ],
+                                                    ),
+                                                    dmc.Stack(
+                                                        gap="sm",
+                                                        children=[
+                                                            dmc.Text("Water temperature increase", fw=600, size="xs"),
+                                                            dcc.Graph(
+                                                                id="vlite-dtw-plot",
+                                                                style={"height": 395},
+                                                            ),
+                                                        ],
                                                     ),
                                                 ],
                                             ),
                                         ],
                                     ),
+
+                                    dmc.Divider(size="xs"),
+
+                                    # Section 3: Model Parameters
+                                    dmc.Stack(
+                                        gap="sm",
+                                        children=[
+                                            dmc.Text("Model Parameters", fw=600, size="sm"),
+                                            html.Div(id="vlite-parameter-table"),
+                                        ],
+                                    ),
                                 ],
                             ),
 
-                            # Card 3: Model parameters table
-                            dmc.Paper(
-                                withBorder=True,
-                                p="md",
-                                radius="md",
-                                style={"minHeight": "120px"},
-                                children=[
-                                    dmc.Text("Model Parameters", fw=600, mb="xs"),
-                                    html.Div(id="vlite-parameter-table"),
-                                ],
-                            ),
+                            # ── Stores ──────────────────────────────────────────
+                            dcc.Store(id="vlite-metadata-store"),
+                            dcc.Store(id="vlite-data-store"),
+                            dcc.Store(id="vlite-model-store"),
+                            dcc.Store(id="vlite-usage-open", data=False),
+                            dcc.Store(id="vlite-theme-store"),
+                            html.Div(id="vlite-theme-dummy", style={"display": "none"}),
                         ],
                     ),
-
-                    # ── Stores ──────────────────────────────────────────────────
-                    dcc.Store(id="vlite-metadata-store"),
-                    dcc.Store(id="vlite-data-store"),
-                    dcc.Store(id="vlite-model-store"),
-                    dcc.Store(id="vlite-usage-open", data=False),
-                    dcc.Store(id="vlite-theme-store"),
-                    html.Div(id="vlite-theme-dummy", style={"display": "none"}),
                 ],
             )
         ],
@@ -481,7 +522,7 @@ def update_metadata_table(metadata, order_id):
     prevent_initial_call=True,
 )
 def run_vlite_model(n_clicks, data, selected_events, metadata):
-    """Run V-lite model for each selected event; store results keyed by event_short_id."""
+    """Run one V-lite fit across all selected events and split outputs per event for plotting."""
     if not data:
         return no_update, "No polcurve data loaded. Please select an Order ID first."
     if not selected_events:
@@ -489,35 +530,49 @@ def run_vlite_model(n_clicks, data, selected_events, metadata):
 
     df_all = _add_event_short_id(pd.DataFrame(data))
     df_meta = pd.DataFrame(metadata) if metadata else None
+    df_fit = df_all[df_all["event_id"].isin(selected_events)].copy().reset_index(drop=True)
+    if df_fit.empty:
+        return no_update, "No rows found for selected event(s)."
 
+    df_meta_event = None
+    if df_meta is not None and "order_id" in df_meta.columns and "order_id" in df_fit.columns:
+        order_id = df_fit["order_id"].iloc[0]
+        df_meta_event = df_meta[df_meta["order_id"] == order_id].head(1).reset_index(drop=True)
+
+    try:
+        inp_serial, out_serial = vlite_run_model(df_fit, df_meta_event)
+    except Exception as exc:
+        return None, f"Model fit failed: {exc}"
+
+    n_rows = len(df_fit)
     model_store: dict = {}
-    errors: list[str] = []
 
-    for event_id in selected_events:
-        df_event = df_all[df_all["event_id"] == event_id].copy()
-        if df_event.empty:
-            errors.append(f"{event_id}: no rows found")
-            continue
-        df_meta_event = None
-        if df_meta is not None and "order_id" in df_meta.columns:
-            order_id = df_event["order_id"].iloc[0]
-            df_meta_event = (
-                df_meta[df_meta["order_id"] == order_id].head(1).reset_index(drop=True)
-            )
-        try:
-            inp_serial, out_serial = vlite_run_model(df_event, df_meta_event)
-            short_id = inp_serial.get("event", str(event_id))
-            model_store[short_id] = {"inp": inp_serial, "out": out_serial}
-        except Exception as exc:
-            errors.append(f"{event_id}: {exc}")
+    def _slice_payload(payload: dict, idxs: list[int]) -> dict:
+        sliced: dict = {}
+        for key, value in payload.items():
+            if isinstance(value, list) and len(value) == n_rows:
+                sliced[key] = [value[i] for i in idxs]
+            else:
+                sliced[key] = value
+        return sliced
 
-    if not model_store:
-        return None, f"Model failed for all events. Errors: {'; '.join(errors)}"
+    for short_id, group in df_fit.groupby("event_short_id", sort=False):
+        idxs = group.index.tolist()
+        inp_event = _slice_payload(inp_serial, idxs)
+        out_event = _slice_payload(out_serial, idxs)
+        inp_event["event"] = short_id
+        model_store[str(short_id)] = {"inp": inp_event, "out": out_event}
 
-    parts = [f"Model fit complete for {len(model_store)} event(s)."]
-    if errors:
-        parts.append(f"Failed ({len(errors)}): {'; '.join(errors)}")
-    return model_store, " ".join(parts)
+    selected_set = {str(e) for e in selected_events}
+    present_set = {str(e) for e in df_fit["event_id"].dropna().unique().tolist()}
+    missing_count = len(selected_set - present_set)
+    msg = f"Global model fit complete across {len(model_store)} event(s), {n_rows} points, single shared parameter set."
+    if missing_count:
+        msg += f" Missing selected events: {missing_count}."
+    warnings = inp_serial.get("warnings")
+    if warnings:
+        msg += f" Warning: {warnings}."
+    return model_store, msg
 
 
 # ── Polcurve + model fit plot ──────────────────────────────────────────────────
@@ -536,7 +591,7 @@ def update_polcurve_plot(data, selected_events, model_store, theme):
         template=template,
         xaxis_title="Current Density [A/cm²]",
         yaxis_title="Cell Voltage [V]",
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        legend=dict(yanchor="top", y=1, xanchor="left", x=1.02),
         margin=dict(l=40, r=20, t=40, b=40),
     )
     if not data:
@@ -545,6 +600,7 @@ def update_polcurve_plot(data, selected_events, model_store, theme):
     df = _add_event_short_id(pd.DataFrame(data))
     events_to_show = selected_events if selected_events else df["event_id"].dropna().unique().tolist()
 
+    model_fit_shown = False
     for i, event_id in enumerate(events_to_show):
         df_ev = df[df["event_id"] == event_id]
         if df_ev.empty:
@@ -555,26 +611,29 @@ def update_polcurve_plot(data, selected_events, model_store, theme):
             if "event_short_id" in df_ev.columns
             else str(event_id)
         )
+        # Measured data: line plot only
         fig.add_trace(go.Scatter(
             x=df_ev["jStck"].tolist(),
             y=df_ev["uCell"].tolist(),
-            mode="markers",
-            marker=dict(color=color, size=5, opacity=0.7),
+            mode="lines",
+            line=dict(color=color, width=2),
             name=short_id,
-            legendgroup=short_id,
         ))
+        # Model fit: crosses, single grouped legend entry for all fits
         if model_store and short_id in model_store:
             inp = model_store[short_id]["inp"]
             out = model_store[short_id]["out"]
             modelj_cm2 = [j / 1e4 for j in inp["modelj"]]
+            cross_color = "#e8e8e8" if theme == "dark" else "#111111"
             fig.add_trace(go.Scatter(
                 x=modelj_cm2,
                 y=out["V"],
-                mode="lines",
-                line=dict(color=color, width=2),
-                name=f"{short_id} (fit)",
-                legendgroup=short_id,
+                mode="markers",
+                marker=dict(color=cross_color, size=8, symbol="x"),
+                name="Model Fit",
+                showlegend=not model_fit_shown,
             ))
+            model_fit_shown = True
 
     return fig
 
@@ -624,49 +683,64 @@ def update_stackup_dtw_plots(selected_event, data, model_store, theme):
     # ── Loss stackup ─────────────────────────────────────────────────────────
     stackup_fig = go.Figure()
     for key, label, color in [
-        ("Erev",   "Reversible [V]", "#1f77b4"),
-        ("etaICR", "η ICR [V]",      "#ff7f0e"),
-        ("etamem", "η Mem [V]",      "#2ca02c"),
-        ("etaact", "η Act [V]",      "#d62728"),
+        ("Erev", "V-lite: OCV", "#1f77b4"),
+        ("etaICR", "V-lite: Ohmic ICR", "#ff7f0e"),
+        ("etamem", "V-lite: Ohmic Membrane", "#2ca02c"),
+        ("etaact", "V-lite: Kinetic", "#d62728"),
     ]:
         if key in out:
-            stackup_fig.add_trace(go.Bar(
-                x=modelj_cm2,
-                y=out[key],
-                name=label,
-                marker_color=color,
-            ))
+            stackup_fig.add_trace(
+                go.Scatter(
+                    x=modelj_cm2,
+                    y=out[key],
+                    mode="lines",
+                    line=dict(color=color, width=1),
+                    stackgroup="one",
+                    name=label,
+                    legendgroup="stack",
+                )
+            )
 
     if "V" in out:
-        stackup_fig.add_trace(go.Scatter(
-            x=modelj_cm2,
-            y=out["V"],
-            mode="lines",
-            name="Model V",
-            line=dict(color=axis_line_color, width=2, dash="dash"),
-        ))
+        stackup_fig.add_trace(
+            go.Scatter(
+                x=modelj_cm2,
+                y=out["V"],
+                mode="lines",
+                name="Model V",
+                line=dict(color=axis_line_color, width=2, dash="dot"),
+            )
+        )
 
     if data:
         df = _add_event_short_id(pd.DataFrame(data))
         if "event_short_id" in df.columns:
-            df_ev = df[df["event_short_id"] == selected_event]
+            df_ev = df[df["event_short_id"] == selected_event].copy()
             if not df_ev.empty:
-                stackup_fig.add_trace(go.Scatter(
-                    x=df_ev["jStck"].tolist(),
-                    y=df_ev["uCell"].tolist(),
-                    mode="markers",
-                    name="Measured V",
-                    marker=dict(color=axis_line_color, size=6, symbol="x"),
-                ))
+                df_ev = df_ev.sort_values("jStck")
+                measured_fill = "#f8f9fa" if theme == "dark" else "#111111"
+                stackup_fig.add_trace(
+                    go.Scatter(
+                        x=df_ev["jStck"].tolist(),
+                        y=df_ev["uCell"].tolist(),
+                        mode="markers",
+                        name="Measured V",
+                        showlegend=True,
+                        marker=dict(
+                            color=measured_fill,
+                            size=11,
+                            symbol="circle",
+                        ),
+                    )
+                )
 
     stackup_fig.update_layout(
         template=template,
-        barmode="stack",
         xaxis_title="Current Density [A/cm²]",
         yaxis_title="Voltage [V]",
         title=selected_event,
         margin=margin,
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        legend=dict(yanchor="top", y=1, xanchor="left", x=1.02),
     )
 
     # ── DTW plot ─────────────────────────────────────────────────────────────
@@ -716,68 +790,132 @@ def update_parameter_table(model_store):
             "Run the model to see fitted parameters.", c="dimmed", size="sm"
         )
 
-    event_ids = list(model_store.keys())
+    first_event_id = next(iter(model_store))
+    global_out = model_store[first_event_id]["out"]
+    fitfix = FitFix()
+
     header_cells = [
-        html.Th("Parameter", style={"textAlign": "left", "paddingRight": "16px"})
+        html.Th("", style={"textAlign": "left", "paddingRight": "16px", "whiteSpace": "nowrap"})
     ] + [
-        html.Th(eid, style={"textAlign": "right", "paddingLeft": "12px"})
-        for eid in event_ids
+        html.Th(
+            PARAM_DISPLAY_NAMES.get(key, key),
+            style={"textAlign": "right", "paddingLeft": "12px", "whiteSpace": "nowrap"},
+        )
+        for key in PARAM_KEYS
     ]
 
-    rows = []
-    for key in PARAM_KEYS:
-        label = PARAM_DISPLAY_NAMES.get(key, key)
-        is_fitted = key in PARAM_FITTED
-        cells = [
-            html.Td(
-                label,
-                style={
-                    "fontWeight": "600" if is_fitted else "normal",
-                    "paddingRight": "16px",
-                    "whiteSpace": "nowrap",
-                },
-            )
-        ]
-        for eid in event_ids:
-            val = model_store[eid]["out"].get(key, "—")
-            cells.append(html.Td(
-                _fmt_param(val),
-                style={"textAlign": "right", "paddingLeft": "12px", "fontFamily": "monospace"},
-            ))
-        rows.append(html.Tr(cells))
+    global_row = [
+        html.Td(
+            "Global Fit",
+            style={"fontWeight": "600", "paddingRight": "16px", "whiteSpace": "nowrap"},
+        )
+    ] + [
+        html.Td(
+            _fmt_param(global_out.get(key, "—")),
+            style={"textAlign": "right", "paddingLeft": "12px", "fontFamily": "monospace"},
+        )
+        for key in PARAM_KEYS
+    ]
 
-    return html.Table(
-        [html.Thead(html.Tr(header_cells)), html.Tbody(rows)],
+    def _fit_cell(key: str) -> html.Td:
+        if key == "LSQerravg":
+            return html.Td("—", style={"textAlign": "right", "paddingLeft": "12px", "fontFamily": "monospace", "color": "var(--mantine-color-dimmed)"})
+        val = getattr(fitfix, key, 0)
+        is_fitted = val == 1
+        return html.Td(
+            str(val),
+            style={
+                "textAlign": "right",
+                "paddingLeft": "12px",
+                "fontFamily": "monospace",
+                "fontWeight": "700" if is_fitted else "normal",
+                "color": "var(--mantine-color-green-6)" if is_fitted else "var(--mantine-color-dimmed)",
+            },
+        )
+
+    fit_row = [
+        html.Td(
+            "Fit",
+            style={"fontWeight": "600", "paddingRight": "16px", "whiteSpace": "nowrap"},
+        )
+    ] + [_fit_cell(key) for key in PARAM_KEYS]
+
+    table = html.Table(
+        [
+            html.Thead(html.Tr(header_cells)),
+            html.Tbody([
+                html.Tr(global_row),
+                html.Tr(fit_row),
+            ]),
+        ],
         style={
             "width": "100%",
             "borderCollapse": "collapse",
             "fontSize": "13px",
             "tableLayout": "auto",
+            "minWidth": "980px",
         },
     )
+    return html.Div(table, style={"overflowX": "auto"})
 
 
 # ── Download ───────────────────────────────────────────────────────────────────
 
 @callback(
     Output("vlite-download-btn", "disabled"),
-    Input("vlite-data-store", "data"),
+    Input("vlite-model-store", "data"),
 )
-def toggle_download_button(data):
-    return not bool(data)
+def toggle_download_button(model_store):
+    return not bool(model_store)
+
+
+# Per-row model output columns to attach to the download
+_MODEL_OUTPUT_COLS = ["V", "Erev", "etaICR", "etamem", "etaact", "DTW"]
+_MODEL_OUTPUT_LABELS = {
+    "V": "uCell_vlite",
+    "Erev": "Erev",
+    "etaICR": "etaICR",
+    "etamem": "etamem",
+    "etaact": "etaact",
+    "DTW": "DTW_model",
+}
 
 
 @callback(
     Output("vlite-download-csv", "data"),
     Input("vlite-download-btn", "n_clicks"),
     State("vlite-data-store", "data"),
+    State("vlite-model-store", "data"),
     State("vlite-event-id-filter", "value"),
     prevent_initial_call=True,
 )
-def download_vlite_data(n_clicks, data, selected_events):
-    if not data:
+def download_vlite_data(n_clicks, data, model_store, selected_events):
+    if not data or not model_store:
         return no_update
-    df = pd.DataFrame(data)
+    df = _add_event_short_id(pd.DataFrame(data))
     if selected_events:
         df = df[df["event_id"].isin(selected_events)]
-    return send_data_frame(df.to_csv, "vlite_polcurve.csv", index=False)
+    df = df.copy().reset_index(drop=True)
+
+    # Attach per-row model outputs and scalar fit parameters
+    for col_label in _MODEL_OUTPUT_LABELS.values():
+        df[col_label] = float("nan")
+
+    first_out = next(iter(model_store.values()))["out"]
+    scalar_params = {k: v for k, v in first_out.items() if not isinstance(v, list)}
+
+    for short_id, entry in model_store.items():
+        mask = df["event_short_id"] == short_id
+        out = entry["out"]
+        for src_key, dst_col in _MODEL_OUTPUT_LABELS.items():
+            if src_key in out and isinstance(out[src_key], list):
+                vals = out[src_key]
+                idxs = df.index[mask].tolist()
+                if len(vals) == len(idxs):
+                    for idx, val in zip(idxs, vals):
+                        df.at[idx, dst_col] = val
+
+    for param_key, param_val in scalar_params.items():
+        df[param_key] = param_val
+
+    return send_data_frame(df.to_csv, "vlite_results.csv", index=False)
