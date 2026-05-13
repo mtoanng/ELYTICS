@@ -888,9 +888,10 @@ _MODEL_OUTPUT_LABELS = {
     State("vlite-data-store", "data"),
     State("vlite-model-store", "data"),
     State("vlite-event-id-filter", "value"),
+    State("vlite-order-id-filter", "value"),
     prevent_initial_call=True,
 )
-def download_vlite_data(n_clicks, data, model_store, selected_events):
+def download_vlite_data(n_clicks, data, model_store, selected_events, order_id):
     if not data or not model_store:
         return no_update
     df = _add_event_short_id(pd.DataFrame(data))
@@ -919,4 +920,5 @@ def download_vlite_data(n_clicks, data, model_store, selected_events):
     for param_key, param_val in scalar_params.items():
         df[param_key] = param_val
 
-    return send_data_frame(df.to_csv, "vlite_results.csv", index=False)
+    filename = f"vlite_results_{order_id}.csv" if order_id else "vlite_results.csv"
+    return send_data_frame(df.to_csv, filename, index=False)
