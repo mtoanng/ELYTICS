@@ -144,6 +144,11 @@
       "pr": 871,
       "title": "fix(sherlock): Fixed timeseries resampling functionality",
       "date": "2026-05-13"
+    },
+    {
+      "pr": 877,
+      "title": "feat(sherlock): Simplified timeseries page",
+      "date": "2026-05-13"
     }
   ],
   "releases": {}

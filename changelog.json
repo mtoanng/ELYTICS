@@ -179,6 +179,11 @@
       "pr": 865,
       "title": "fix(core): Added development role to backend access config",
       "date": "2026-05-12"
+    },
+    {
+      "pr": 877,
+      "title": "feat(sherlock): Simplified timeseries page",
+      "date": "2026-05-13"
     }
   ],
   "releases": {}
