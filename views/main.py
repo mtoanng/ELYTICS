@@ -82,6 +82,7 @@ def main() -> None:
     args = _parse_args()
     catalog = args.catalog
     schema = args.schema
+    failures: list[tuple[str, str]] = []
 
     sql_files = collect_sql_files()
     print(f"Found {len(sql_files)} view(s) to deploy -> {catalog}.{schema}")
@@ -94,14 +95,18 @@ def main() -> None:
 
         for sql_path, view_name in sql_files:
             print(f"  deploying {view_name} ...", end=" ", flush=True)
-            deploy_view_with_spark(
-                spark=spark,
-                catalog=catalog,
-                schema=schema,
-                view_name=view_name,
-                sql_body=sql_path.read_text(encoding="utf-8"),
-            )
-            print("OK")
+            try:
+                deploy_view_with_spark(
+                    spark=spark,
+                    catalog=catalog,
+                    schema=schema,
+                    view_name=view_name,
+                    sql_body=sql_path.read_text(encoding="utf-8"),
+                )
+                print("OK")
+            except Exception as exc:
+                failures.append((view_name, str(exc)))
+                print("FAILED")
     else:
         client = WorkspaceClient(
             host=os.environ["DATABRICKS_HOST"],
@@ -114,15 +119,27 @@ def main() -> None:
 
         for sql_path, view_name in sql_files:
             print(f"  deploying {view_name} ...", end=" ", flush=True)
-            deploy_view_with_sql_warehouse(
-                client=client,
-                warehouse_id=warehouse_id,
-                catalog=catalog,
-                schema=schema,
-                view_name=view_name,
-                sql_body=sql_path.read_text(encoding="utf-8"),
-            )
-            print("OK")
+            try:
+                deploy_view_with_sql_warehouse(
+                    client=client,
+                    warehouse_id=warehouse_id,
+                    catalog=catalog,
+                    schema=schema,
+                    view_name=view_name,
+                    sql_body=sql_path.read_text(encoding="utf-8"),
+                )
+                print("OK")
+            except Exception as exc:
+                failures.append((view_name, str(exc)))
+                print("FAILED")
+
+    if failures:
+        print("\nDeployment finished with failures:")
+        for view_name, error in failures:
+            print(f"  - {view_name}: {error}")
+        raise RuntimeError(
+            f"Failed deployments: {len(failures)} of {len(sql_files)} view(s)."
+        )
 
     print(f"\nAll {len(sql_files)} view(s) deployed successfully.")
 

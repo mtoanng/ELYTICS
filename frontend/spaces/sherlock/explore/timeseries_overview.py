@@ -3,7 +3,6 @@ import re
 from dash import (
     callback,
     ctx,
-    clientside_callback,
     dcc,
     Input,
     Output,
@@ -173,11 +172,6 @@ USAGE_BLOCKQUOTE_TEXT = [
     "Default signals: " + ", ".join(DEFAULT_SENSOR_NAMES) + ".",
 ]
 
-NORMALIZED_DESCRIPTION = (
-    "Selected signals are min-max normalized to a 0-1 range and overlaid on a shared axis."
-)
-
-
 def _empty_figure(
     theme: str, message: str = "Select filters to view timeseries data"
 ) -> go.Figure:
@@ -208,6 +202,78 @@ def _empty_figure(
 
 def _to_options(values: list) -> list[dict]:
     return [{"label": str(v), "value": v} for v in values]
+
+
+def _normalize_cell_value(value) -> str | None:
+    if value in (None, ""):
+        return None
+    text = str(value)
+    return re.sub(r"\.0$", "", text)
+
+
+def _resolve_testrig_column(df: pd.DataFrame) -> str | None:
+    if "testrig_id" in df.columns:
+        return "testrig_id"
+    if "testrig_label" in df.columns:
+        return "testrig_label"
+    return None
+
+
+def _apply_metadata_filters(
+    df: pd.DataFrame,
+    order_id=None,
+    testrig_id=None,
+    sample_name=None,
+    number_of_cells=None,
+    exclude: str | None = None,
+) -> pd.DataFrame:
+    filtered = df
+
+    if exclude != "order_id" and order_id not in (None, "") and "order_id" in filtered.columns:
+        filtered = filtered[filtered["order_id"] == order_id]
+
+    testrig_column = _resolve_testrig_column(filtered)
+    if exclude != "testrig_id" and testrig_id not in (None, "") and testrig_column:
+        filtered = filtered[filtered[testrig_column] == testrig_id]
+
+    if (
+        exclude != "sample_name"
+        and sample_name not in (None, "")
+        and "sample_name" in filtered.columns
+    ):
+        filtered = filtered[filtered["sample_name"] == sample_name]
+
+    if exclude != "number_of_cells" and number_of_cells not in (None, "") and "number_of_cells" in filtered.columns:
+        normalized_cells = (
+            filtered["number_of_cells"].dropna().astype(str).str.replace(r"\.0$", "", regex=True)
+        )
+        selected_cell = _normalize_cell_value(number_of_cells)
+        filtered = filtered.loc[normalized_cells == selected_cell]
+
+    return filtered
+
+
+def _metadata_time_bounds(df: pd.DataFrame) -> tuple[str | None, str | None]:
+    if df.empty:
+        return None, None
+
+    start_candidates = ["start_time", "start_timestamp", "start_ts", "start"]
+    end_candidates = ["end_time", "end_timestamp", "end_ts", "end"]
+
+    start_col = next((col for col in start_candidates if col in df.columns), None)
+    end_col = next((col for col in end_candidates if col in df.columns), None)
+    if not start_col or not end_col:
+        return None, None
+
+    start_series = pd.to_datetime(df[start_col], errors="coerce", utc=True).dropna()
+    end_series = pd.to_datetime(df[end_col], errors="coerce", utc=True).dropna()
+    if start_series.empty or end_series.empty:
+        return None, None
+
+    return (
+        start_series.min().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        end_series.max().strftime("%Y-%m-%dT%H:%M:%SZ"),
+    )
 
 
 def _read_viewport(relayout_data: dict | None) -> tuple[str | None, str | None]:
@@ -264,7 +330,6 @@ def _hex_to_rgba(hex_color: str, alpha: float) -> str:
     blue = int(clean[4:6], 16)
     return f"rgba({red},{green},{blue},{alpha})"
 
-
 def _resolve_metric_column(df: pd.DataFrame, signal: str, metric: str) -> str | None:
     preferred = f"{signal}_{metric}"
     if preferred in df.columns:
@@ -306,13 +371,6 @@ def _build_plot_groups(
     return [(f"{unit} signals", unit, grouped[unit]) for unit in grouped]
 
 
-def _signal_selector_options(signals: list[str]) -> list[dict[str, str]]:
-    return [
-        {"label": SENSOR_TITLES.get(signal, signal), "value": signal}
-        for signal in signals
-    ]
-
-
 def _compute_gap_positions(
     time_values: pd.Series,
     max_gap_seconds: int | None,
@@ -342,8 +400,6 @@ def _insert_gap_markers(values: list, gap_positions: set[int]) -> list:
             output.append(None)
         output.append(value)
     return output
-
-
 def _contiguous_band_segments(
     df: pd.DataFrame,
     min_col: str,
@@ -378,32 +434,6 @@ def _contiguous_band_segments(
         segments.append((start_idx, len(df)))
 
     return segments
-
-
-def _build_signal_selector_data(
-    df: pd.DataFrame,
-    signals: list[str],
-    metric: str,
-) -> list[dict]:
-    available = [
-        {"label": SENSOR_TITLES.get(signal, signal), "value": signal}
-        for signal in signals
-        if _signal_has_data(df, signal, metric)
-    ]
-    missing = [
-        {
-            "label": SENSOR_TITLES.get(signal, signal),
-            "value": signal,
-            "disabled": True,
-        }
-        for signal in signals
-        if not _signal_has_data(df, signal, metric)
-    ]
-
-    selector_data: list[dict] = [*available]
-    if missing:
-        selector_data.append({"group": "Missing data", "items": missing})
-    return selector_data
 
 
 def _format_subplot_legend(entries: list[tuple[str, str]]) -> str:
@@ -728,13 +758,13 @@ def _resolve_time_column(df: pd.DataFrame) -> str | None:
     return None
 
 
-def _humanize_timestamp(value: str | None) -> str:
+def _normalize_datetime_value(value: str | None) -> str | None:
     if value in (None, ""):
-        return "-"
+        return None
     ts = pd.to_datetime(value, errors="coerce", utc=True)
     if pd.isna(ts):
-        return str(value)
-    return ts.strftime("%Y-%m-%d %H:%M:%S UTC")
+        return None
+    return ts.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _humanize_bucket(
@@ -826,6 +856,7 @@ def timeseries_overview_layout():
                     ),
                     dcc.Store(id="timeseries-init-trigger", data=True),
                     dcc.Store(id="timeseries-data-store"),
+                    dcc.Download(id="timeseries-download"),
                     dcc.Store(
                         id="timeseries-filter-state-store",
                         data={
@@ -840,102 +871,118 @@ def timeseries_overview_layout():
                         p="md",
                         radius="md",
                         children=[
-                            dmc.SimpleGrid(
-                                cols={"base": 1, "sm": 2, "lg": 3},
-                                spacing="md",
-                                verticalSpacing="md",
+                            dmc.Stack(
+                                gap="md",
                                 children=[
-                                    dmc.InputWrapper(
-                                        dcc.Dropdown(
-                                            id="timeseries-order-id-filter",
-                                            options=[],
-                                            value=None,
-                                            clearable=False,
-                                            searchable=True,
-                                            placeholder="Select order ID",
-                                            style={"width": "100%"},
-                                        ),
-                                        label="Order ID",
-                                        htmlFor="timeseries-order-id-filter",
-                                        className="dmc",
-                                        styles={"label": {"marginBottom": "6px"}},
-                                    ),
-                                    dmc.InputWrapper(
-                                        dcc.Dropdown(
-                                            id="timeseries-testrig-id-filter",
-                                            options=[],
-                                            value=None,
-                                            clearable=True,
-                                            searchable=True,
-                                            placeholder="Select testrig ID",
-                                            style={"width": "100%"},
-                                        ),
-                                        label="Testrig ID",
-                                        htmlFor="timeseries-testrig-id-filter",
-                                        className="dmc",
-                                        styles={"label": {"marginBottom": "6px"}},
-                                    ),
-                                    dmc.InputWrapper(
-                                        dcc.Dropdown(
-                                            id="timeseries-sample-name-filter",
-                                            options=[],
-                                            value=None,
-                                            clearable=True,
-                                            searchable=True,
-                                            placeholder="Select sample name",
-                                            style={"width": "100%"},
-                                        ),
-                                        label="Sample Name",
-                                        htmlFor="timeseries-sample-name-filter",
-                                        className="dmc",
-                                        styles={"label": {"marginBottom": "6px"}},
-                                    ),
-                                    dmc.InputWrapper(
-                                        dcc.Dropdown(
-                                            id="timeseries-number-of-cells-filter",
-                                            options=[],
-                                            value=None,
-                                            clearable=True,
-                                            searchable=True,
-                                            placeholder="Select number of cells",
-                                            style={"width": "100%"},
-                                        ),
-                                        label="Number of Cells",
-                                        htmlFor="timeseries-number-of-cells-filter",
-                                        className="dmc",
-                                        styles={"label": {"marginBottom": "6px"}},
-                                    ),
-                                    dmc.InputWrapper(
-                                        dcc.Dropdown(
-                                            id="timeseries-extra-signals",
-                                            options=_to_options(EXTRA_SIGNALS),
-                                            value=[],
-                                            multi=True,
-                                            clearable=True,
-                                            searchable=True,
-                                            placeholder="Select additional signals",
-                                            style={"width": "100%"},
-                                        ),
-                                        label="Additional Signals",
-                                        htmlFor="timeseries-extra-signals",
-                                        className="dmc",
-                                        styles={"label": {"marginBottom": "6px"}},
-                                    ),
-                                    dmc.Stack(
-                                        gap=6,
-                                        justify="flex-end",
+                                    dmc.SimpleGrid(
+                                        cols={"base": 1, "sm": 2, "lg": 3},
+                                        spacing="md",
+                                        verticalSpacing="md",
                                         children=[
-                                            dmc.Text("Download", fw=600, size="sm"),
+                                            dmc.InputWrapper(
+                                                dcc.Dropdown(
+                                                    id="timeseries-order-id-filter",
+                                                    options=[],
+                                                    value=None,
+                                                    clearable=False,
+                                                    searchable=True,
+                                                    placeholder="Select order ID",
+                                                    style={"width": "100%"},
+                                                ),
+                                                label="Order ID",
+                                                htmlFor="timeseries-order-id-filter",
+                                                className="dmc",
+                                                styles={"label": {"marginBottom": "6px"}},
+                                            ),
+                                            dmc.InputWrapper(
+                                                dcc.Dropdown(
+                                                    id="timeseries-testrig-id-filter",
+                                                    options=[],
+                                                    value=None,
+                                                    clearable=True,
+                                                    searchable=True,
+                                                    placeholder="Select testrig ID",
+                                                    style={"width": "100%"},
+                                                ),
+                                                label="Testrig ID",
+                                                htmlFor="timeseries-testrig-id-filter",
+                                                className="dmc",
+                                                styles={"label": {"marginBottom": "6px"}},
+                                            ),
+                                            dmc.InputWrapper(
+                                                dcc.Dropdown(
+                                                    id="timeseries-sample-name-filter",
+                                                    options=[],
+                                                    value=None,
+                                                    clearable=True,
+                                                    searchable=True,
+                                                    placeholder="Select sample name",
+                                                    style={"width": "100%"},
+                                                ),
+                                                label="Sample Name",
+                                                htmlFor="timeseries-sample-name-filter",
+                                                className="dmc",
+                                                styles={"label": {"marginBottom": "6px"}},
+                                            ),
+                                        ],
+                                    ),
+                                    dmc.Group(
+                                        gap="md",
+                                        align="flex-end",
+                                        wrap="wrap",
+                                        children=[
+                                            dmc.Box(
+                                                style={"flex": "1 1 320px"},
+                                                children=[
+                                                    dmc.InputWrapper(
+                                                        dcc.Dropdown(
+                                                            id="timeseries-number-of-cells-filter",
+                                                            options=[],
+                                                            value=None,
+                                                            clearable=True,
+                                                            searchable=True,
+                                                            placeholder="Select number of cells",
+                                                            style={"width": "100%"},
+                                                        ),
+                                                        label="Number of Cells",
+                                                        htmlFor="timeseries-number-of-cells-filter",
+                                                        className="dmc",
+                                                        styles={"label": {"marginBottom": "6px"}},
+                                                    )
+                                                ],
+                                            ),
+                                            dmc.Box(
+                                                style={"flex": "1 1 320px"},
+                                                children=[
+                                                    dmc.InputWrapper(
+                                                        dcc.Dropdown(
+                                                            id="timeseries-extra-signals",
+                                                            options=_to_options(EXTRA_SIGNALS),
+                                                            value=[],
+                                                            multi=True,
+                                                            clearable=True,
+                                                            searchable=True,
+                                                            placeholder="Select additional signals",
+                                                            style={"width": "100%"},
+                                                        ),
+                                                        label="Additional Signals",
+                                                        htmlFor="timeseries-extra-signals",
+                                                        className="dmc",
+                                                        styles={"label": {"marginBottom": "6px"}},
+                                                    )
+                                                ],
+                                            ),
                                             dmc.Button(
-                                                "Download CSV (disabled)",
-                                                id="timeseries-download-btn",
-                                                disabled=True,
+                                                "Clear",
+                                                id="timeseries-clear-filters-btn",
                                                 variant="light",
+                                                size="xs",
+                                                style={"alignSelf": "flex-end", "marginBottom": "2px"},
                                             ),
                                         ],
                                     ),
                                 ],
-                            )
+                            ),
                         ],
                     ),
                     dmc.Paper(
@@ -944,24 +991,50 @@ def timeseries_overview_layout():
                         radius="md",
                         style={"overflow": "hidden"},
                         children=[
-                            dmc.MultiSelect(
-                                id="timeseries-signal-selector",
-                                label="Visible Signals",
-                                description="Hide or show signals in stacked and isolated views.",
-                                data=[],
-                                value=None,
-                                searchable=True,
-                                clearable=False,
-                                nothingFoundMessage="No signals available",
+                            dmc.Box(id="timeseries-missing-signals-box"),
+                            dmc.Divider(
+                                id="timeseries-missing-signals-divider",
+                                size="xs",
+                                my="sm",
+                                style={"display": "none"},
                             ),
-                            dmc.Divider(size="xs", my="sm"),
                             dmc.Group(
                                 justify="space-between",
+                                align="flex-end",
                                 children=[
-                                    dmc.Text(
-                                        id="timeseries-status-text",
-                                        c="dimmed",
-                                        size="sm",
+                                    dmc.Group(
+                                        gap="sm",
+                                        wrap="wrap",
+                                        children=[
+                                            dmc.Group(
+                                                gap=6,
+                                                align="center",
+                                                children=[
+                                                    dmc.Text("Start", size="sm", c="dimmed", fw=600),
+                                                    dmc.DateTimePicker(
+                                                        id="timeseries-start-datetime",
+                                                        placeholder="Select start",
+                                                        clearable=True,
+                                                        size="xs",
+                                                        style={"minWidth": "220px"},
+                                                    ),
+                                                ],
+                                            ),
+                                            dmc.Group(
+                                                gap=6,
+                                                align="center",
+                                                children=[
+                                                    dmc.Text("End", size="sm", c="dimmed", fw=600),
+                                                    dmc.DateTimePicker(
+                                                        id="timeseries-end-datetime",
+                                                        placeholder="Select end",
+                                                        clearable=True,
+                                                        size="xs",
+                                                        style={"minWidth": "220px"},
+                                                    ),
+                                                ],
+                                            ),
+                                        ],
                                     ),
                                     dmc.Group(
                                         gap="sm",
@@ -972,60 +1045,71 @@ def timeseries_overview_layout():
                                                 variant="light",
                                                 color="blue",
                                             ),
-                                            dmc.Text(
-                                                "Value", size="sm", c="dimmed", fw=600
-                                            ),
-                                            dmc.SegmentedControl(
-                                                id="timeseries-metric-selector",
-                                                data=[
-                                                    {"label": "All", "value": "all"},
-                                                    {"label": "Avg", "value": "avg"},
-                                                    {"label": "Min", "value": "min"},
-                                                    {"label": "Max", "value": "max"},
-                                                ],
-                                                value="all",
+                                            dmc.Button(
+                                                "Download CSV",
+                                                id="timeseries-download-btn",
+                                                variant="light",
                                                 size="xs",
-                                                radius="md",
-                                                style={"minWidth": "220px"},
-                                            ),
-                                            dmc.Text(
-                                                "Layout", size="sm", c="dimmed", fw=600
-                                            ),
-                                            dmc.SegmentedControl(
-                                                id="timeseries-plot-mode-selector",
-                                                data=[
-                                                    {
-                                                        "label": "Isolated",
-                                                        "value": "isolated",
-                                                    },
-                                                    {
-                                                        "label": "Stacked",
-                                                        "value": "stacked",
-                                                    },
-                                                ],
-                                                value="isolated",
-                                                size="xs",
-                                                radius="md",
-                                                style={"minWidth": "190px"},
+                                                disabled=True,
                                             ),
                                         ],
                                     ),
                                 ],
                             ),
                             dmc.Space(h="sm"),
-                            dcc.Graph(
-                                id="timeseries-normalized-graph",
-                                figure=_empty_figure(
-                                    "light", "Loading metadata..."
-                                ),
-                                config={
-                                    "responsive": True,
-                                    "displaylogo": False,
-                                },
+                            dmc.Box(
+                                id="timeseries-normalized-plot-container",
+                                pos="relative",
                                 style={
                                     "width": "100%",
                                     "minHeight": "360px",
                                 },
+                                children=[
+                                    dmc.LoadingOverlay(
+                                        id="timeseries-normalized-plot-loading-overlay",
+                                        visible=True,
+                                        zIndex=10,
+                                        loaderProps={
+                                            "color": "blue",
+                                            "size": "lg",
+                                            "variant": "dots",
+                                        },
+                                        overlayProps={
+                                            "radius": "sm",
+                                            "blur": 2,
+                                            "backgroundOpacity": 0.92,
+                                        },
+                                    ),
+                                    dmc.LoadingOverlay(
+                                        id="timeseries-normalized-render-loading-overlay",
+                                        visible=False,
+                                        zIndex=11,
+                                        loaderProps={
+                                            "color": "blue",
+                                            "size": "lg",
+                                            "variant": "dots",
+                                        },
+                                        overlayProps={
+                                            "radius": "sm",
+                                            "blur": 2,
+                                            "backgroundOpacity": 0.92,
+                                        },
+                                    ),
+                                    dcc.Graph(
+                                        id="timeseries-normalized-graph",
+                                        figure=_empty_figure(
+                                            "light", "Loading metadata..."
+                                        ),
+                                        config={
+                                            "responsive": True,
+                                            "displaylogo": False,
+                                        },
+                                        style={
+                                            "width": "100%",
+                                            "minHeight": "360px",
+                                        },
+                                    ),
+                                ],
                             ),
                             dmc.Divider(size="xs", my="sm"),
                             dmc.Box(
@@ -1126,30 +1210,9 @@ def load_timeseries_metadata(_):
 
 
 @callback(
+    Output("timeseries-filter-state-store", "data"),
     Output("timeseries-order-id-filter", "options"),
     Output("timeseries-order-id-filter", "value"),
-    Input("timeseries-metadata-store", "data"),
-)
-def populate_order_filter(metadata_rows):
-    if not metadata_rows:
-        return [], None
-
-    df = pd.DataFrame(metadata_rows)
-
-    order_values = (
-        sorted(df["order_id"].dropna().unique().tolist(), reverse=True)
-        if "order_id" in df.columns
-        else []
-    )
-
-    return (
-        _to_options(order_values),
-        None,
-    )
-
-
-@callback(
-    Output("timeseries-filter-state-store", "data"),
     Output("timeseries-testrig-id-filter", "options"),
     Output("timeseries-testrig-id-filter", "value"),
     Output("timeseries-sample-name-filter", "options"),
@@ -1158,15 +1221,13 @@ def populate_order_filter(metadata_rows):
     Output("timeseries-number-of-cells-filter", "value"),
     Input("timeseries-metadata-store", "data"),
     Input("timeseries-order-id-filter", "value"),
-    State("timeseries-filter-state-store", "data"),
-    State("timeseries-testrig-id-filter", "value"),
-    State("timeseries-sample-name-filter", "value"),
-    State("timeseries-number-of-cells-filter", "value"),
+    Input("timeseries-testrig-id-filter", "value"),
+    Input("timeseries-sample-name-filter", "value"),
+    Input("timeseries-number-of-cells-filter", "value"),
 )
 def sync_stateful_filters(
     metadata_rows,
     order_id,
-    filter_state,
     current_testrig_id,
     current_sample_name,
     current_number_of_cells,
@@ -1185,33 +1246,73 @@ def sync_stateful_filters(
             None,
             [],
             None,
+            [],
+            None,
         )
 
     df = pd.DataFrame(metadata_rows)
-    filtered_df = df
-    if order_id not in (None, "") and "order_id" in df.columns:
-        filtered_df = df[df["order_id"] == order_id]
 
-    testrig_column = None
-    if "testrig_id" in filtered_df.columns:
-        testrig_column = "testrig_id"
-    elif "testrig_label" in filtered_df.columns:
-        testrig_column = "testrig_label"
+    order_df = _apply_metadata_filters(
+        df,
+        order_id=order_id,
+        testrig_id=current_testrig_id,
+        sample_name=current_sample_name,
+        number_of_cells=current_number_of_cells,
+        exclude="order_id",
+    )
+    order_values = (
+        sorted(order_df["order_id"].dropna().unique().tolist(), reverse=True)
+        if "order_id" in order_df.columns
+        else []
+    )
+    selected_order = order_id if order_id in order_values else None
 
+    testrig_df = _apply_metadata_filters(
+        df,
+        order_id=selected_order,
+        testrig_id=current_testrig_id,
+        sample_name=current_sample_name,
+        number_of_cells=current_number_of_cells,
+        exclude="testrig_id",
+    )
+    testrig_column = _resolve_testrig_column(testrig_df)
     testrig_values = (
-        sorted(filtered_df[testrig_column].dropna().unique().tolist())
+        sorted(testrig_df[testrig_column].dropna().unique().tolist())
         if testrig_column
         else []
     )
-    sample_values = (
-        sorted(filtered_df["sample_name"].dropna().unique().tolist())
-        if "sample_name" in filtered_df.columns
-        else []
+    selected_testrig = (
+        current_testrig_id if current_testrig_id in testrig_values else None
     )
 
-    if "number_of_cells" in filtered_df.columns:
+    sample_df = _apply_metadata_filters(
+        df,
+        order_id=selected_order,
+        testrig_id=selected_testrig,
+        sample_name=current_sample_name,
+        number_of_cells=current_number_of_cells,
+        exclude="sample_name",
+    )
+    sample_values = (
+        sorted(sample_df["sample_name"].dropna().unique().tolist())
+        if "sample_name" in sample_df.columns
+        else []
+    )
+    selected_sample = (
+        current_sample_name if current_sample_name in sample_values else None
+    )
+
+    cells_df = _apply_metadata_filters(
+        df,
+        order_id=selected_order,
+        testrig_id=selected_testrig,
+        sample_name=selected_sample,
+        number_of_cells=current_number_of_cells,
+        exclude="number_of_cells",
+    )
+    if "number_of_cells" in cells_df.columns:
         cell_series = (
-            filtered_df["number_of_cells"]
+            cells_df["number_of_cells"]
             .dropna()
             .astype(str)
             .str.replace(r"\.0$", "", regex=True)
@@ -1222,21 +1323,11 @@ def sync_stateful_filters(
     else:
         cell_values = []
 
-    filter_state = filter_state or {}
-    preferred_testrig = current_testrig_id or filter_state.get("testrig_id")
-    preferred_sample = current_sample_name or filter_state.get("sample_name")
-    preferred_cells = current_number_of_cells or filter_state.get("number_of_cells")
-
-    selected_testrig = (
-        preferred_testrig if preferred_testrig in testrig_values else None
-    )
-
-    selected_sample = preferred_sample if preferred_sample in sample_values else None
-
-    selected_cells = preferred_cells if preferred_cells in cell_values else None
+    selected_cells = _normalize_cell_value(current_number_of_cells)
+    selected_cells = selected_cells if selected_cells in cell_values else None
 
     next_state = {
-        "order_id": order_id,
+        "order_id": selected_order,
         "testrig_id": selected_testrig,
         "sample_name": selected_sample,
         "number_of_cells": selected_cells,
@@ -1244,6 +1335,8 @@ def sync_stateful_filters(
 
     return (
         next_state,
+        _to_options(order_values),
+        selected_order,
         _to_options(testrig_values),
         selected_testrig,
         _to_options(sample_values),
@@ -1255,12 +1348,18 @@ def sync_stateful_filters(
 
 @callback(
     Output("timeseries-viewport-store", "data"),
+    Output("timeseries-start-datetime", "value"),
+    Output("timeseries-end-datetime", "value"),
     Input("timeseries-graph", "relayoutData"),
     Input("timeseries-normalized-graph", "relayoutData"),
     State("timeseries-viewport-store", "data"),
     prevent_initial_call=True,
 )
-def update_viewport_store(main_relayout_data, normalized_relayout_data, current):
+def update_viewport_store(
+    main_relayout_data,
+    normalized_relayout_data,
+    current,
+):
     relayout_data = None
     trigger_id = ctx.triggered_id
 
@@ -1284,10 +1383,46 @@ def update_viewport_store(main_relayout_data, normalized_relayout_data, current)
         raise PreventUpdate
 
     start, end = _read_viewport(relayout_data)
+    start = _normalize_datetime_value(start)
+    end = _normalize_datetime_value(end)
+    current = current or {"start": None, "end": None}
+    if start == current.get("start") and end == current.get("end"):
+        raise PreventUpdate
+    return {"start": start, "end": end}, start, end
+
+
+@callback(
+    Output("timeseries-viewport-store", "data", allow_duplicate=True),
+    Input("timeseries-start-datetime", "value"),
+    Input("timeseries-end-datetime", "value"),
+    State("timeseries-viewport-store", "data"),
+    prevent_initial_call=True,
+)
+def update_viewport_from_datetime(start_datetime, end_datetime, current):
+    start = _normalize_datetime_value(start_datetime)
+    end = _normalize_datetime_value(end_datetime)
     current = current or {"start": None, "end": None}
     if start == current.get("start") and end == current.get("end"):
         raise PreventUpdate
     return {"start": start, "end": end}
+
+
+@callback(
+    Output("timeseries-order-id-filter", "value", allow_duplicate=True),
+    Output("timeseries-testrig-id-filter", "value", allow_duplicate=True),
+    Output("timeseries-sample-name-filter", "value", allow_duplicate=True),
+    Output("timeseries-number-of-cells-filter", "value", allow_duplicate=True),
+    Output("timeseries-extra-signals", "value", allow_duplicate=True),
+    Output("timeseries-viewport-store", "data", allow_duplicate=True),
+    Output("timeseries-start-datetime", "value", allow_duplicate=True),
+    Output("timeseries-end-datetime", "value", allow_duplicate=True),
+    Input("timeseries-clear-filters-btn", "n_clicks"),
+    prevent_initial_call=True,
+)
+def clear_timeseries_filters(n_clicks):
+    if not n_clicks:
+        raise PreventUpdate
+    return None, None, None, None, [], {"start": None, "end": None}, None, None
 
 
 @callback(
@@ -1298,12 +1433,11 @@ def update_viewport_store(main_relayout_data, normalized_relayout_data, current)
     Input("timeseries-number-of-cells-filter", "value"),
     Input("timeseries-extra-signals", "value"),
     Input("timeseries-viewport-store", "data"),
+    Input("timeseries-metadata-store", "data"),
     running=[
-        (Output("timeseries-metric-selector", "disabled"), True, False),
-        (Output("timeseries-plot-mode-selector", "disabled"), True, False),
-        (Output("timeseries-signal-selector", "disabled"), True, False),
         (Output("timeseries-graph", "style"), _GRAPH_STYLE_LOADING, _GRAPH_STYLE_READY),
         (Output("timeseries-plot-loading-overlay", "visible"), True, False),
+        (Output("timeseries-normalized-plot-loading-overlay", "visible"), True, False),
         (
             Output("timeseries-graph-wrapper", "style"),
             _GRAPH_WRAPPER_STYLE_LOADING,
@@ -1319,15 +1453,17 @@ def load_timeseries_data(
     number_of_cells,
     extra_signals,
     viewport,
+    metadata_rows,
 ):
     has_required_filter = any(f not in (None, "") for f in [order_id, testrig_id, sample_name])
     if not has_required_filter:
         return {
             "error": "Please select either Order ID, Testrig ID, or Sample Name to view data",
-            "status": "Awaiting filter selection",
             "badge": "No request yet",
             "signals": [],
             "records": [],
+            "data_min": None,
+            "data_max": None,
             "viewport": viewport or {"start": None, "end": None},
         }
 
@@ -1347,6 +1483,20 @@ def load_timeseries_data(
     if number_of_cells not in (None, ""):
         filters["number_of_cells"] = number_of_cells
 
+    metadata_df = pd.DataFrame(metadata_rows or [])
+    metadata_filtered = _apply_metadata_filters(
+        metadata_df,
+        order_id=order_id,
+        testrig_id=testrig_id,
+        sample_name=sample_name,
+        number_of_cells=number_of_cells,
+    )
+    metadata_start, metadata_end = _metadata_time_bounds(metadata_filtered)
+    if start_value in (None, "") and metadata_start:
+        start_value = metadata_start
+    if end_value in (None, "") and metadata_end:
+        end_value = metadata_end
+
     try:
         df = get_timeseries(
             space="sherlock",
@@ -1361,10 +1511,11 @@ def load_timeseries_data(
     except Exception as exc:
         return {
             "error": f"Request failed: {exc}",
-            "status": "Failed to load timeseries",
             "badge": "Request error",
             "signals": signals,
             "records": [],
+            "data_min": None,
+            "data_max": None,
             "viewport": viewport,
         }
 
@@ -1372,114 +1523,160 @@ def load_timeseries_data(
     if not time_col:
         return {
             "error": "No supported time column was returned",
-            "status": "No time axis available",
             "badge": "Request error",
             "signals": signals,
             "records": [],
+            "data_min": None,
+            "data_max": None,
             "viewport": viewport,
         }
 
     plot_df = df.rename(columns={time_col: PLOT_TIME_COLUMN}).copy()
     plot_df[PLOT_TIME_COLUMN] = pd.to_datetime(
         plot_df[PLOT_TIME_COLUMN], errors="coerce", utc=True
-    ).dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+    )
+    valid_times = plot_df[PLOT_TIME_COLUMN].dropna()
+    data_min = (
+        valid_times.min().strftime("%Y-%m-%dT%H:%M:%SZ")
+        if not valid_times.empty
+        else None
+    )
+    data_max = (
+        valid_times.max().strftime("%Y-%m-%dT%H:%M:%SZ")
+        if not valid_times.empty
+        else None
+    )
+    plot_df[PLOT_TIME_COLUMN] = plot_df[PLOT_TIME_COLUMN].dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
     meta = df.attrs.get("meta", {}) if hasattr(df, "attrs") else {}
     bucket_seconds = meta.get("bucket_seconds")
     bucket_label = meta.get("bucket_label")
     bucket_display = _humanize_bucket(bucket_seconds, bucket_label)
-    effective_start = meta.get("effective_start") or start_value
-    effective_end = meta.get("effective_end") or end_value
-    readable_start = _humanize_timestamp(effective_start)
-    readable_end = _humanize_timestamp(effective_end)
-
-    status_text = NORMALIZED_DESCRIPTION
     badge = f" Bucket: {bucket_display}" if bucket_display else ""
 
     return {
         "error": None,
-        "status": status_text,
         "badge": badge,
         "signals": signals,
         "bucket_seconds": bucket_seconds,
         "records": plot_df.to_dict("records"),
+        "data_min": data_min,
+        "data_max": data_max,
         "viewport": viewport,
     }
 
+
 @callback(
-    Output("timeseries-signal-selector", "data"),
-    Output("timeseries-signal-selector", "value"),
+    Output("timeseries-start-datetime", "minDate"),
+    Output("timeseries-start-datetime", "maxDate"),
+    Output("timeseries-end-datetime", "minDate"),
+    Output("timeseries-end-datetime", "maxDate"),
+    Output("timeseries-start-datetime", "value", allow_duplicate=True),
+    Output("timeseries-end-datetime", "value", allow_duplicate=True),
     Input("timeseries-data-store", "data"),
-    Input("timeseries-metric-selector", "value"),
-    State("timeseries-signal-selector", "value"),
+    prevent_initial_call=True,
 )
-def sync_signal_selector(data, metric, current_selection):
+def sync_datetime_bounds(data):
     data = data or {}
-    signals = data.get("signals") or []
-    metric = metric or "all"
+    data_min = _normalize_datetime_value(data.get("data_min"))
+    data_max = _normalize_datetime_value(data.get("data_max"))
+    if not data_min or not data_max:
+        return None, None, None, None, None, None
+
+    viewport = data.get("viewport") or {}
+    start_value = _normalize_datetime_value(viewport.get("start")) or data_min
+    end_value = _normalize_datetime_value(viewport.get("end")) or data_max
+
+    min_ts = pd.to_datetime(data_min, errors="coerce", utc=True)
+    max_ts = pd.to_datetime(data_max, errors="coerce", utc=True)
+    start_ts = pd.to_datetime(start_value, errors="coerce", utc=True)
+    end_ts = pd.to_datetime(end_value, errors="coerce", utc=True)
+
+    if pd.notna(min_ts) and pd.notna(max_ts):
+        if pd.isna(start_ts) or start_ts < min_ts:
+            start_value = data_min
+            start_ts = min_ts
+        if pd.isna(end_ts) or end_ts > max_ts:
+            end_value = data_max
+            end_ts = max_ts
+        if pd.notna(start_ts) and pd.notna(end_ts) and start_ts > end_ts:
+            start_value, end_value = data_min, data_max
+
+    return data_min, data_max, data_min, data_max, start_value, end_value
+
+
+@callback(
+    Output("timeseries-download", "data"),
+    Input("timeseries-download-btn", "n_clicks"),
+    State("timeseries-data-store", "data"),
+    prevent_initial_call=True,
+)
+def download_timeseries_csv(n_clicks, data):
+    if not n_clicks:
+        raise PreventUpdate
+
+    data = data or {}
     records = data.get("records") or []
-    plot_df = pd.DataFrame(records)
-    options = _build_signal_selector_data(plot_df, signals, metric)
-    selectable_signals = [
-        signal for signal in signals if _signal_has_data(plot_df, signal, metric)
-    ]
+    if not records:
+        raise PreventUpdate
 
-    if not signals:
-        return [], []
-
-    if not current_selection:
-        return options, selectable_signals
-
-    selected = [signal for signal in current_selection if signal in selectable_signals]
-    if not selected:
-        return options, selectable_signals
-    return options, selected
+    df = pd.DataFrame(records)
+    return dcc.send_data_frame(df.to_csv, "timeseries_overview.csv", index=False)
 
 
 @callback(
     Output("timeseries-graph", "figure"),
     Output("timeseries-normalized-graph", "figure"),
-    Output("timeseries-status-text", "children"),
     Output("timeseries-meta-badge", "children"),
+    Output("timeseries-missing-signals-box", "children"),
+    Output("timeseries-missing-signals-divider", "style"),
+    Output("timeseries-download-btn", "disabled"),
     Input("timeseries-data-store", "data"),
-    Input("timeseries-signal-selector", "value"),
-    Input("timeseries-metric-selector", "value"),
-    Input("timeseries-plot-mode-selector", "value"),
     Input("theme-store", "data"),
     running=[
         (Output("timeseries-render-loading-overlay", "visible"), True, False),
+        (Output("timeseries-normalized-render-loading-overlay", "visible"), True, False),
     ],
     prevent_initial_call=False,
 )
-def render_timeseries(data, selected_signals, metric, plot_mode, theme):
+def render_timeseries(data, theme):
     theme = theme or "light"
-    metric = metric or "all"
-    plot_mode = plot_mode or "isolated"
+    metric = "all"
+    plot_mode = "isolated"
     data = data or {}
+    hidden_divider_style = {"display": "none"}
 
     error_message = data.get("error")
     if error_message:
         fig = _empty_figure(theme, error_message)
-        return fig, fig, data.get("status", "No data"), data.get("badge", "Request error")
+        return fig, fig, data.get("badge", "Request error"), None, hidden_divider_style, True
 
     records = data.get("records") or []
     signals = data.get("signals") or []
     bucket_seconds = data.get("bucket_seconds")
     viewport = data.get("viewport") or {"start": None, "end": None}
 
-    if selected_signals is None:
-        active_signals = signals
-    else:
-        active_signals = [signal for signal in selected_signals if signal in signals]
-
-    if not active_signals:
+    if not signals:
         fig = _empty_figure(theme, "No signals selected")
-        return fig, fig, data.get("status", "No data"), data.get("badge", "")
+        return fig, fig, data.get("badge", ""), None, hidden_divider_style, True
 
     plot_df = pd.DataFrame(records)
     resolved_signals = [
-        signal for signal in active_signals if _signal_has_data(plot_df, signal, metric)
+        signal for signal in signals if _signal_has_data(plot_df, signal, metric)
     ]
+    missing_signals = [
+        signal for signal in signals if signal not in resolved_signals
+    ]
+
+    missing_message = None
+    divider_style = hidden_divider_style
+    if missing_signals:
+        missing_message = dmc.Text(
+            f"Missing signals in selected range: {', '.join(missing_signals)}",
+            size="sm",
+            c="dimmed",
+        )
+        divider_style = {}
 
     fig = _build_figure(
         plot_df,
@@ -1502,4 +1699,12 @@ def render_timeseries(data, selected_signals, metric, plot_mode, theme):
         bucket_seconds=bucket_seconds,
     )
 
-    return fig, normalized_fig, data.get("status", "No data"), data.get("badge", "")
+    has_records = bool(records)
+    return (
+        fig,
+        normalized_fig,
+        data.get("badge", ""),
+        missing_message,
+        divider_style,
+        not has_records,
+    )
