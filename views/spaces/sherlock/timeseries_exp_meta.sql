@@ -43,7 +43,9 @@ SELECT
   order_id,
   testrig_id,
   sample_name,
-  number_of_cells
+  number_of_cells,
+  MIN(time) AS start_time,
+  MAX(time) AS end_time
 FROM
   filtered_ts
 GROUP BY
