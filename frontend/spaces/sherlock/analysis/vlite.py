@@ -29,6 +29,7 @@ register_page(
 USAGE_BLOCKQUOTE_TEXT = [
     "Select an Order ID to load polarisation curve data for that order.",
     "Select one or more events from the Event ID(s) dropdown, then click 'Run Model' to fit the V-lite model.",
+    "When an input parameter is missing or zero, it is highlighted in red in the parameter table. A standard value is used for the model.",
     "After the model runs, select an event in the Results section to see the loss stackup and temperature increase plots.",
     "Download the polcurve data and model results as CSV using the Download CSV button.",
 ]
@@ -313,10 +314,10 @@ def vlite_layout():
                                                 dashGridOptions={
                                                     "pagination": False,
                                                     "domLayout": "normal",
-                                                    "rowHeight": 40,
-                                                    "headerHeight": 44,
+                                                    "rowHeight": 34,
+                                                    "headerHeight": 34,
                                                 },
-                                                style={"height": "100px", "width": "100%"},
+                                                style={"height": "72px", "width": "100%"},
                                             ),
                                         ],
                                     ),
@@ -844,8 +845,8 @@ def update_parameter_table(model_store):
         [
             html.Thead(html.Tr(header_cells)),
             html.Tbody([
-                html.Tr(global_row),
                 html.Tr(fit_row),
+                html.Tr(global_row),
             ]),
         ],
         style={
