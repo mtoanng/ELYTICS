@@ -2,6 +2,7 @@ import re
 
 from dash import (
     callback,
+    ctx,
     clientside_callback,
     dcc,
     Input,
@@ -171,6 +172,10 @@ USAGE_BLOCKQUOTE_TEXT = [
     "Zoom or pan the chart to reload the selected time window.",
     "Default signals: " + ", ".join(DEFAULT_SENSOR_NAMES) + ".",
 ]
+
+NORMALIZED_DESCRIPTION = (
+    "Selected signals are min-max normalized to a 0-1 range and overlaid on a shared axis."
+)
 
 
 def _empty_figure(
@@ -1008,6 +1013,21 @@ def timeseries_overview_layout():
                                 ],
                             ),
                             dmc.Space(h="sm"),
+                            dcc.Graph(
+                                id="timeseries-normalized-graph",
+                                figure=_empty_figure(
+                                    "light", "Loading metadata..."
+                                ),
+                                config={
+                                    "responsive": True,
+                                    "displaylogo": False,
+                                },
+                                style={
+                                    "width": "100%",
+                                    "minHeight": "360px",
+                                },
+                            ),
+                            dmc.Divider(size="xs", my="sm"),
                             dmc.Box(
                                 id="timeseries-plot-container",
                                 pos="relative",
@@ -1064,37 +1084,6 @@ def timeseries_overview_layout():
                                         ],
                                     ),
                                 ],
-                            ),
-                            dmc.Divider(size="xs", my="sm"),
-                            dmc.Box(
-                                children=[
-                                    dmc.Text(
-                                        "Normalized Overlay",
-                                        fw=600,
-                                        size="sm",
-                                        mb=4,
-                                    ),
-                                    dmc.Text(
-                                        "Selected signals are min-max normalized to a 0-1 range and overlaid on a shared axis.",
-                                        size="xs",
-                                        c="dimmed",
-                                        mb="sm",
-                                    ),
-                                    dcc.Graph(
-                                        id="timeseries-normalized-graph",
-                                        figure=_empty_figure(
-                                            "light", "Loading metadata..."
-                                        ),
-                                        config={
-                                            "responsive": True,
-                                            "displaylogo": False,
-                                        },
-                                        style={
-                                            "width": "100%",
-                                            "minHeight": "360px",
-                                        },
-                                    ),
-                                ]
                             ),
                         ],
                     ),
@@ -1273,10 +1262,19 @@ def sync_stateful_filters(
 )
 def update_viewport_store(main_relayout_data, normalized_relayout_data, current):
     relayout_data = None
-    for candidate in (normalized_relayout_data, main_relayout_data):
-        if isinstance(candidate, dict):
-            relayout_data = candidate
-            break
+    trigger_id = ctx.triggered_id
+
+    if trigger_id == "timeseries-normalized-graph" and isinstance(
+        normalized_relayout_data, dict
+    ):
+        relayout_data = normalized_relayout_data
+    elif trigger_id == "timeseries-graph" and isinstance(main_relayout_data, dict):
+        relayout_data = main_relayout_data
+    else:
+        for candidate in (main_relayout_data, normalized_relayout_data):
+            if isinstance(candidate, dict):
+                relayout_data = candidate
+                break
     if not isinstance(relayout_data, dict):
         raise PreventUpdate
     if not any(
@@ -1395,7 +1393,7 @@ def load_timeseries_data(
     readable_start = _humanize_timestamp(effective_start)
     readable_end = _humanize_timestamp(effective_end)
 
-    status_text = f"Viewport: {readable_start} to {readable_end}"
+    status_text = NORMALIZED_DESCRIPTION
     badge = f" Bucket: {bucket_display}" if bucket_display else ""
 
     return {
