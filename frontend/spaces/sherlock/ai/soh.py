@@ -23,6 +23,11 @@ register_page(
 )
 
 
+
+# Information on how the State of Health (SOH) is obtained via the virtual sensor is available here.
+# Reference Operating Conditions (Ref OpCons) comprise the set of conditions at which the virtual sensor's overpotential is evaluated to track ageing-related changes. Ref OpCons: Current density = 3.0 A/cm², Temperature = 70°C, Cathode Outlet Pressure = 40 bar, Anode Outlet Pressure = 2.5 bar, Water Inflow = 5.2 l/min per cell.
+# Δηtot is the change in overpotential relative to the Begin of Life (BoL) baseline, assessed at Ref OpCons and the BoL parameters (SOH_lin=0 & SOH_kin=1) of the CSM configuration for the respective stack. Similarly, Δηlin/Δηkin is obtained with respect to Ref OpCons and SOH_kin=1/SOH_lin=0.
+
 USAGE_BLOCKQUOTE_TEXT = [
     "Explore SOH trends with lazy-loaded fleet and stack datasets.",
     "Select a sample to unlock stack-level detail plots.",

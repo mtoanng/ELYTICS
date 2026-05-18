@@ -2,6 +2,7 @@
 SOH Service - Utility and helper functions for State of Health analysis
 """
 import re
+import zlib
 import numpy as np
 import pandas as pd
 import plotly.graph_objs as go
@@ -34,6 +35,14 @@ def adjust_color_brightness(hex_color, factor):
     g = min(255, max(0, int(g * factor)))
     b = min(255, max(0, int(b * factor)))
     return f"#{r:02x}{g:02x}{b:02x}"
+
+
+def _sample_color(sample_name):
+    """Return a stable color for a sample, independent of filtering/order."""
+    if sample_name is None:
+        return "#e74c3c"
+    idx = zlib.crc32(str(sample_name).encode("utf-8")) % len(CELL_COLORS)
+    return CELL_COLORS[idx]
 
 
 def get_array_len(arr):
@@ -636,13 +645,6 @@ def create_overpotential_plots(df_soh, dff, xaxis_col, theme_data, sample_name):
     dff = _filter_valid_timestamps(dff, xaxis_col)
     fig = make_subplots(rows=3, cols=1, row_heights=[0.33, 0.33, 0.33], vertical_spacing=0.08)
 
-    # Define color map for consistent colors across samples
-    all_samples_full = sorted(df_soh["sample_name"].dropna().unique())
-    color_map = {
-        sample: CELL_COLORS[i % len(CELL_COLORS)]
-        for i, sample in enumerate(all_samples_full)
-    }
-
     col_bol_lin = "model_uCellAvg_BoL-lin_ref_jStck-3-0pAndeOut-2-5pCtdeOut-40tAndeIn-70vfAndeIn-5-2delta_Rohm-0_stack"
     col_bol_kin = "model_uCellAvg_BoL-kin_ref_jStck-3-0pAndeOut-2-5pCtdeOut-40tAndeIn-70vfAndeIn-5-2ECSA-1_stack"
     col_pc = "model_uCellAvg_pc_3-0_stack"
@@ -656,7 +658,7 @@ def create_overpotential_plots(df_soh, dff, xaxis_col, theme_data, sample_name):
 
     for sample in dff["sample_name"].unique():
         sample_data = dff[dff["sample_name"] == sample]
-        color = color_map.get(sample, "#e74c3c")
+        color = _sample_color(sample)
 
         eta_tot = 1000 * (-sample_data[col_bol_lin] - sample_data[col_bol_kin] + 2*sample_data[col_pc])
         eta_kin = 1000 * (-sample_data[col_bol_kin] + sample_data[col_pc])
@@ -776,12 +778,6 @@ def create_overpotential_plots(df_soh, dff, xaxis_col, theme_data, sample_name):
 
 def create_overpotential_lin_vs_kin_plot(dff, df_soh, plotly_template, sample_name, fit_coeffs=None):
     fig_lin_vs_lin = go.Figure().update_layout(template=plotly_template)
-    # define color map such that each sample gets a consistent color across plots
-    all_samples_full = sorted(df_soh["sample_name"].dropna().unique())
-    color_map = {
-        sample: CELL_COLORS[i % len(CELL_COLORS)] 
-        for i, sample in enumerate(all_samples_full)
-    }
 
     col_bol_lin = "model_uCellAvg_BoL-lin_ref_jStck-3-0pAndeOut-2-5pCtdeOut-40tAndeIn-70vfAndeIn-5-2delta_Rohm-0_stack"
     col_bol_kin = "model_uCellAvg_BoL-kin_ref_jStck-3-0pAndeOut-2-5pCtdeOut-40tAndeIn-70vfAndeIn-5-2ECSA-1_stack"
@@ -791,47 +787,61 @@ def create_overpotential_lin_vs_kin_plot(dff, df_soh, plotly_template, sample_na
         sample_data = dff[dff["sample_name"] == sample_name]
         eta_kin = 1000 * (-sample_data[col_bol_kin] + sample_data[col_pc])
         eta_lin = 1000 * (-sample_data[col_bol_lin] + sample_data[col_pc])
-        # Plot the individual data points, colored by runtime
+        selected_color = _sample_color(sample_name)
         runtime_vals = sample_data["runtime_hours"]
+
+        # Color selected-sample points by runtime to show temporal progression.
         fig_lin_vs_lin.add_trace(go.Scattergl(
             x=eta_kin,
             y=eta_lin,
             mode="markers",
             marker=dict(
-                size=6, color=runtime_vals, colorscale='Turbo',
-                colorbar=dict(title="Runtime [h]", thickness=20)
+                size=7,
+                color=runtime_vals,
+                colorscale="Turbo",
+                colorbar=dict(title="Runtime [h]", thickness=18),
             ),
-            hovertemplate="<b>Sample</b>: "+sample_name+"<br>Kinetic: %{x:.3f} mV<br>Linear: %{y:.3f} mV<br>Runtime: %{marker.color:.1f}h<extra></extra>",
+            hovertemplate="<b>Sample</b>: "+sample_name+"<br>Kinetic: %{x:.3f} mV<br>Linear: %{y:.3f} mV<br>Runtime: %{customdata:.1f}h<extra></extra>",
+            customdata=runtime_vals,
             showlegend=False
         ))
-        # Plot parametric trendline from fit coefficients (kin(t) vs lin(t))
-        if fit_coeffs and sample_name in fit_coeffs:
-            sc = fit_coeffs[sample_name]
-            if "kin" in sc and "lin" in sc:
-                t_vals = sample_data["runtime_hours"].values
-                t_smooth = np.linspace(np.nanmin(t_vals), np.nanmax(t_vals), 200)
+        # Plot parametric trendline from fit coefficients (kin(t) vs lin(t)).
+        # Fallback to direct fit on selected sample data if coefficients were not provided.
+        sc = fit_coeffs.get(sample_name) if fit_coeffs else None
+        if (not sc or "kin" not in sc or "lin" not in sc) and len(sample_data) >= 3:
+            runtime_vals = sample_data["runtime_hours"].values
+            if np.isfinite(runtime_vals).sum() >= 3:
+                _, _, coeffs_lin_runtime = get_polyfit_smooth(runtime_vals, eta_kin.values, degree=2)
+                _, _, coeffs_kin_runtime = get_polyfit_smooth(runtime_vals, eta_lin.values, degree=2)
+                if coeffs_lin_runtime is not None and coeffs_kin_runtime is not None:
+                    sc = {"lin": coeffs_lin_runtime, "kin": coeffs_kin_runtime}
+
+        if sc and "kin" in sc and "lin" in sc:
+            t_vals = sample_data["runtime_hours"].values
+            finite_mask = np.isfinite(t_vals)
+            if finite_mask.sum() >= 2:
+                t_min = np.nanmin(t_vals[finite_mask])
+                t_max = np.nanmax(t_vals[finite_mask])
+                t_smooth = np.linspace(t_min, t_max, 200)
                 x_curve = np.polyval(sc["lin"], t_smooth)
                 y_curve = np.polyval(sc["kin"], t_smooth)
-                selected_color = color_map.get(sample_name, "#e74c3c")
                 fig_lin_vs_lin.add_trace(go.Scattergl(
                     x=x_curve, y=y_curve, mode="lines",
-                    line=dict(color=selected_color, width=3, dash="dash"),
+                    line=dict(color=selected_color, width=2, dash="dash"),
                     hoverinfo="skip", showlegend=False
                 ))
-                # Add arrowhead annotation at the end of the trendline
-                # Overlay a large triangle-up marker at the end of the trendline for visibility
                 if len(x_curve) > 0 and len(y_curve) > 0:
                     fig_lin_vs_lin.add_trace(go.Scattergl(
                         x=[x_curve[-1]], y=[y_curve[-1]],
                         mode="markers",
-                        marker=dict(symbol="triangle-up", size=18, color=selected_color),
+                        marker=dict(symbol="triangle-up", size=15, color=selected_color),
                         showlegend=False, hoverinfo="skip"
                     ))
         title = "Overpotential Trendline"
     else: # no sample name selected
         for other_sample in dff["sample_name"].unique():
             sample_data = dff[dff["sample_name"] == other_sample]
-            color = color_map[other_sample]
+            color = _sample_color(other_sample)
             eta_kin = 1000 * (-sample_data[col_bol_kin] + sample_data[col_pc])
             eta_lin = 1000 * (-sample_data[col_bol_lin] + sample_data[col_pc])
             # Use fit coefficients for parametric curve if available
