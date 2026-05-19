@@ -34,6 +34,11 @@
       "pr": 859,
       "title": "feat(enola): Migrated customer overview page",
       "date": "2026-05-12"
+    },
+    {
+      "pr": 895,
+      "title": "feat(holmes): Change Holmes landing page and space home pages",
+      "date": "2026-05-19"
     }
   ],
   "releases": {}

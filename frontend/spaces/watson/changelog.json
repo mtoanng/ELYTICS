@@ -14,6 +14,11 @@
       "pr": 791,
       "title": "feat(core): Added fullscreen functionality",
       "date": "2026-04-21"
+    },
+    {
+      "pr": 895,
+      "title": "feat(holmes): Change Holmes landing page and space home pages",
+      "date": "2026-05-19"
     }
   ],
   "releases": {
