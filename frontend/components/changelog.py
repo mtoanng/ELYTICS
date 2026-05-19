@@ -200,7 +200,7 @@ def _create_update_log_item(update: dict[str, Any], source_label: str, source_co
 		p="md",
 		radius="md",
 		withBorder=True,
-		maw=760,
+		w="100%",
 	)
 
 
