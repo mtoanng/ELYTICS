@@ -204,6 +204,11 @@
       "pr": 892,
       "title": "fix(core): Changelog component width not scaling",
       "date": "2026-05-19"
+    },
+    {
+      "pr": 891,
+      "title": "feat(sherlock): Added events to timeseries page",
+      "date": "2026-05-19"
     }
   ],
   "releases": {}

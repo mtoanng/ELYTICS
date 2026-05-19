@@ -159,6 +159,11 @@
       "pr": 886,
       "title": "fix(sherlock): fixed trendline and color scheme for stack soh plots",
       "date": "2026-05-19"
+    },
+    {
+      "pr": 891,
+      "title": "feat(sherlock): Added events to timeseries page",
+      "date": "2026-05-19"
     }
   ],
   "releases": {}
