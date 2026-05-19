@@ -463,6 +463,23 @@ def populate_order_options(metadata):
 
 
 @callback(
+    Output("vlite-order-id-filter", "value"),
+    Input("vlite-order-id-filter", "options"),
+    State("vlite-order-id-filter", "value"),
+)
+def set_default_order_id(order_options, current_value):
+    """Set default order_id to the most recent (first option) on initial page load."""
+    if not order_options:
+        return None
+    
+    valid_order_ids = {opt["value"] for opt in order_options}
+    if current_value and current_value in valid_order_ids:
+        return current_value
+    
+    return order_options[0]["value"]
+
+
+@callback(
     Output("vlite-data-store", "data"),
     Output("vlite-model-store", "data"),
     Output("vlite-model-status", "children"),
@@ -487,10 +504,14 @@ def update_event_options(data):
     if not data:
         return [], []
     df = pd.DataFrame(data)
+    df = _add_event_short_id(df)
     if "event_id" not in df.columns:
         return [], []
     events = sorted(df["event_id"].dropna().unique())
-    options = [{"label": str(e), "value": e} for e in events]
+    options = []
+    for e in events:
+        event_short = df[df["event_id"] == e]["event_short_id"].iloc[0]
+        options.append({"label": str(event_short), "value": e})
     return options, list(events)
 
 
