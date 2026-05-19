@@ -95,6 +95,7 @@ def _create_space_selector():
             style={"display": "flex", "alignItems": "center", "height": "100%"},
         ),
         checkIconPosition="right",
+        maxDropdownHeight=300,
         w=240,
         size="md",
         value=None,

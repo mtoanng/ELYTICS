@@ -15,15 +15,13 @@ def sherlock_layout():
         pt="md",
         pb="xl",
         children=[
-            dmc.Title("Welcome to Sherlock Home", order=1),
+            dmc.Title("Welcome to PEMELY Sherlock", order=1),
             dmc.Text(
-                "Sherlock is your unified workspace for battery test data management, "
-                "exploration, and advanced analytics. Here you can monitor test rigs, "
-                "explore datasets, and leverage AI/ML tools for deeper insights.",
+                "Explore ELY asTested Stack Data including Bosch internal test rigs and external testing.",
                 size="md",
                 c="dimmed",
             ),
-            dmc.Title("What can you do here?", order=2, mt="xl"),
+            dmc.Title("What can you do here?", order=2, mt="md"),
             dmc.List(
                 [
                     dmc.ListItem([
@@ -32,15 +30,15 @@ def sherlock_layout():
                     ]),
                     dmc.ListItem([
                         dmc.Text("Data Exploration: ", fw=700, span=True),
-                        "Dive into Order, Sample, CCM, and Timeseries Overviews. Analyze Polarization Curves."
+                        "Check Order, Sample, CCM, and Timeseries Overviews. Analyze Polarization Curves."
                     ]),
                     dmc.ListItem([
                         dmc.Text("Data Analysis: ", fw=700, span=True),
-                        "Generate Summary Stats and custom Charts."
+                        "Dive deeper in polcurve data."
                     ]),
                     dmc.ListItem([
                         dmc.Text("AI/ML: ", fw=700, span=True),
-                        "Access Model Overview and generate Predictions."
+                        "Get advanced insights regarding stack state-of-health."
                     ]),
                 ],
                 spacing="md",
@@ -54,7 +52,7 @@ def sherlock_layout():
                     ),
                 ],
                 gap="lg",
-                mt="xl",
+                mt="md",
             ),
         ],
     )
