@@ -24,9 +24,51 @@ register_page(
 
 
 USAGE_BLOCKQUOTE_TEXT = [
-    "Explore SOH trends with lazy-loaded fleet and stack datasets.",
-    "Select a sample to unlock stack-level detail plots.",
-    "Download the currently relevant SOH dataset as CSV.",
+    dmc.Text(
+        "Explore SOH trends with lazy-loaded fleet and stack datasets. Select a sample to unlock stack-level detail plots, then download the currently relevant SOH dataset as CSV.",
+        size="sm",
+    ),
+    dmc.Text(
+        [
+            "Information on how State of Health (SOH) is obtained via the ",
+            html.Strong("virtual sensor"),
+            " is available ",
+            html.A(
+                "here",
+                href="https://inside-docupedia.bosch.com/confluence/spaces/ELYSTACK/pages/6187147889/UC001-DEV+Virtual+Sensor+for+State+Of+Health",
+                target="_blank",
+            ),
+            ".",
+        ],
+        size="sm",
+    ),
+    dmc.Text(
+        [           
+            html.Strong("Reference Operating Conditions (Ref OpCons)", style={"fontWeight": "700"}),
+            html.Span(" comprise the set of conditions at which the virtual sensor's overpotential is evaluated to track ageing-related changes."),
+            html.Strong(" Ref OpCons:", style={"fontWeight": "700"}),
+            html.Span(" Current density = 3.0 A/cm², Temperature = 70°C, Cathode Outlet"),
+            html.Span(" Pressure = 40 bar, Anode Outlet Pressure = 2.5 bar, Water Inflow = 5.2 l/min per cell."),
+        ],
+        size="sm",
+    ),
+    dmc.Text(
+        [
+            html.Span("Δη", style={"fontWeight": "700"}),
+            html.Sub("tot", style={"fontWeight": "700"}),
+            html.Span(" is the change in overpotential relative to the Begin of Life (BoL) baseline, assessed at "),
+            html.Strong("Ref OpCons", style={"fontWeight": "700"}),
+            html.Span(" and the "),
+            html.Strong("BoL parameters", style={"fontWeight": "700"}),
+            html.Span(" (SOH_lin=0 & SOH_kin=1) of the CSM configuration for the respective stack. Similarly, "),
+            html.Span("Δη", style={"fontWeight": "700"}),
+            html.Sub("lin", style={"fontWeight": "700"}),
+            html.Span("/Δη", style={"fontWeight": "700"}),
+            html.Sub("kin", style={"fontWeight": "700"}),
+            html.Span(" is obtained with respect to Ref OpCons and SOH_kin=1/SOH_lin=0."),
+        ],
+        size="sm",
+    )
 ]
 
 
@@ -121,10 +163,7 @@ layout = dmc.Container(
                         ),
                         dmc.Collapse(
                             dmc.Blockquote(
-                                dmc.List(
-                                    withPadding=False,
-                                    children=[dmc.ListItem(item) for item in USAGE_BLOCKQUOTE_TEXT],
-                                ),
+                                dmc.Stack(gap=4, children=USAGE_BLOCKQUOTE_TEXT),
                                 color="blue",
                             ),
                             id="soh-usage-collapse",
