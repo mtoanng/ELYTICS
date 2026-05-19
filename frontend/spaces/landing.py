@@ -202,7 +202,6 @@ def create_landing():
                                     order=1,
                                     style={"textAlign": "center"},
                                 ),
-                                dmc.Divider(size="xs"),
                                 dmc.Stack(
                                     [
                                         dmc.Text(
@@ -220,7 +219,6 @@ def create_landing():
                                     ],
                                     gap=2,
                                 ),
-                                dmc.Divider(size="xs"),
                                 dmc.Text(
                                     "The Holmes application Suite is your central hub for navigating, visualizing, and understanding all ELY related stack data at Bosch. Effortlessly browse and search through complex datasets, generate insightful summaries, and uncover trends with advanced analytics and AI-powered tools.",
                                     size="md",
@@ -229,7 +227,7 @@ def create_landing():
                                 dmc.Divider(
                                     label="Application spaces",
                                     labelPosition="center",
-                                    my="xl",
+                                    my="xs",
                                 ),
                                 dmc.Text(
                                     "Select a space to begin your journey",
@@ -260,7 +258,7 @@ def create_landing():
                             dmc.Divider(
                                 label="Additional sources & documentation",
                                 labelPosition="center",
-                                my=0,
+                                my="sm",
                             ),
                             dmc.Group(
                                 [
@@ -304,6 +302,7 @@ def create_landing():
                                         ],
                                         gap="xs",
                                         align="center",
+                                        style={"width": "250px", "maxWidth": "250px"},
                                     ),
                                     dmc.Divider(orientation="vertical", size="sm", h=64),
                                     dmc.Stack(
@@ -342,6 +341,7 @@ def create_landing():
                                         ],
                                         gap="xs",
                                         align="center",
+                                        style={"width": "250px", "maxWidth": "250px"},
                                     ),
                                     dmc.Divider(orientation="vertical", size="sm", h=64),
                                     dmc.Stack(
@@ -380,6 +380,7 @@ def create_landing():
                                         ],
                                         gap="xs",
                                         align="center",
+                                        style={"width": "250px", "maxWidth": "250px"},
                                     ),
                                 ],
                                 gap="xl",

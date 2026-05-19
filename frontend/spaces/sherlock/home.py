@@ -21,7 +21,7 @@ def sherlock_layout():
                 size="md",
                 c="dimmed",
             ),
-            dmc.Title("What can you do here?", order=2, mt="xl"),
+            dmc.Title("What can you do here?", order=2, mt="md"),
             dmc.List(
                 [
                     dmc.ListItem([
@@ -52,7 +52,7 @@ def sherlock_layout():
                     ),
                 ],
                 gap="lg",
-                mt="xl",
+                mt="md",
             ),
         ],
     )
