@@ -1,5 +1,5 @@
 $ACR="acrxplatformprodwesteu01.azurecr.io"
-$TAG="develop"
+$TAG="release"
 
 az acr login --name acrxplatformprodwesteu01
 
