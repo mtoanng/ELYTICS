@@ -14,12 +14,29 @@ def mycroft_layout():
         pt="md",
         pb="xl",
         children=[
-            dmc.Title("Welcome to Mycroft Home", order=1),
+            dmc.Title("Welcome to PEMELY Mycroft", order=1),
             dmc.Text(
-                "Mycroft provides comprehensive data visualization and reporting tools "
-                "for business intelligence and insights.",
+                "Explore ELY AsProduced Stack Data, everything related to manufacturing of ELY stacks.",
                 size="md",
                 c="dimmed",
+            ),
+            dmc.Title("What can you do here?", order=2, mt="xl"),
+            dmc.List(
+                [
+                    dmc.ListItem([
+                        dmc.Text("Management: ", fw=700, span=True),
+                        "View production overview and status."
+                    ]),
+                    dmc.ListItem([
+                        dmc.Text("Data Exploration: ", fw=700, span=True),
+                        "Check stack overviews, soaking data, CVM measurements and EOL Polarization Curves."
+                    ]),
+                    dmc.ListItem([
+                        dmc.Text("Data Analysis: ", fw=700, span=True),
+                        "Analyse the trends in EOL data."
+                    ]),
+                ],
+                spacing="md",
             ),
             dmc.Stack(
                 [

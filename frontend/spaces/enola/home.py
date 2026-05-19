@@ -14,12 +14,25 @@ def enola_layout():
         pt="md",
         pb="xl",
         children=[
-            dmc.Title("Welcome to Enola Home", order=1),
+            dmc.Title("Welcome to PEMELY Enola", order=1),
             dmc.Text(
-                "Enola provides comprehensive management and administration tools for system "
-                "configuration and user access control.",
+                "Explore ELY Management Overview and get a strategic, bird's-EYE view of PEM Electrolyzer activities.",
                 size="md",
                 c="dimmed",
+            ),
+            dmc.Title("What can you do here?", order=2, mt="xl"),
+            dmc.List(
+                [
+                    dmc.ListItem([
+                        dmc.Text("Internal: ", fw=700, span=True),
+                        "View Stack details, Test Statistics and monitor Test (Rig) Activity."
+                    ]),
+                    dmc.ListItem([
+                        dmc.Text("Customers: ", fw=700, span=True),
+                        "Get customer overview."
+                    ]),
+                ],
+                spacing="md",
             ),
             dmc.Stack(
                 [

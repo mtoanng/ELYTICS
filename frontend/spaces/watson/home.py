@@ -16,10 +16,27 @@ def watson_layout():
         children=[
             dmc.Title("Welcome to Watson Home", order=1),
             dmc.Text(
-                "Watson is your intelligent data processing and analysis workspace. "
-                "Leverage advanced analytics and natural language processing for enhanced decision-making.",
+                "Explore ELY Field Stack Data from customer sites.",
                 size="md",
                 c="dimmed",
+            ),
+            dmc.Title("What can you do here?", order=2, mt="xl"),
+            dmc.List(
+                [
+                    dmc.ListItem([
+                        dmc.Text("Management: ", fw=700, span=True),
+                        "Get customer overview."
+                    ]),
+                    dmc.ListItem([
+                        dmc.Text("Data Exploration: ", fw=700, span=True),
+                        "Check customer plants, timeseries data, polarization curves and operating performance."
+                    ]),
+                    dmc.ListItem([
+                        dmc.Text("Performance & Warranty monitoring: ", fw=700, span=True),
+                        "Monitor most important KPIs, violations and CVM data."
+                    ]),
+                ],
+                spacing="md",
             ),
             dmc.Stack(
                 [
