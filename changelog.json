@@ -199,6 +199,11 @@
       "pr": 890,
       "title": "fix(core): Changed permissions to require space access",
       "date": "2026-05-19"
+    },
+    {
+      "pr": 892,
+      "title": "fix(core): Changelog component width not scaling",
+      "date": "2026-05-19"
     }
   ],
   "releases": {}
