@@ -1,6 +1,6 @@
 from backend.internal.config_types import MetadataConfig, TabularConfig, TimeseriesConfig
 
-_USER = ["IdM2BCD_holmes_pemely_user", "IdM2BCD_holmes_pemely_development"]
+_USER = ["IdM2BCD_holmes_pemely_mycroft", "IdM2BCD_holmes_pemely_development"]
 _TABULAR_TTL = 3600
 
 TABULAR_CONFIG: list[TabularConfig] = [
