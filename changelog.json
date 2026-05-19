@@ -194,6 +194,11 @@
       "pr": 886,
       "title": "fix(sherlock): fixed trendline and color scheme for stack soh plots",
       "date": "2026-05-19"
+    },
+    {
+      "pr": 890,
+      "title": "fix(core): Changed permissions to require space access",
+      "date": "2026-05-19"
     }
   ],
   "releases": {}
