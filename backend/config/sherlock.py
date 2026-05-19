@@ -38,6 +38,13 @@ TABULAR_CONFIG: list[TabularConfig] = [
         auth_groups=_USER,
         ttl=_TABULAR_TTL,
     ),
+    TabularConfig(
+        table_name="event",
+        route_name="event",
+        auth_groups=_USER,
+        ttl=_TABULAR_TTL,
+        required_filters=["order_id"]
+    )
 ]
 
 TIMESERIES_CONFIG: list[TimeseriesConfig] = [

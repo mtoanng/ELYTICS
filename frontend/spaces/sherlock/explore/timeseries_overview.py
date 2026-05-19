@@ -17,7 +17,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-from services.backend_service import get_metadata, get_timeseries
+from services.backend_service import get_metadata, get_tabular, get_timeseries
 
 register_page(
     __name__,
@@ -320,6 +320,13 @@ _PLOT_COLORS = [
     "#17becf",
 ]
 
+EVENT_TYPES = {"loadchange", "ivcurve", "testtype"}
+EVENT_COLORS = {
+    "loadchange": "rgba(66, 133, 244, 0.16)",
+    "ivcurve": "rgba(244, 180, 0, 0.16)",
+    "testtype": "rgba(15, 157, 88, 0.16)",
+}
+
 
 def _hex_to_rgba(hex_color: str, alpha: float) -> str:
     clean = hex_color.lstrip("#")
@@ -329,6 +336,150 @@ def _hex_to_rgba(hex_color: str, alpha: float) -> str:
     green = int(clean[2:4], 16)
     blue = int(clean[4:6], 16)
     return f"rgba({red},{green},{blue},{alpha})"
+
+
+def _extract_order_ids_for_events(
+    metadata_filtered: pd.DataFrame,
+    selected_order_id,
+    filtered_order_options: list[dict] | None = None,
+) -> list[str]:
+    if selected_order_id not in (None, ""):
+        return [str(selected_order_id)]
+
+    option_values = [
+        str(opt.get("value"))
+        for opt in (filtered_order_options or [])
+        if isinstance(opt, dict) and opt.get("value") not in (None, "")
+    ]
+    if option_values:
+        return sorted(set(option_values))
+
+    if metadata_filtered.empty or "order_id" not in metadata_filtered.columns:
+        return []
+    return sorted(metadata_filtered["order_id"].dropna().astype(str).unique().tolist())
+
+
+def _fetch_events_for_order_ids(order_ids: list[str]) -> list[dict]:
+    if not order_ids:
+        return []
+
+    # Keep events non-blocking for the page callback.
+    max_order_ids = 50
+    unique_order_ids = sorted(set(order_ids))[:max_order_ids]
+
+    try:
+        merged = get_tabular(
+            "sherlock",
+            "event",
+            filters={"order_id": unique_order_ids},
+        )
+    except Exception:
+        return []
+
+    if merged.empty:
+        return []
+    if not {"event_type", "start", "end"}.issubset(merged.columns):
+        return []
+
+    merged = merged.copy()
+    merged["event_type"] = merged["event_type"].astype(str).str.strip().str.lower()
+    merged = merged[merged["event_type"].isin(EVENT_TYPES)]
+    if merged.empty:
+        return []
+
+    if "order_id" not in merged.columns:
+        merged["order_id"] = None
+
+    merged["start"] = pd.to_datetime(merged["start"], errors="coerce", utc=True)
+    merged["end"] = pd.to_datetime(merged["end"], errors="coerce", utc=True)
+    merged = merged.dropna(subset=["start", "end"])
+    merged = merged[merged["end"] > merged["start"]]
+    if merged.empty:
+        return []
+
+    merged["start"] = merged["start"].dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+    merged["end"] = merged["end"].dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+    merged = (
+        merged[["order_id", "event_type", "start", "end"]]
+        .drop_duplicates(subset=["order_id", "event_type", "start", "end"])
+        .sort_values(["start", "event_type", "order_id"])
+    )
+    return merged.to_dict("records")
+
+
+def _apply_event_overlays(
+    fig: go.Figure,
+    event_rows: list[dict],
+    all_rows: bool = True,
+    row_count: int = 1,
+    y_mids: dict[int, float] | None = None,
+) -> None:
+    if not event_rows:
+        return
+
+    seen: set[tuple[str, str, str]] = set()
+    for event in event_rows:
+        event_type = str(event.get("event_type", "")).strip().lower()
+        if event_type not in EVENT_TYPES:
+            continue
+
+        start_ts = pd.to_datetime(event.get("start"), errors="coerce", utc=True)
+        end_ts = pd.to_datetime(event.get("end"), errors="coerce", utc=True)
+        if pd.isna(start_ts) or pd.isna(end_ts) or end_ts <= start_ts:
+            continue
+
+        start_naive = start_ts.tz_localize(None)
+        end_naive = end_ts.tz_localize(None)
+
+        dedupe_key = (event_type, str(start_naive), str(end_naive))
+        if dedupe_key in seen:
+            continue
+        seen.add(dedupe_key)
+
+        vrect_kwargs = dict(
+            x0=start_naive,
+            x1=end_naive,
+            fillcolor=EVENT_COLORS[event_type],
+            opacity=1,
+            layer="below",
+            line_width=0,
+        )
+        rows = range(1, max(1, int(row_count)) + 1) if all_rows else [None]
+        for row_idx in rows:
+            try:
+                if row_idx is not None:
+                    fig.add_vrect(row=row_idx, col=1, **vrect_kwargs)
+                else:
+                    fig.add_vrect(**vrect_kwargs)
+            except Exception:
+                pass
+
+
+def _build_event_lookup(event_rows: list[dict]):
+    """Return a function (timestamp) -> event label string or empty string."""
+    intervals: list[tuple[pd.Timestamp, pd.Timestamp, str]] = []
+    for event in event_rows:
+        event_type = str(event.get("event_type", "")).strip().lower()
+        if event_type not in EVENT_TYPES:
+            continue
+        start_ts = pd.to_datetime(event.get("start"), errors="coerce", utc=True)
+        end_ts = pd.to_datetime(event.get("end"), errors="coerce", utc=True)
+        if pd.isna(start_ts) or pd.isna(end_ts) or end_ts <= start_ts:
+            continue
+        intervals.append((start_ts.tz_localize(None), end_ts.tz_localize(None), event_type.title()))
+
+    def lookup(ts) -> str:
+        if pd.isna(ts):
+            return ""
+        t = pd.Timestamp(ts)
+        if t.tzinfo is not None:
+            t = t.tz_localize(None)
+        for s, e, label in intervals:
+            if s <= t < e:
+                return label
+        return ""
+
+    return lookup
 
 def _resolve_metric_column(df: pd.DataFrame, signal: str, metric: str) -> str | None:
     preferred = f"{signal}_{metric}"
@@ -459,6 +610,7 @@ def _build_figure(
     viewport_start: str | None = None,
     viewport_end: str | None = None,
     bucket_seconds: int | None = None,
+    event_rows: list[dict] | None = None,
 ) -> go.Figure:
     if df.empty:
         return _empty_figure(theme, "No data for selected filters")
@@ -572,6 +724,10 @@ def _build_figure(
                     avg_with_gaps = _insert_gap_markers(
                         df[avg_col].tolist(), gap_positions
                     )
+                    event_lookup = _build_event_lookup(event_rows or [])
+                    event_labels = [
+                        event_lookup(t) for t in _insert_gap_markers(df[PLOT_TIME_COLUMN].tolist(), gap_positions)
+                    ]
                     fig.add_trace(
                         go.Scatter(
                             x=x_with_gaps,
@@ -580,6 +736,11 @@ def _build_figure(
                             name=signal_title,
                             line=dict(width=2.0, color=color),
                             showlegend=False,
+                            customdata=event_labels,
+                            hovertemplate=(
+                                "%{x}<br>%{y:.4g}<br>"
+                                "%{customdata}<extra>" + signal_title + "</extra>"
+                            ),
                         ),
                         row=row_index,
                         col=1,
@@ -593,6 +754,10 @@ def _build_figure(
             if not _series_has_data(df, value_col):
                 continue
 
+            event_lookup = _build_event_lookup(event_rows or [])
+            event_labels = [
+                event_lookup(t) for t in _insert_gap_markers(df[PLOT_TIME_COLUMN].tolist(), gap_positions)
+            ]
             fig.add_trace(
                 go.Scatter(
                     x=x_with_gaps,
@@ -601,6 +766,11 @@ def _build_figure(
                     name=signal_title,
                     line=dict(width=1.8, color=color),
                     showlegend=False,
+                    customdata=event_labels,
+                    hovertemplate=(
+                        "%{x}<br>%{y:.4g}<br>"
+                        "%{customdata}<extra>" + signal_title + "</extra>"
+                    ),
                 ),
                 row=row_index,
                 col=1,
@@ -636,6 +806,7 @@ def _build_figure(
 
     fig.update_layout(**layout_updates)
 
+    _apply_event_overlays(fig, event_rows or [], all_rows=True, row_count=n_groups)
     for row_index in range(1, n_groups + 1):
         row_suffix = "" if row_index == 1 else str(row_index)
         yaxis_name = f"yaxis{row_suffix}"
@@ -668,6 +839,7 @@ def _build_normalized_figure(
     viewport_start: str | None = None,
     viewport_end: str | None = None,
     bucket_seconds: int | None = None,
+    event_rows: list[dict] | None = None,
 ) -> go.Figure:
     if df.empty:
         return _empty_figure(theme, "No data for selected filters")
@@ -702,6 +874,7 @@ def _build_normalized_figure(
     x_with_gaps = _insert_gap_markers(plot_df[PLOT_TIME_COLUMN].tolist(), gap_positions)
 
     fig = go.Figure()
+    event_lookup = _build_event_lookup(event_rows or [])
     for idx, (signal, value_col) in enumerate(safe_signals):
         series = pd.to_numeric(plot_df[value_col], errors="coerce")
         min_value = series.min(skipna=True)
@@ -714,14 +887,23 @@ def _build_normalized_figure(
             normalized = (series - min_value) / (max_value - min_value)
 
         color = _PLOT_COLORS[idx % len(_PLOT_COLORS)]
+        norm_with_gaps = _insert_gap_markers(normalized.tolist(), gap_positions)
+        event_labels = [
+            event_lookup(t) for t in _insert_gap_markers(plot_df[PLOT_TIME_COLUMN].tolist(), gap_positions)
+        ]
         fig.add_trace(
             go.Scatter(
                 x=x_with_gaps,
-                y=_insert_gap_markers(normalized.tolist(), gap_positions),
+                y=norm_with_gaps,
                 mode="lines",
                 name=SENSOR_TITLES.get(signal, signal),
                 line=dict(width=1.8, color=color),
                 showlegend=True,
+                customdata=event_labels,
+                hovertemplate=(
+                    "%{x}<br>%{y:.4f}<br>"
+                    "%{customdata}<extra>" + SENSOR_TITLES.get(signal, signal) + "</extra>"
+                ),
             )
         )
 
@@ -748,6 +930,7 @@ def _build_normalized_figure(
     if viewport_start and viewport_end:
         x_axis_kwargs["range"] = [viewport_start, viewport_end]
     fig.update_xaxes(**x_axis_kwargs)
+    _apply_event_overlays(fig, event_rows or [], all_rows=False)
     return fig
 
 
@@ -850,6 +1033,7 @@ def timeseries_overview_layout():
                     ),
                     dcc.Store(id="timeseries-usage-open", data=False),
                     dcc.Store(id="timeseries-metadata-store"),
+                    dcc.Store(id="timeseries-events-store", data={"order_ids": [], "rows": []}),
                     dcc.Store(
                         id="timeseries-viewport-store",
                         data={"start": None, "end": None},
@@ -1426,6 +1610,60 @@ def clear_timeseries_filters(n_clicks):
 
 
 @callback(
+    Output("timeseries-events-store", "data"),
+    Input("timeseries-order-id-filter", "value"),
+    Input("timeseries-testrig-id-filter", "value"),
+    Input("timeseries-sample-name-filter", "value"),
+    Input("timeseries-number-of-cells-filter", "value"),
+    Input("timeseries-metadata-store", "data"),
+    Input("timeseries-order-id-filter", "options"),
+    State("timeseries-events-store", "data"),
+    prevent_initial_call=False,
+)
+def load_timeseries_events(
+    order_id,
+    testrig_id,
+    sample_name,
+    number_of_cells,
+    metadata_rows,
+    order_options,
+    events_store,
+):
+    has_required_filter = any(
+        f not in (None, "") for f in [order_id, testrig_id, sample_name]
+    )
+    if not has_required_filter:
+        cached = events_store or {}
+        if not (cached.get("rows") or cached.get("order_ids")):
+            return no_update
+        return {"order_ids": [], "rows": []}
+
+    metadata_df = pd.DataFrame(metadata_rows or [])
+    metadata_filtered = _apply_metadata_filters(
+        metadata_df,
+        order_id=order_id,
+        testrig_id=testrig_id,
+        sample_name=sample_name,
+        number_of_cells=number_of_cells,
+    )
+    event_order_ids = _extract_order_ids_for_events(
+        metadata_filtered,
+        order_id,
+        order_options,
+    )
+    cached = events_store or {}
+    cached_ids = cached.get("order_ids") or []
+    if event_order_ids == cached_ids:
+        return no_update
+
+    event_rows = _fetch_events_for_order_ids(event_order_ids)
+    return {
+        "order_ids": event_order_ids,
+        "rows": event_rows,
+    }
+
+
+@callback(
     Output("timeseries-data-store", "data"),
     Input("timeseries-order-id-filter", "value"),
     Input("timeseries-testrig-id-filter", "value"),
@@ -1434,6 +1672,7 @@ def clear_timeseries_filters(n_clicks):
     Input("timeseries-extra-signals", "value"),
     Input("timeseries-viewport-store", "data"),
     Input("timeseries-metadata-store", "data"),
+    Input("timeseries-events-store", "data"),
     running=[
         (Output("timeseries-graph", "style"), _GRAPH_STYLE_LOADING, _GRAPH_STYLE_READY),
         (Output("timeseries-plot-loading-overlay", "visible"), True, False),
@@ -1454,6 +1693,7 @@ def load_timeseries_data(
     extra_signals,
     viewport,
     metadata_rows,
+    events_store,
 ):
     has_required_filter = any(f not in (None, "") for f in [order_id, testrig_id, sample_name])
     if not has_required_filter:
@@ -1461,6 +1701,7 @@ def load_timeseries_data(
             "error": "Please select either Order ID, Testrig ID, or Sample Name to view data",
             "badge": "No request yet",
             "signals": [],
+            "events": [],
             "records": [],
             "data_min": None,
             "data_max": None,
@@ -1492,6 +1733,7 @@ def load_timeseries_data(
         number_of_cells=number_of_cells,
     )
     metadata_start, metadata_end = _metadata_time_bounds(metadata_filtered)
+    event_rows = (events_store or {}).get("rows") or []
     if start_value in (None, "") and metadata_start:
         start_value = metadata_start
     if end_value in (None, "") and metadata_end:
@@ -1513,6 +1755,7 @@ def load_timeseries_data(
             "error": f"Request failed: {exc}",
             "badge": "Request error",
             "signals": signals,
+            "events": event_rows,
             "records": [],
             "data_min": None,
             "data_max": None,
@@ -1525,6 +1768,7 @@ def load_timeseries_data(
             "error": "No supported time column was returned",
             "badge": "Request error",
             "signals": signals,
+            "events": event_rows,
             "records": [],
             "data_min": None,
             "data_max": None,
@@ -1558,6 +1802,7 @@ def load_timeseries_data(
         "error": None,
         "badge": badge,
         "signals": signals,
+        "events": event_rows,
         "bucket_seconds": bucket_seconds,
         "records": plot_df.to_dict("records"),
         "data_min": data_min,
@@ -1652,6 +1897,7 @@ def render_timeseries(data, theme):
         return fig, fig, data.get("badge", "Request error"), None, hidden_divider_style, True
 
     records = data.get("records") or []
+    event_rows = data.get("events") or []
     signals = data.get("signals") or []
     bucket_seconds = data.get("bucket_seconds")
     viewport = data.get("viewport") or {"start": None, "end": None}
@@ -1678,26 +1924,34 @@ def render_timeseries(data, theme):
         )
         divider_style = {}
 
-    fig = _build_figure(
-        plot_df,
-        resolved_signals,
-        theme,
-        metric=metric,
-        plot_mode=plot_mode,
-        viewport_start=viewport.get("start"),
-        viewport_end=viewport.get("end"),
-        bucket_seconds=bucket_seconds,
-    )
+    try:
+        fig = _build_figure(
+            plot_df,
+            resolved_signals,
+            theme,
+            metric=metric,
+            plot_mode=plot_mode,
+            viewport_start=viewport.get("start"),
+            viewport_end=viewport.get("end"),
+            bucket_seconds=bucket_seconds,
+            event_rows=event_rows,
+        )
+    except Exception as e:
+        fig = _empty_figure(theme, f"Error building figure: {str(e)}")
 
-    normalized_fig = _build_normalized_figure(
-        plot_df,
-        resolved_signals,
-        theme,
-        metric=metric,
-        viewport_start=viewport.get("start"),
-        viewport_end=viewport.get("end"),
-        bucket_seconds=bucket_seconds,
-    )
+    try:
+        normalized_fig = _build_normalized_figure(
+            plot_df,
+            resolved_signals,
+            theme,
+            metric=metric,
+            viewport_start=viewport.get("start"),
+            viewport_end=viewport.get("end"),
+            bucket_seconds=bucket_seconds,
+            event_rows=event_rows,
+        )
+    except Exception as e:
+        normalized_fig = _empty_figure(theme, f"Error building normalized figure: {str(e)}")
 
     has_records = bool(records)
     return (
