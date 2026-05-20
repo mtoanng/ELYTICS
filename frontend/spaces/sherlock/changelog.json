@@ -169,6 +169,11 @@
       "pr": 895,
       "title": "feat(holmes): Change Holmes landing page and space home pages",
       "date": "2026-05-19"
+    },
+    {
+      "pr": 879,
+      "title": "feat(sherlock): migrate Vlite model in sherlock data analysis section.",
+      "date": "2026-05-20"
     }
   ],
   "releases": {}
