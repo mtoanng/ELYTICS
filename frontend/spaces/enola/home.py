@@ -16,7 +16,7 @@ def enola_layout():
         children=[
             dmc.Title("Welcome to PEMELY Enola", order=1),
             dmc.Text(
-                "Explore ELY Management Overview and get a strategic, bird's-EYE view of PEM Electrolyzer activities.",
+                "Explore ELY Management Overview and get a strategic, bird's-eye view of PEM Electrolyzer activities.",
                 size="md",
                 c="dimmed",
             ),
@@ -25,11 +25,11 @@ def enola_layout():
                 [
                     dmc.ListItem([
                         dmc.Text("Internal: ", fw=700, span=True),
-                        "View Stack details, Test Statistics and monitor Test (Rig) Activity."
+                        "View stack details, test statistics and monitor test (rig) activity."
                     ]),
                     dmc.ListItem([
                         dmc.Text("Customers: ", fw=700, span=True),
-                        "Get customer overview."
+                        "Get customer details."
                     ]),
                 ],
                 spacing="md",
