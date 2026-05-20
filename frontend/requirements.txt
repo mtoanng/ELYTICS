@@ -8,6 +8,8 @@ dash-leaflet
 authlib
 requests
 pandas
+numpy
+scipy
 python-dotenv
 databricks
 databricks-sql-connector

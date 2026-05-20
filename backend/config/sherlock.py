@@ -15,7 +15,7 @@ TABULAR_CONFIG: list[TabularConfig] = [
     TabularConfig(table_name="runtime",                 route_name="runtime",                 auth_groups=_USER, ttl=_TABULAR_TTL),
     TabularConfig(table_name="order",               route_name="order",               auth_groups=_USER, ttl=_TABULAR_TTL),
     TabularConfig(table_name="polcurve",            route_name="polcurve",            auth_groups=_USER, ttl=_TABULAR_TTL, required_filters=["order_id"]),
-    TabularConfig(table_name="polcurve_vlite",      route_name="polcurve_vlite",      auth_groups=_USER, ttl=_TABULAR_TTL, required_filters=["order_id"]),
+    TabularConfig(table_name="vlite",            route_name="vlite",            auth_groups=_USER, ttl=_TABULAR_TTL, required_filters=["order_id"]),
     TabularConfig(table_name="sample",              route_name="sample",              auth_groups=_USER, ttl=_TABULAR_TTL),
     TabularConfig(table_name="soh_fleet",           route_name="soh_fleet",           auth_groups=_USER, ttl=_TABULAR_TTL),
     TabularConfig(table_name="soh_stack",           route_name="soh_stack",           auth_groups=_USER, ttl=_TABULAR_TTL, required_filters=["sample_name"]),
@@ -62,10 +62,7 @@ METADATA_CONFIG: list[MetadataConfig] = [
         table_name="polcurve", route_name="polcurve", auth_groups=_USER, ttl=_META_TTL
     ),
     MetadataConfig(
-        table_name="polcurve_vlite",
-        route_name="polcurve_vlite",
-        auth_groups=_USER,
-        ttl=_META_TTL,
+        table_name="vlite", route_name="vlite", auth_groups=_USER, ttl=_META_TTL
     ),
     MetadataConfig(
         table_name="timeseries_exp",
