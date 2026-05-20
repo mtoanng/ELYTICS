@@ -36,6 +36,8 @@ SAMPLE_TYPE_COLORS = {
 
 USAGE_BLOCKQUOTE_TEXT = [
     "Only electrochemical testing is shown.",
+    "Different years can be selected via the filter.",
+    "Sample types or locations can be selected via filters or by clicking on the bars in the plots.",
     "Note: some testrigs do not show all data yet, as data is currently being ingested.",
 ]
 
@@ -86,7 +88,7 @@ def create_test_rig_statistics_page(ns: str):
                                     ),
                                 ],
                             ),
-                            dmc.Text("This page provides an overview of test rig statistics.", c="dimmed"),
+                            dmc.Text("Test rig statistics overview of running hours.", c="dimmed"),
                             dmc.Collapse(
                                 dmc.Blockquote(
                                     dmc.List(
