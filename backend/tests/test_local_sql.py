@@ -1,10 +1,10 @@
-import backend.internal.util as util
+import backend.services.sql as sql_service
 
 
 def test_resolve_query_source_uses_view_when_local_sql_disabled(monkeypatch):
-    monkeypatch.setattr(util, "LOCAL_SQL", False)
+    monkeypatch.setattr(sql_service, "LOCAL_SQL", False)
 
-    query_source, cache_source = util.resolve_query_source(
+    query_source, cache_source = sql_service.resolve_query_source(
         space="sherlock",
         data_kind="data",
         table_name="ccm",
@@ -15,10 +15,10 @@ def test_resolve_query_source_uses_view_when_local_sql_disabled(monkeypatch):
 
 
 def test_resolve_query_source_uses_local_sql_when_enabled(monkeypatch):
-    monkeypatch.setattr(util, "LOCAL_SQL", True)
-    monkeypatch.setattr(util, "_read_local_sql", lambda _: "SELECT 1 AS x")
+    monkeypatch.setattr(sql_service, "LOCAL_SQL", True)
+    monkeypatch.setattr(sql_service, "read_local_sql", lambda _: "SELECT 1 AS x")
 
-    query_source, cache_source = util.resolve_query_source(
+    query_source, cache_source = sql_service.resolve_query_source(
         space="sherlock",
         data_kind="metadata",
         table_name="polcurve",

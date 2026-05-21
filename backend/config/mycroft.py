@@ -1,7 +1,8 @@
-from backend.internal.config_types import MetadataConfig, TabularConfig, TimeseriesConfig
+from backend.config.types import MetadataConfig, TabularConfig, TimeseriesConfig
 
 _USER = ["IdM2BCD_holmes_pemely_mycroft", "IdM2BCD_holmes_pemely_development"]
-_TABULAR_TTL = 3600
+# 12 hour TTL due to ETL schedules
+_TABULAR_TTL = 43200
 
 TABULAR_CONFIG: list[TabularConfig] = [
     TabularConfig(table_name="component", route_name="component", auth_groups=_USER, ttl=_TABULAR_TTL),

@@ -3,9 +3,9 @@ from collections import defaultdict
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
-from backend.internal.auth import require_groups
-from backend.internal.config_types import TabularConfig
-from backend.internal.util import get_query_result, resolve_query_source
+from backend.services.auth import require_groups
+from backend.config.types import TabularConfig
+from backend.services.sql import get_query_result, resolve_query_source
 
 import backend.config.sherlock as sherlock
 import backend.config.watson as watson
