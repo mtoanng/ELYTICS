@@ -219,6 +219,11 @@
       "pr": 879,
       "title": "feat(sherlock): migrate Vlite model in sherlock data analysis section.",
       "date": "2026-05-20"
+    },
+    {
+      "pr": 899,
+      "title": "fix(core): Backend services improvements",
+      "date": "2026-05-21"
     }
   ],
   "releases": {}
