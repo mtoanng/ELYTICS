@@ -5,9 +5,10 @@ from backend.config.types import (
 )
 
 _USER = ["IdM2BCD_holmes_pemely_sherlock", "IdM2BCD_holmes_pemely_development"]
-_TABULAR_TTL = 3600
-_META_TTL = 7200
-_TS_TTL = 1800
+# 12 hour TTL due to ETL schedules
+_TABULAR_TTL = 43200
+_META_TTL = 43200
+_TS_TTL = 43200
 
 # soh disabled, the table and page needs a lot of work.
 
