@@ -156,7 +156,7 @@ def create_production_overview_page(ns: str):
                                 style={"flexWrap": "wrap"},
                                 children=[
                                     dmc.InputWrapper(
-                                        dcc.Dropdown(id=f"{ns}-cells", multi=True, style={"width": "100%"}),
+                                        dcc.Dropdown(id=f"{ns}-cells", multi=True, style={"width": "100%"},placeholder="Select number of cells"),
                                         label="Number of Cells",
                                         htmlFor=f"{ns}-cells",
                                         className="dmc",
@@ -164,7 +164,7 @@ def create_production_overview_page(ns: str):
                                         style={"flex": "1", "minWidth": "180px"},
                                     ),
                                     dmc.InputWrapper(
-                                        dcc.Dropdown(id=f"{ns}-proto", multi=True, style={"width": "100%"}),
+                                        dcc.Dropdown(id=f"{ns}-proto", multi=True, style={"width": "100%"}, placeholder="Select generation / proto"),
                                         label="Generation / Proto",
                                         htmlFor=f"{ns}-proto",
                                         className="dmc",
@@ -175,6 +175,7 @@ def create_production_overview_page(ns: str):
                                         dcc.Dropdown(
                                             id=f"{ns}-date-range",
                                             options=DATE_RANGE_OPTIONS,
+                                            placeholder="Select time range",
                                             value="last_6_months",
                                             clearable=False,
                                             style={"width": "100%"},
