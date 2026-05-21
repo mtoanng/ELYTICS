@@ -11,8 +11,6 @@ SIDEBAR_STRUCTURE = {
                 {
                     "path": "production-overview",
                     "label": "Production Overview",
-                    "preview": True,
-                    "tooltip": "This page is currently a proof of concept, data should still be validated.",
                 },
             ],
         },
@@ -81,6 +79,15 @@ SIDEBAR_STRUCTURE = {
     },
     "enola": {
         None: [{"path": "home", "label": "Home"}],
+        "Management": {
+            "path": "management",
+            "pages": [
+                {
+                    "path": "production-overview",
+                    "label": "Production Overview",
+                },
+            ],
+        },
         "Internal": {
             "path": "internal",
             "pages": [
