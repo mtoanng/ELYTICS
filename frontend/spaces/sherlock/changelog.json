@@ -179,6 +179,11 @@
       "pr": 899,
       "title": "fix(core): Backend services improvements",
       "date": "2026-05-21"
+    },
+    {
+      "pr": 900,
+      "title": "fix(holmes): checked and fixed text in holmes and subspaces",
+      "date": "2026-05-21"
     }
   ],
   "releases": {}

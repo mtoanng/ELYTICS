@@ -39,6 +39,11 @@
       "pr": 895,
       "title": "feat(holmes): Change Holmes landing page and space home pages",
       "date": "2026-05-19"
+    },
+    {
+      "pr": 900,
+      "title": "fix(holmes): checked and fixed text in holmes and subspaces",
+      "date": "2026-05-21"
     }
   ],
   "releases": {}
