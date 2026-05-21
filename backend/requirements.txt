@@ -5,11 +5,8 @@ pyjwt
 python-dotenv
 redis
 pandas
-databricks
-databricks-sql-connector
+databricks-sqlalchemy
+databricks-sdk
 cryptography
-prometheus-fastapi-instrumentator
-prometheus_client
-azure-storage-blob
 pyarrow
 httpx

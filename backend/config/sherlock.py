@@ -1,4 +1,4 @@
-from backend.internal.config_types import (
+from backend.config.types import (
     MetadataConfig,
     TabularConfig,
     TimeseriesConfig,

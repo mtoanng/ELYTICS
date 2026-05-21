@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from backend.internal.auth import verify_oidc_token
+from backend.services.auth import verify_oidc_token
 from backend.main import app
 import backend.routers.tabular as tabular_router
 

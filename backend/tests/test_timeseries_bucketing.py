@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from backend.internal.util import compute_bucket_seconds
+from backend.services.timeseries import compute_bucket_seconds
 
 
 @pytest.mark.parametrize(

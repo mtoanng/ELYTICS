@@ -1,4 +1,4 @@
-from backend.internal.config_types import MetadataConfig, TabularConfig, TimeseriesConfig
+from backend.config.types import MetadataConfig, TabularConfig, TimeseriesConfig
 
 _USER = ["IdM2BCD_holmes_pemely_enola", "IdM2BCD_holmes_pemely_development"]
 _TABULAR_TTL = 3600

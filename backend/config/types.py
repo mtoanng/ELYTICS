@@ -37,11 +37,16 @@ def validate_space_configs(
     timeseries: list[TimeseriesConfig],
     metadata: list[MetadataConfig],
 ) -> None:
-    def _validate_group_route_names(group_name: str, configs: list[TabularConfig | TimeseriesConfig | MetadataConfig]) -> None:
+    def _validate_group_route_names(
+        group_name: str,
+        configs: list[TabularConfig | TimeseriesConfig | MetadataConfig],
+    ) -> None:
         seen: set[str] = set()
         for cfg in configs:
             if cfg.route_name in seen:
-                raise ValueError(f"[{space}] duplicate route_name in {group_name}: {cfg.route_name!r}")
+                raise ValueError(
+                    f"[{space}] duplicate route_name in {group_name}: {cfg.route_name!r}"
+                )
             seen.add(cfg.route_name)
 
     for cfg in [*tabular, *timeseries, *metadata]:

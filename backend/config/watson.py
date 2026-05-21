@@ -1,4 +1,4 @@
-from backend.internal.config_types import MetadataConfig, TabularConfig, TimeseriesConfig
+from backend.config.types import MetadataConfig, TabularConfig, TimeseriesConfig
 
 TABULAR_CONFIG: list[TabularConfig] = []
 TIMESERIES_CONFIG: list[TimeseriesConfig] = []

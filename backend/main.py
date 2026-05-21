@@ -7,18 +7,17 @@ from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from prometheus_fastapi_instrumentator import Instrumentator
 
 load_dotenv(Path(__file__).resolve().parent / ".env")
 
-from backend.internal.auth import verify_oidc_token
-from backend.internal.config_types import validate_space_configs
-from backend.internal.util import close_all_databricks_connections, configure_redis_cache_policy, execute_sql_query, fully_qualified_view, get_redis_client, invalidate_view_cache
+from backend.services.auth import verify_oidc_token
+from backend.config.types import validate_space_configs
+from backend.services.cache import configure_redis_cache_policy
+from backend.services.databricks import close_all_databricks_connections
 
 from backend.routers.tabular import router as tabular_router
 from backend.routers.metadata import router as metadata_router
 from backend.routers.timeseries import router as timeseries_router
-from backend.routers.download import router as download_router
 
 import backend.config.sherlock as sherlock
 import backend.config.watson as watson
@@ -48,12 +47,9 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-Instrumentator().instrument(app).expose(app)
-
 app.include_router(tabular_router)
 app.include_router(metadata_router)
 app.include_router(timeseries_router)
-app.include_router(download_router)
 
 if os.getenv("ENVIRONMENT") == "development":
     app.add_middleware(

@@ -25,4 +25,4 @@ COPY . ./backend
 EXPOSE 8000
 
 # Start FastAPI app with gunicorn + uvicorn workers for true OS-level parallelism
-CMD ["gunicorn", "backend.main:app", "--worker-class", "uvicorn.workers.UvicornWorker", "--workers", "4", "--bind", "0.0.0.0:8000", "--timeout", "120"]
+CMD ["gunicorn", "backend.main:app", "--worker-class", "uvicorn.workers.UvicornWorker", "--workers", "1", "--bind", "0.0.0.0:8000", "--timeout", "120"]

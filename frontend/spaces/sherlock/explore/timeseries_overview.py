@@ -122,7 +122,7 @@ SENSOR_TITLES = {
     "cndAndeOut": "Anode Outlet Conductivity (cndAndeOut)",
     "cndCtdeIn": "Cathode Inlet Conductivity (cndCtdeIn)",
     "cndCtdeOut": "Cathode Outlet Conductivity (cndCtdeOut)",
-    "concH2O2": "Hydrogen Peroxide Concentration (concH2O2)",
+    "concH2O2": "Hydrogen concentration in Oxygen (concH2O2)",
     "concH2StckAmb": "Hydrogen Stack Ambient Concentration (concH2StckAmb)",
     "concO2H2": "Oxygen in Hydrogen Concentration (concO2H2)",
 }
@@ -173,7 +173,9 @@ USAGE_BLOCKQUOTE_TEXT = [
 ]
 
 def _empty_figure(
-    theme: str, message: str = "Select filters to view timeseries data"
+    theme: str,
+    message: str = "Select filters to view timeseries data",
+    height: int = EMPTY_FIGURE_HEIGHT,
 ) -> go.Figure:
     is_dark = theme == "dark"
     plot_bg = PLOT_BG_DARK if is_dark else PLOT_BG_LIGHT
@@ -181,7 +183,7 @@ def _empty_figure(
     fig.update_layout(
         template="plotly_dark" if is_dark else "plotly",
         autosize=True,
-        height=EMPTY_FIGURE_HEIGHT,
+        height=height,
         paper_bgcolor=PAPER_BG_TRANSPARENT,
         plot_bgcolor=plot_bg,
         margin=dict(t=40, l=80, r=30, b=60),
@@ -327,6 +329,10 @@ EVENT_COLORS = {
     "testtype": "rgba(15, 157, 88, 0.16)",
 }
 
+MAX_EVENT_OVERLAY_SHAPES = 500
+EVENT_MAX_RANGE_DAYS = 14
+NORMALIZED_FIGURE_HEIGHT = 460
+
 
 def _hex_to_rgba(hex_color: str, alpha: float) -> str:
     clean = hex_color.lstrip("#")
@@ -412,10 +418,19 @@ def _apply_event_overlays(
     event_rows: list[dict],
     all_rows: bool = True,
     row_count: int = 1,
+    target_row: int | None = None,
     y_mids: dict[int, float] | None = None,
 ) -> None:
     if not event_rows:
         return
+
+    # Drawing each event on every subplot row can create thousands of shapes and
+    # make Plotly rendering very slow. Fall back to a single-row overlay when
+    # the shape count would exceed a safe threshold.
+    effective_row_count = max(1, int(row_count)) if all_rows else 1
+    if len(event_rows) * effective_row_count > MAX_EVENT_OVERLAY_SHAPES:
+        all_rows = False
+        effective_row_count = 1
 
     seen: set[tuple[str, str, str]] = set()
     for event in event_rows:
@@ -444,7 +459,12 @@ def _apply_event_overlays(
             layer="below",
             line_width=0,
         )
-        rows = range(1, max(1, int(row_count)) + 1) if all_rows else [None]
+        if all_rows:
+            rows = range(1, effective_row_count + 1)
+        elif target_row is not None:
+            rows = [target_row]
+        else:
+            rows = [None]
         for row_idx in rows:
             try:
                 if row_idx is not None:
@@ -480,6 +500,37 @@ def _build_event_lookup(event_rows: list[dict]):
         return ""
 
     return lookup
+
+
+def _build_event_labels_for_timestamps(
+    timestamps: list,
+    event_rows: list[dict] | None,
+) -> list[str]:
+    if not timestamps:
+        return []
+    lookup = _build_event_lookup(event_rows or [])
+    return [lookup(ts) for ts in timestamps]
+
+
+def _should_render_events(
+    viewport_start: str | None,
+    viewport_end: str | None,
+    time_values: pd.Series,
+) -> bool:
+    start_ts = pd.to_datetime(viewport_start, errors="coerce", utc=True)
+    end_ts = pd.to_datetime(viewport_end, errors="coerce", utc=True)
+
+    if pd.isna(start_ts) or pd.isna(end_ts):
+        parsed = pd.to_datetime(time_values, errors="coerce", utc=True).dropna()
+        if parsed.empty:
+            return False
+        start_ts = parsed.min()
+        end_ts = parsed.max()
+
+    if pd.isna(start_ts) or pd.isna(end_ts) or end_ts <= start_ts:
+        return False
+
+    return (end_ts - start_ts).total_seconds() <= EVENT_MAX_RANGE_DAYS * 24 * 60 * 60
 
 def _resolve_metric_column(df: pd.DataFrame, signal: str, metric: str) -> str | None:
     preferred = f"{signal}_{metric}"
@@ -656,6 +707,7 @@ def _build_figure(
         2 * bucket_seconds if bucket_seconds else None,
     )
     x_with_gaps = _insert_gap_markers(df[PLOT_TIME_COLUMN].tolist(), gap_positions)
+    # Individual plots intentionally exclude event overlays and event hover labels.
 
     color_index = 0
     subplot_legends: dict[int, list[tuple[str, str]]] = {}
@@ -724,10 +776,6 @@ def _build_figure(
                     avg_with_gaps = _insert_gap_markers(
                         df[avg_col].tolist(), gap_positions
                     )
-                    event_lookup = _build_event_lookup(event_rows or [])
-                    event_labels = [
-                        event_lookup(t) for t in _insert_gap_markers(df[PLOT_TIME_COLUMN].tolist(), gap_positions)
-                    ]
                     fig.add_trace(
                         go.Scatter(
                             x=x_with_gaps,
@@ -736,11 +784,7 @@ def _build_figure(
                             name=signal_title,
                             line=dict(width=2.0, color=color),
                             showlegend=False,
-                            customdata=event_labels,
-                            hovertemplate=(
-                                "%{x}<br>%{y:.4g}<br>"
-                                "%{customdata}<extra>" + signal_title + "</extra>"
-                            ),
+                            hovertemplate="%{x}<br>%{y:.4g}<extra>" + signal_title + "</extra>",
                         ),
                         row=row_index,
                         col=1,
@@ -754,10 +798,6 @@ def _build_figure(
             if not _series_has_data(df, value_col):
                 continue
 
-            event_lookup = _build_event_lookup(event_rows or [])
-            event_labels = [
-                event_lookup(t) for t in _insert_gap_markers(df[PLOT_TIME_COLUMN].tolist(), gap_positions)
-            ]
             fig.add_trace(
                 go.Scatter(
                     x=x_with_gaps,
@@ -766,11 +806,7 @@ def _build_figure(
                     name=signal_title,
                     line=dict(width=1.8, color=color),
                     showlegend=False,
-                    customdata=event_labels,
-                    hovertemplate=(
-                        "%{x}<br>%{y:.4g}<br>"
-                        "%{customdata}<extra>" + signal_title + "</extra>"
-                    ),
+                    hovertemplate="%{x}<br>%{y:.4g}<extra>" + signal_title + "</extra>",
                 ),
                 row=row_index,
                 col=1,
@@ -806,7 +842,6 @@ def _build_figure(
 
     fig.update_layout(**layout_updates)
 
-    _apply_event_overlays(fig, event_rows or [], all_rows=True, row_count=n_groups)
     for row_index in range(1, n_groups + 1):
         row_suffix = "" if row_index == 1 else str(row_index)
         yaxis_name = f"yaxis{row_suffix}"
@@ -872,9 +907,18 @@ def _build_normalized_figure(
         2 * bucket_seconds if bucket_seconds else None,
     )
     x_with_gaps = _insert_gap_markers(plot_df[PLOT_TIME_COLUMN].tolist(), gap_positions)
+    include_events = _should_render_events(
+        viewport_start,
+        viewport_end,
+        plot_df[PLOT_TIME_COLUMN],
+    )
+    event_labels_with_gaps = (
+        _build_event_labels_for_timestamps(x_with_gaps, event_rows)
+        if include_events
+        else None
+    )
 
     fig = go.Figure()
-    event_lookup = _build_event_lookup(event_rows or [])
     for idx, (signal, value_col) in enumerate(safe_signals):
         series = pd.to_numeric(plot_df[value_col], errors="coerce")
         min_value = series.min(skipna=True)
@@ -888,9 +932,6 @@ def _build_normalized_figure(
 
         color = _PLOT_COLORS[idx % len(_PLOT_COLORS)]
         norm_with_gaps = _insert_gap_markers(normalized.tolist(), gap_positions)
-        event_labels = [
-            event_lookup(t) for t in _insert_gap_markers(plot_df[PLOT_TIME_COLUMN].tolist(), gap_positions)
-        ]
         fig.add_trace(
             go.Scatter(
                 x=x_with_gaps,
@@ -899,10 +940,11 @@ def _build_normalized_figure(
                 name=SENSOR_TITLES.get(signal, signal),
                 line=dict(width=1.8, color=color),
                 showlegend=True,
-                customdata=event_labels,
+                customdata=event_labels_with_gaps,
                 hovertemplate=(
-                    "%{x}<br>%{y:.4f}<br>"
-                    "%{customdata}<extra>" + SENSOR_TITLES.get(signal, signal) + "</extra>"
+                    "%{x}<br>%{y:.4f}<br>%{customdata}<extra>" + SENSOR_TITLES.get(signal, signal) + "</extra>"
+                    if include_events
+                    else "%{x}<br>%{y:.4f}<extra>" + SENSOR_TITLES.get(signal, signal) + "</extra>"
                 ),
             )
         )
@@ -914,7 +956,7 @@ def _build_normalized_figure(
         template=template,
         paper_bgcolor=PAPER_BG_TRANSPARENT,
         plot_bgcolor=plot_bg,
-        height=360,
+        height=NORMALIZED_FIGURE_HEIGHT,
         margin=dict(t=40, l=80, r=30, b=60),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         yaxis=dict(range=[-0.02, 1.02]),
@@ -930,7 +972,8 @@ def _build_normalized_figure(
     if viewport_start and viewport_end:
         x_axis_kwargs["range"] = [viewport_start, viewport_end]
     fig.update_xaxes(**x_axis_kwargs)
-    _apply_event_overlays(fig, event_rows or [], all_rows=False)
+    if include_events:
+        _apply_event_overlays(fig, event_rows or [], all_rows=False)
     return fig
 
 
@@ -1246,7 +1289,7 @@ def timeseries_overview_layout():
                                 pos="relative",
                                 style={
                                     "width": "100%",
-                                    "minHeight": "360px",
+                                    "minHeight": f"{NORMALIZED_FIGURE_HEIGHT}px",
                                 },
                                 children=[
                                     dmc.LoadingOverlay(
@@ -1282,7 +1325,9 @@ def timeseries_overview_layout():
                                     dcc.Graph(
                                         id="timeseries-normalized-graph",
                                         figure=_empty_figure(
-                                            "light", "Loading metadata..."
+                                            "light",
+                                            "Loading metadata...",
+                                            height=NORMALIZED_FIGURE_HEIGHT,
                                         ),
                                         config={
                                             "responsive": True,
@@ -1290,7 +1335,7 @@ def timeseries_overview_layout():
                                         },
                                         style={
                                             "width": "100%",
-                                            "minHeight": "360px",
+                                            "minHeight": f"{NORMALIZED_FIGURE_HEIGHT}px",
                                         },
                                     ),
                                 ],
@@ -1871,7 +1916,6 @@ def download_timeseries_csv(n_clicks, data):
 
 @callback(
     Output("timeseries-graph", "figure"),
-    Output("timeseries-normalized-graph", "figure"),
     Output("timeseries-meta-badge", "children"),
     Output("timeseries-missing-signals-box", "children"),
     Output("timeseries-missing-signals-divider", "style"),
@@ -1880,11 +1924,10 @@ def download_timeseries_csv(n_clicks, data):
     Input("theme-store", "data"),
     running=[
         (Output("timeseries-render-loading-overlay", "visible"), True, False),
-        (Output("timeseries-normalized-render-loading-overlay", "visible"), True, False),
     ],
     prevent_initial_call=False,
 )
-def render_timeseries(data, theme):
+def render_main_timeseries(data, theme):
     theme = theme or "light"
     metric = "all"
     plot_mode = "isolated"
@@ -1894,17 +1937,16 @@ def render_timeseries(data, theme):
     error_message = data.get("error")
     if error_message:
         fig = _empty_figure(theme, error_message)
-        return fig, fig, data.get("badge", "Request error"), None, hidden_divider_style, True
+        return fig, data.get("badge", "Request error"), None, hidden_divider_style, True
 
     records = data.get("records") or []
-    event_rows = data.get("events") or []
     signals = data.get("signals") or []
     bucket_seconds = data.get("bucket_seconds")
     viewport = data.get("viewport") or {"start": None, "end": None}
 
     if not signals:
         fig = _empty_figure(theme, "No signals selected")
-        return fig, fig, data.get("badge", ""), None, hidden_divider_style, True
+        return fig, data.get("badge", ""), None, hidden_divider_style, True
 
     plot_df = pd.DataFrame(records)
     resolved_signals = [
@@ -1934,10 +1976,53 @@ def render_timeseries(data, theme):
             viewport_start=viewport.get("start"),
             viewport_end=viewport.get("end"),
             bucket_seconds=bucket_seconds,
-            event_rows=event_rows,
         )
     except Exception as e:
         fig = _empty_figure(theme, f"Error building figure: {str(e)}")
+
+    has_records = bool(records)
+    return (
+        fig,
+        data.get("badge", ""),
+        missing_message,
+        divider_style,
+        not has_records,
+    )
+
+
+@callback(
+    Output("timeseries-normalized-graph", "figure"),
+    Input("timeseries-data-store", "data"),
+    Input("theme-store", "data"),
+    running=[
+        (Output("timeseries-normalized-render-loading-overlay", "visible"), True, False),
+    ],
+    prevent_initial_call=False,
+)
+def render_normalized_timeseries(data, theme):
+    theme = theme or "light"
+    metric = "all"
+    data = data or {}
+
+    error_message = data.get("error")
+    if error_message:
+        fig = _empty_figure(theme, error_message, height=NORMALIZED_FIGURE_HEIGHT)
+        return fig
+
+    records = data.get("records") or []
+    event_rows = data.get("events") or []
+    signals = data.get("signals") or []
+    bucket_seconds = data.get("bucket_seconds")
+    viewport = data.get("viewport") or {"start": None, "end": None}
+
+    if not signals:
+        fig = _empty_figure(theme, "No signals selected", height=NORMALIZED_FIGURE_HEIGHT)
+        return fig
+
+    plot_df = pd.DataFrame(records)
+    resolved_signals = [
+        signal for signal in signals if _signal_has_data(plot_df, signal, metric)
+    ]
 
     try:
         normalized_fig = _build_normalized_figure(
@@ -1951,14 +2036,9 @@ def render_timeseries(data, theme):
             event_rows=event_rows,
         )
     except Exception as e:
-        normalized_fig = _empty_figure(theme, f"Error building normalized figure: {str(e)}")
-
-    has_records = bool(records)
-    return (
-        fig,
-        normalized_fig,
-        data.get("badge", ""),
-        missing_message,
-        divider_style,
-        not has_records,
-    )
+        normalized_fig = _empty_figure(
+            theme,
+            f"Error building normalized figure: {str(e)}",
+            height=NORMALIZED_FIGURE_HEIGHT,
+        )
+    return normalized_fig

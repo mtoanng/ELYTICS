@@ -4,12 +4,12 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
-from backend.internal.auth import require_groups
-from backend.internal.config_types import TimeseriesConfig
-from backend.internal.util import (
-    _TARGET_POINTS_DEFAULT,
+from backend.services.auth import require_groups
+from backend.config.types import TimeseriesConfig
+from backend.services.sql import resolve_query_source
+from backend.services.timeseries import (
+    TARGET_POINTS_DEFAULT,
     get_timeseries_result,
-    resolve_query_source,
 )
 
 import backend.config.sherlock as sherlock
@@ -43,13 +43,13 @@ def _register_timeseries_routes(space: str, configs: list[TimeseriesConfig]) -> 
 
 
 def _bind_route(space: str, cfg: TimeseriesConfig) -> None:
-    async def route_handler(
+    def route_handler(
         request: Request,
         start: datetime | None = Query(None),
         end: datetime | None = Query(None),
         columns: list[str] = Query(...),
         time_column: str = Query(...),
-        target_points: int = Query(_TARGET_POINTS_DEFAULT),
+        target_points: int = Query(TARGET_POINTS_DEFAULT),
         token: dict = Depends(require_groups(cfg.auth_groups)),
     ):
         _ = token

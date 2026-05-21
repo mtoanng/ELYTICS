@@ -1,13 +1,13 @@
 import json
 import logging
-import time
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from backend.internal.auth import require_groups
-from backend.internal.config_types import MetadataConfig
-from backend.internal.metrics import record_query
-from backend.internal.util import LOCAL_SQL, execute_sql_query, get_redis_client, resolve_query_source, _cache_set
+from backend.services.auth import require_groups
+from backend.config.types import MetadataConfig
+from backend.services.cache import cache_set, get_redis_client
+from backend.services.databricks import execute_sql_query
+from backend.services.sql import LOCAL_SQL, resolve_query_source
 
 import backend.config.sherlock as sherlock
 import backend.config.watson as watson
@@ -41,16 +41,12 @@ def _bind_route(space: str, cfg: MetadataConfig) -> None:
             if effective_ttl > 0:
                 cached = r.get(cache_key)
                 if cached:
-                    record_query("metadata", space, cfg.table_name, cache_hit=True, duration_s=0, payload_bytes=len(cached), rows=0)
                     return {"data": json.loads(cached)}
 
-            t0 = time.monotonic()
             data = execute_sql_query(f"SELECT DISTINCT * FROM {query_source}")
-            duration = time.monotonic() - t0
             serialized = json.dumps(data, default=str)
             if effective_ttl > 0:
-                _cache_set(r, cache_key, cache_source, data, effective_ttl)
-            record_query("metadata", space, cfg.table_name, cache_hit=False, duration_s=duration, payload_bytes=len(serialized), rows=len(data))
+                cache_set(r, cache_key, cache_source, data, effective_ttl)
             return {"data": data}
         except HTTPException:
             raise
