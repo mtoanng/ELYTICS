@@ -34,10 +34,10 @@ PLOT_HOVER_COLS = [
 ]
 
 USAGE_BLOCKQUOTE_TEXT = [
-    "The top chart shows total runtime for GEN 1 Proto 1 stacks from column run_hours.",
-    "Each bar corresponds to one sample_name.",
+    "The top chart shows total runtime for GEN 1 Proto 1 stacks.",
+    "Each bar corresponds to one sample.",
     "Hover on a bar to inspect runtime and stack metadata.",
-    "Select a sample name below to load detailed uCell, concO2H2, and concH2O2 data from track_record tabular data.",
+    "Select a sample name from the filter or by clicking on the plot bars to load detailed data shown below.",
     "Use the x-axis toggle to switch the lower charts between runtime hours and date when a time column is available.",
     "NOTE: Current in-depth plots show the full timeseries (1hr) data. The conditioning events are not yet available in the data sources.",
 ]
@@ -287,7 +287,7 @@ def create_track_record_page(ns: str):
                                 ],
                             ),
                             dmc.Text(
-                                "Total runtime for GEN 1 Proto 1 stacks by sample name (based on cloud data)",
+                                "Total runtime for GEN 1 Proto 1 stacks by sample name (based on cloud data).",
                                 c="dimmed",
                             ),
                             dmc.Collapse(
