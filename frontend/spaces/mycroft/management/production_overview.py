@@ -147,7 +147,6 @@ layout = dmc.Container(
                                         start_date=datetime.today() - relativedelta(months=6),
                                         end_date=datetime.today(),
                                     ),
-                                    placeholder="Select date range",
                                     label="Date range",
                                     htmlFor="myc-prod-date-range",
                                     className="dmc",
