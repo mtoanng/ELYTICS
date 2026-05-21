@@ -15,7 +15,7 @@ register_page(
 
 USAGE_BLOCKQUOTE_TEXT = [
     "Use the filters to narrow datasets before plotting.",
-    "Select plot parameters independently for each graph.",
+    "Select plot parameters independently for each of the three graphs.",
     "Download the currently filtered dataset using Download CSV.",
 ]
 

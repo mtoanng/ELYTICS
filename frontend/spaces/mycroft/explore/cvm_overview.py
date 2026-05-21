@@ -131,7 +131,7 @@ layout = dmc.Container(
                                 ),
                             ],
                         ),
-                        dmc.Text("Cell voltage monitoring overview for Mycroft.", c="dimmed"),
+                        dmc.Text("Cell voltage monitoring overview.", c="dimmed"),
                         dmc.Collapse(
                             dmc.Blockquote(
                                 dmc.List(withPadding=False, children=[dmc.ListItem(item) for item in USAGE_BLOCKQUOTE_TEXT]),
