@@ -212,17 +212,17 @@ layout = dmc.Container(
                                     cols={"base": 1, "md": 2},
                                     spacing="md",
                                     children=[
-                                        dmc.InputWrapper(dcc.Dropdown(id="myc-soaking-stack", multi=True, style={"width": "100%"}), label="Stack Short Number", htmlFor="myc-soaking-stack", className="dmc", styles={"label": {"marginBottom": "6px"}}),
-                                        dmc.InputWrapper(dcc.Dropdown(id="myc-soaking-up", multi=True, style={"width": "100%"}), label="Unique Part ID", htmlFor="myc-soaking-up", className="dmc", styles={"label": {"marginBottom": "6px"}}),
+                                        dmc.InputWrapper(dcc.Dropdown(id="myc-soaking-stack", multi=True, style={"width": "100%"},placeholder="Select Stack Short Numbers"), label="Stack Short Number", htmlFor="myc-soaking-stack", className="dmc", styles={"label": {"marginBottom": "6px"}}),
+                                        dmc.InputWrapper(dcc.Dropdown(id="myc-soaking-up", multi=True, style={"width": "100%"},placeholder="Select Unique Part IDs"), label="Unique Part ID", htmlFor="myc-soaking-up", className="dmc", styles={"label": {"marginBottom": "6px"}}),
                                     ],
                                 ),
                                 dmc.SimpleGrid(
                                     cols={"base": 1, "md": 3},
                                     spacing="md",
                                     children=[
-                                        dmc.InputWrapper(dcc.Dropdown(id="myc-soaking-cells", multi=True, style={"width": "100%"}), label="Number of Cells", htmlFor="myc-soaking-cells", className="dmc", styles={"label": {"marginBottom": "6px"}}),
-                                        dmc.InputWrapper(dcc.Dropdown(id="myc-soaking-part-attr", multi=True, style={"width": "100%"}), label="Part Attribute", htmlFor="myc-soaking-part-attr", className="dmc", styles={"label": {"marginBottom": "6px"}}),
-                                        dmc.InputWrapper(dcc.Dropdown(id="myc-soaking-location", multi=True, style={"width": "100%"}), label="Location Result State", htmlFor="myc-soaking-location", className="dmc", styles={"label": {"marginBottom": "6px"}}),
+                                        dmc.InputWrapper(dcc.Dropdown(id="myc-soaking-cells", multi=True, style={"width": "100%"},placeholder="Select Number of Cells"), label="Number of Cells", htmlFor="myc-soaking-cells", className="dmc", styles={"label": {"marginBottom": "6px"}}),
+                                        dmc.InputWrapper(dcc.Dropdown(id="myc-soaking-part-attr", multi=True, style={"width": "100%"},placeholder="Select Part Attributes"), label="Part Attribute", htmlFor="myc-soaking-part-attr", className="dmc", styles={"label": {"marginBottom": "6px"}}),
+                                        dmc.InputWrapper(dcc.Dropdown(id="myc-soaking-location", multi=True, style={"width": "100%"},placeholder="Select Location Result States"), label="Location Result State", htmlFor="myc-soaking-location", className="dmc", styles={"label": {"marginBottom": "6px"}}),
                                     ],
                                 ),
                             ],

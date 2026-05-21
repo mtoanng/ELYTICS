@@ -21,8 +21,7 @@ register_page(
 )
 
 USAGE_BLOCKQUOTE_TEXT = [
-    "This page allows you to explore polarization curve data.",
-    "Select at least one filter to load and plot data.",
+    "This page allows you to explore and compare polarization curve data.",
     "Download the data as CSV using the Download CSV button below the filters.",
 ]
 
@@ -138,7 +137,7 @@ layout = dmc.Container(
                                     dcc.Dropdown(
                                         id="polcurve-order-id-filter",
                                         multi=True,
-                                        placeholder="Order ID",
+                                        placeholder="Select one or more order IDs",
                                         style={"width": "100%"},
                                     ),
                                     label="Order ID",
@@ -151,7 +150,7 @@ layout = dmc.Container(
                                     dcc.Dropdown(
                                         id="polcurve-sample-name-filter",
                                         multi=True,
-                                        placeholder="Sample Name",
+                                        placeholder="Select one or more sample names",
                                         style={"width": "100%"},
                                     ),
                                     label="Sample Name",
@@ -164,7 +163,7 @@ layout = dmc.Container(
                                     dcc.Dropdown(
                                         id="polcurve-testrig-id-filter",
                                         multi=True,
-                                        placeholder="Testrig ID",
+                                        placeholder="Select one or more testrig IDs",
                                         style={"width": "100%"},
                                     ),
                                     label="Testrig ID",

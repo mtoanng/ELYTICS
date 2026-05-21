@@ -28,7 +28,7 @@ register_page(
 
 USAGE_BLOCKQUOTE_TEXT = [
     "Select an Order ID to load polarisation curve data for that order.",
-    "Select one or more events from the Event ID(s) dropdown, then click 'Run Model' to fit the V-lite model.",
+    "Select one or more events from the Event ID dropdown, then click 'Run Model' to fit the V-lite model.",
     "When an input parameter is missing or zero, it is highlighted in red in the parameter table. A standard value is used for the model.",
     "After the model runs, select an event in the Results section to see the loss stackup and temperature increase plots.",
     "Download the polcurve data and model results as CSV using the Download CSV button.",
@@ -225,7 +225,7 @@ def vlite_layout():
                                         dcc.Dropdown(
                                             id="vlite-order-id-filter",
                                             multi=False,
-                                            placeholder="Order ID",
+                                            placeholder="Select an order ID",
                                             className="dmc",
                                             style={"width": "100%"},
                                         ),
@@ -239,11 +239,11 @@ def vlite_layout():
                                         dcc.Dropdown(
                                             id="vlite-event-id-filter",
                                             multi=True,
-                                            placeholder="Event(s)",
+                                            placeholder="Select one or more events",
                                             className="dmc",
                                             style={"width": "100%"},
                                         ),
-                                        label="Event ID(s)",
+                                        label="Event ID",
                                         htmlFor="vlite-event-id-filter",
                                         className="dmc",
                                         styles={"label": {"marginBottom": "6px"}},

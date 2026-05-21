@@ -16,11 +16,10 @@ register_page(
 )
 
 USAGE_BLOCKQUOTE_TEXT = [
-    "This dashboard provides an overview of deployed stacks per customer.",
-    "KPI cards summarize active, commissioning, installed power, and stacks with exceeded warranty.",
+    "This dashboard provides an overview of deployed stacks for each customer.",
+    "KPI cards summarize active, commissioning, installed power, and warranty exceeding stacks.",
     "The map shows geographical stack deployment using city coordinates.",
     "The lifecycle chart displays stack status distribution.",
-    "The runtime chart compares total operational hours per customer.",
 ]
 
 LIFECYCLE_COLORS = {
@@ -74,7 +73,7 @@ layout = dmc.Container(
                             ],
                         ),
                         dmc.Text(
-                            "Deployed stack portfolio — geographical distribution, lifecycle status, and runtime per customer.",
+                            "Deployed stack portfolio — geographical distribution and lifecycle status.",
                             c="dimmed",
                         ),
                         dmc.Collapse(

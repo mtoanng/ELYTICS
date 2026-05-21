@@ -159,7 +159,7 @@ layout = dmc.Container(
                             align="flex-end",
                             style={"flexWrap": "wrap"},
                             children=[
-                                dmc.InputWrapper(dcc.Dropdown(id="myc-polcurve-stack", multi=True, style={"width": "100%"}), label="Stack Short Number", htmlFor="myc-polcurve-stack", className="dmc", styles={"label": {"marginBottom": "6px"}}, style={"flex": "1", "minWidth": "180px"}),
+                                dmc.InputWrapper(dcc.Dropdown(id="myc-polcurve-stack", multi=True, style={"width": "100%"},placeholder="Select one or more Stack Short Numbers"), label="Stack Short Number", htmlFor="myc-polcurve-stack", className="dmc", styles={"label": {"marginBottom": "6px"}}, style={"flex": "1", "minWidth": "180px"}),
                                 dmc.InputWrapper(dcc.Dropdown(id="myc-polcurve-up", multi=True, style={"width": "100%"}), label="Unique Part ID", htmlFor="myc-polcurve-up", className="dmc", styles={"label": {"marginBottom": "6px"}}, style={"flex": "1", "minWidth": "180px"}),
                             ],
                         )

@@ -125,7 +125,7 @@ layout = dmc.Container(
                             style={"flexWrap": "wrap"},
                             children=[
                                 dmc.InputWrapper(
-                                    dcc.Dropdown(id="myc-prod-cells", multi=True, style={"width": "100%"}),
+                                    dcc.Dropdown(id="myc-prod-cells", multi=True, style={"width": "100%"},placeholder="Select Number of Cells"),
                                     label="Number of Cells",
                                     htmlFor="myc-prod-cells",
                                     className="dmc",
@@ -133,7 +133,7 @@ layout = dmc.Container(
                                     style={"flex": "1", "minWidth": "180px"},
                                 ),
                                 dmc.InputWrapper(
-                                    dcc.Dropdown(id="myc-prod-proto", multi=True, style={"width": "100%"}),
+                                    dcc.Dropdown(id="myc-prod-proto", multi=True, style={"width": "100%"},placeholder="Select Protos"),
                                     label="Proto",
                                     htmlFor="myc-prod-proto",
                                     className="dmc",

@@ -15,7 +15,7 @@ register_page(
 
 USAGE_BLOCKQUOTE_TEXT = [
     "Use the filters to narrow datasets before plotting.",
-    "Select plot parameters independently for each graph.",
+    "Select plot parameters independently for each of the three graphs.",
     "Download the currently filtered dataset using Download CSV.",
 ]
 
@@ -182,14 +182,14 @@ layout = dmc.Container(
                                     spacing="md",
                                     children=[
                                         dmc.InputWrapper(
-                                            dcc.Dropdown(id="myc-eol-trend-stack-filter", multi=True, style={"width": "100%"}),
+                                            dcc.Dropdown(id="myc-eol-trend-stack-filter", multi=True, style={"width": "100%"},placeholder="Select one or more Stack Short Numbers",),
                                             label="Stack Short Number",
                                             htmlFor="myc-eol-trend-stack-filter",
                                             className="dmc",
                                             styles={"label": {"marginBottom": "6px"}},
                                         ),
                                         dmc.InputWrapper(
-                                            dcc.Dropdown(id="myc-eol-trend-uniquepart-filter", multi=True, style={"width": "100%"}),
+                                            dcc.Dropdown(id="myc-eol-trend-uniquepart-filter", multi=True, style={"width": "100%"}, placeholder="Select one or more Unique Part IDs"),
                                             label="Unique Part ID",
                                             htmlFor="myc-eol-trend-uniquepart-filter",
                                             className="dmc",
@@ -202,28 +202,28 @@ layout = dmc.Container(
                                     spacing="md",
                                     children=[
                                         dmc.InputWrapper(
-                                            dcc.Dropdown(id="myc-eol-trend-cells-filter", multi=True, style={"width": "100%"}),
+                                            dcc.Dropdown(id="myc-eol-trend-cells-filter", multi=True, style={"width": "100%"}, placeholder="Select one or more Number of Cells"),
                                             label="Number of Cells",
                                             htmlFor="myc-eol-trend-cells-filter",
                                             className="dmc",
                                             styles={"label": {"marginBottom": "6px"}},
                                         ),
                                         dmc.InputWrapper(
-                                            dcc.Dropdown(id="myc-eol-trend-jset-filter", multi=True, style={"width": "100%"}),
+                                            dcc.Dropdown(id="myc-eol-trend-jset-filter", multi=True, style={"width": "100%"}, placeholder="Select one or more J Sets"),
                                             label="J Set",
                                             htmlFor="myc-eol-trend-jset-filter",
                                             className="dmc",
                                             styles={"label": {"marginBottom": "6px"}},
                                         ),
                                         dmc.InputWrapper(
-                                            dcc.Dropdown(id="myc-eol-trend-eol-type-filter", multi=True, style={"width": "100%"}),
+                                            dcc.Dropdown(id="myc-eol-trend-eol-type-filter", multi=True, style={"width": "100%"}, placeholder="Select one or more EOL Types"),
                                             label="EOL Type",
                                             htmlFor="myc-eol-trend-eol-type-filter",
                                             className="dmc",
                                             styles={"label": {"marginBottom": "6px"}},
                                         ),
                                         dmc.InputWrapper(
-                                            dcc.Dropdown(id="myc-eol-trend-setpoint-filter", multi=True, style={"width": "100%"}),
+                                            dcc.Dropdown(id="myc-eol-trend-setpoint-filter", multi=True, style={"width": "100%"}, placeholder="Select one or more Setpoint Directions"),
                                             label="Setpoint Direction",
                                             htmlFor="myc-eol-trend-setpoint-filter",
                                             className="dmc",

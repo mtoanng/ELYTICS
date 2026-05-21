@@ -159,13 +159,20 @@ layout = dmc.Container(
                             ],
                         ),
                         dmc.Text(
-                            "Monitor stack and fleet SOH behavior for Sherlock.", c="dimmed"
+                            "Monitor stack and fleet SOH behavior.", c="dimmed"
                         ),
                         dmc.Collapse(
                             dmc.Blockquote(
-                                dmc.Stack(gap=4, children=USAGE_BLOCKQUOTE_TEXT),
+                                dmc.List(
+                                    withPadding=True,
+                                    children=[
+                                        dmc.ListItem(item)
+                                        for item in USAGE_BLOCKQUOTE_TEXT
+                                    ],
+                                ),
                                 color="blue",
                             ),
+                            opened=False,
                             id="soh-usage-collapse",
                         ),
                     ],
@@ -188,7 +195,7 @@ layout = dmc.Container(
                                 dmc.InputWrapper(
                                     dcc.Dropdown(
                                         id="soh-sample-name-filter",
-                                        placeholder="Sample Name",
+                                        placeholder="Select a sample name",
                                         clearable=True,
                                         style={"width": "100%"},
                                     ),
@@ -201,7 +208,7 @@ layout = dmc.Container(
                                 dmc.InputWrapper(
                                     dcc.Dropdown(
                                         id="soh-number-of-cells-filter",
-                                        placeholder="Number of Cells",
+                                        placeholder="Select the number of cells",
                                         clearable=True,
                                         style={"width": "100%"},
                                     ),
@@ -214,7 +221,7 @@ layout = dmc.Container(
                                 dmc.InputWrapper(
                                     dcc.Dropdown(
                                         id="soh-ccm-type-filter",
-                                        placeholder="CCM Type",
+                                        placeholder="Select a CCM type",
                                         clearable=True,
                                         style={"width": "100%"},
                                     ),
