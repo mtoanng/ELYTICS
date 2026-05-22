@@ -79,20 +79,12 @@ SIDEBAR_STRUCTURE = {
     },
     "enola": {
         None: [{"path": "home", "label": "Home"}],
-        "Management": {
-            "path": "management",
-            "pages": [
-                {
-                    "path": "production-overview",
-                    "label": "Production Overview",
-                },
-            ],
-        },
         "Internal": {
             "path": "internal",
             "pages": [
                 {"path": "test-rig-statistics", "label": "Test Rig Statistics"},
                 {"path": "test-rig-activity", "label": "Test Rig Activity"},
+                {"path": "production-overview", "label": "Production Overview"},
                 {
                     "path": "track-record",
                     "label": "Track Record",
