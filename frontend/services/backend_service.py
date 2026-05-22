@@ -5,8 +5,10 @@ import pandas as pd
 from flask import session
 from typing import Any, Dict, List, Optional
 from datetime import datetime
+from services.auth import _refresh_access_token
 
 API_BASE = os.environ.get("BACKEND_API_URL", "http://localhost:8000")
+REQUEST_TIMEOUT_SECONDS = 125
 
 
 def get_api_headers():
@@ -21,15 +23,33 @@ def get_api_headers():
     }
 
 
+def _get_with_token_refresh(url: str, params: dict | None = None) -> requests.Response:
+    """GET request that automatically refreshes an expired token once and retries."""
+    response = requests.get(
+        url,
+        params=params,
+        headers=get_api_headers(),
+        timeout=REQUEST_TIMEOUT_SECONDS,
+    )
+    if response.status_code == 401:
+        if _refresh_access_token():
+            response = requests.get(
+                url,
+                params=params,
+                headers=get_api_headers(),
+                timeout=REQUEST_TIMEOUT_SECONDS,
+            )
+    response.raise_for_status()
+    return response
+
+
 def get_metadata(space: str, route_name: str) -> List[Dict[str, Any]]:
     """
     Fetch metadata (distinct values for filter columns) from the backend.
     Metadata endpoints return all distinct values for a table's columns.
     """
-    headers = get_api_headers()
     url = f"{API_BASE}/api/{space}/metadata/{route_name}"
-    response = requests.get(url, headers=headers)
-    response.raise_for_status()
+    response = _get_with_token_refresh(url)
     return response.json().get("data", [])
 
 
@@ -51,7 +71,6 @@ def get_tabular(
         sort_by: Column name to sort by
         sort_dir: Sort direction ('asc' or 'desc')
     """
-    headers = get_api_headers()
     params = {}
 
     # Add filters as query params
@@ -68,8 +87,7 @@ def get_tabular(
         params["sort_dir"] = sort_dir
 
     url = f"{API_BASE}/api/{space}/tabular/{route_name}"
-    response = requests.get(url, params=params, headers=headers)
-    response.raise_for_status()
+    response = _get_with_token_refresh(url, params=params)
     data = response.json().get("data", [])
     return pd.DataFrame(data)
 
@@ -97,7 +115,6 @@ def get_timeseries(
         target_points: Target number of buckets (~1200 is good default)
         filters: Dict of filter column -> value(s) including required filters like order_id
     """
-    headers = get_api_headers()
     params = {
         "time_column": time_column,
         "target_points": target_points,
@@ -121,8 +138,7 @@ def get_timeseries(
                 params[key] = str(value)
 
     url = f"{API_BASE}/api/{space}/timeseries/{route_name}"
-    response = requests.get(url, params=params, headers=headers)
-    response.raise_for_status()
+    response = _get_with_token_refresh(url, params=params)
     payload = response.json()
 
     # Parse the response which includes data and metadata
@@ -151,8 +167,6 @@ def get_table_as_df(
 
 def get_table_stats():
     """Fetch system table statistics from the backend."""
-    headers = get_api_headers()
     url = f"{API_BASE}/api/system/table-stats"
-    response = requests.get(url, headers=headers)
-    response.raise_for_status()
+    response = _get_with_token_refresh(url)
     return response.json()
