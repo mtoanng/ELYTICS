@@ -234,6 +234,11 @@
       "pr": 901,
       "title": "feat(mycroft): Cleaned up page & shared with Enola",
       "date": "2026-05-21"
+    },
+    {
+      "pr": 904,
+      "title": "fix(core): Added backend service token refresh",
+      "date": "2026-05-22"
     }
   ],
   "releases": {}
