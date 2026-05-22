@@ -21,13 +21,6 @@ TABULAR_CONFIG: list[TabularConfig] = [
     TabularConfig(table_name="soh_fleet",           route_name="soh_fleet",           auth_groups=_USER, ttl=_TABULAR_TTL),
     TabularConfig(table_name="soh_stack",           route_name="soh_stack",           auth_groups=_USER, ttl=_TABULAR_TTL, required_filters=["sample_name"]),
     TabularConfig(
-        table_name="testrig_activity",
-        route_name="testrig_activity",
-        auth_groups=_USER,
-        ttl=_TABULAR_TTL,
-        required_filters=["testrig_id"],
-    ),
-    TabularConfig(
         table_name="testrig_statistics",
         route_name="testrig_statistics",
         auth_groups=_USER,
@@ -49,6 +42,13 @@ TABULAR_CONFIG: list[TabularConfig] = [
 ]
 
 TIMESERIES_CONFIG: list[TimeseriesConfig] = [
+    TimeseriesConfig(
+        table_name="testrig_activity",
+        route_name="testrig_activity",
+        auth_groups=_USER,
+        ttl=_TS_TTL,
+        required_filters=["testrig_id"],
+    ),
     TimeseriesConfig(
         table_name="timeseries_exp",
         route_name="timeseries_exp",
