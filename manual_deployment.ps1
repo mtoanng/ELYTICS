@@ -1,7 +1,7 @@
 $ACR="acrxplatformprodwesteu01.azurecr.io"
-$TAG="develop"
-$RESOURCE_GROUP="rg-holmes-suite-dev-westeu"
-$APP="app-holmes-suite-dev"
+$TAG="release"
+$RESOURCE_GROUP="rg-holmes-suite-prod-westeu"
+$APP="app-holmes-suite-prod"
 
 az acr login --name acrxplatformprodwesteu01
 

@@ -12,6 +12,7 @@ register_page(__name__, path="/", title="HOLMES - Home")
 SPACE_INFO = {
     "sherlock": {
         "title": "Sherlock",
+        "subtitle": "asTested",
         "description": "Single platform for all internal external testing data.",
         "version": None,
         "color": "blue",
@@ -19,6 +20,7 @@ SPACE_INFO = {
     },
     "watson": {
         "title": "Watson",
+        "subtitle": "asManufactured",
         "description": "Single platform for all customer related data analysis.",
         "version": None,
         "color": "cyan",
@@ -26,6 +28,7 @@ SPACE_INFO = {
     },
     "mycroft": {
         "title": "Mycroft",
+        "subtitle": "asProduced",
         "description": "Single platform for manufacturing data analysis.",
         "version": None,
         "color": "grape",
@@ -33,6 +36,7 @@ SPACE_INFO = {
     },
     "enola": {
         "title": "Enola",
+        "subtitle": "asManaged",
         "description": "Management overview of test rig operations and customer data.",
         "version": None,
         "color": "red",
@@ -122,9 +126,21 @@ def _create_space_card(space_name, space_data, version, has_access=False):
             ),
             dmc.Stack(
                 [
-                    dmc.Title(
-                        space_data["title"],
-                        order=3,
+                    dmc.Group(
+                        [
+                            dmc.Title(
+                                space_data["title"],
+                                order=3,
+                            ),
+                            dmc.Text(
+                                space_data.get("subtitle", ""),
+                                size="xs",
+                                c="dimmed",
+                                style={"fontStyle": "italic"},
+                            ),
+                        ],
+                        gap="xs",
+                        align="baseline",
                     ),
                     dmc.Text(
                         space_data["description"],
@@ -137,7 +153,7 @@ def _create_space_card(space_name, space_data, version, has_access=False):
                             DashIconify(icon=access_icon, width=16, color=access_color),
                             dmc.Code(
                                 required_role,
-                                style={"fontSize": "11px"},
+                                style={"fontSize": "11px", "background": "rgba(128,128,128,0.14)"},
                             ),
                         ],
                         gap="xs",
