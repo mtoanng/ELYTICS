@@ -15,7 +15,7 @@ import pandas as pd
 from datetime import datetime, timedelta, timezone
 from dash_iconify import DashIconify
 
-from services.backend_service import get_metadata, get_tabular
+from services.backend_service import get_metadata, get_timeseries
 
 # -------------------------------------------------
 # CONSTANTS
@@ -40,6 +40,52 @@ USAGE_BLOCKQUOTE_TEXT = [
     "Zoom on any chart to synchronise the x-axis across all sensor plots.",
     "Data is 1-hour aggregated sensor readings per test rig.",
 ]
+
+
+def _resolve_location_column(df: pd.DataFrame) -> str | None:
+    for column in ("testrig_location", "location", "raw_location"):
+        if column in df.columns:
+            return column
+    return None
+
+
+def _get_time_range_bounds(days: int | None) -> tuple[str, str]:
+    range_days = days or 7
+    now = datetime.now(timezone.utc)
+    # Round end up to end-of-day and start down to start-of-day so that
+    # requests within the same calendar day share the same cache key.
+    end = now.replace(hour=23, minute=59, second=59, microsecond=0)
+    start_day = (now - timedelta(days=range_days)).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+    return start_day.isoformat(), end.isoformat()
+
+
+def _build_testrig_label_map(meta: list[dict] | None) -> dict[str, str]:
+    if not meta:
+        return {}
+
+    df = pd.DataFrame(meta)
+    if "testrig_id" not in df.columns:
+        return {}
+
+    location_col = _resolve_location_column(df)
+    label_map: dict[str, str] = {}
+    for _, row in df.dropna(subset=["testrig_id"]).iterrows():
+        testrig_id = str(row["testrig_id"])
+        location = row.get(location_col) if location_col else None
+        if pd.notna(location) and str(location).strip():
+            label_map[testrig_id] = f"{testrig_id} - {location}"
+        else:
+            label_map[testrig_id] = testrig_id
+    return label_map
+
+
+def _resolve_metric_column(df: pd.DataFrame, sensor_key: str) -> str | None:
+    for candidate in (f"{sensor_key}_avg", sensor_key, f"{sensor_key}_max", f"{sensor_key}_min"):
+        if candidate in df.columns:
+            return candidate
+    return None
 
 
 def create_test_rig_activity_page(ns: str):
@@ -227,6 +273,7 @@ def create_test_rig_activity_page(ns: str):
                     # ── Stores ────────────────────────────────────────────
                     dcc.Store(id=f"{ns}-activity-metadata-store"),
                     dcc.Store(id=f"{ns}-activity-raw-store", data=None),
+                    dcc.Store(id=f"{ns}-activity-is-fetching", data=True),
                     dcc.Store(id=f"{ns}-activity-usage-open", data=False),
                 ],
             )
@@ -286,8 +333,9 @@ def create_test_rig_activity_page(ns: str):
         # Build location options from full metadata
         location_options = []
         normalized_locations = []
-        if "location" in df.columns:
-            locations = sorted(df["location"].dropna().unique().tolist())
+        location_col = _resolve_location_column(df)
+        if location_col:
+            locations = sorted(df[location_col].dropna().unique().tolist())
             location_options = [{"label": l, "value": l} for l in locations]
             tbp_locations = [
                 loc for loc in locations if "tbp" in str(loc).strip().lower()
@@ -295,7 +343,7 @@ def create_test_rig_activity_page(ns: str):
             default_locations = tbp_locations or locations
             normalized_locations = selected_locations or default_locations
             if normalized_locations:
-                df = df[df["location"].isin(normalized_locations)]
+                df = df[df[location_col].isin(normalized_locations)]
 
         ids = sorted(df["testrig_id"].dropna().unique().tolist(), key=str)
         testrig_options = [{"label": str(i), "value": str(i)} for i in ids]
@@ -311,33 +359,54 @@ def create_test_rig_activity_page(ns: str):
         return testrig_options, selected_testrigs, location_options, normalized_locations
 
     # =========================================================
-    # STEP 3 — fetch tabular data when test rig selection changes
+    # STEP 3 — fetch timeseries data when filters change
     # =========================================================
 
     @callback(
-        Output(f"{ns}-activity-raw-store", "data"),
+        Output(f"{ns}-activity-is-fetching", "data", allow_duplicate=True),
         Input(f"{ns}-activity-testrig-filter", "value"),
+        Input(f"{ns}-activity-date-range", "value"),
         prevent_initial_call=True,
     )
-    def load_testrig_data(testrig_ids):
+    def mark_fetching_start(_testrig_ids, _date_range):
+        return True
+
+    @callback(
+        Output(f"{ns}-activity-raw-store", "data"),
+        Output(f"{ns}-activity-is-fetching", "data"),
+        Input(f"{ns}-activity-testrig-filter", "value"),
+        Input(f"{ns}-activity-date-range", "value"),
+        State(f"{ns}-activity-metadata-store", "data"),
+        prevent_initial_call=True,
+    )
+    def load_testrig_data(testrig_ids, last_n_days, metadata_rows):
         if not testrig_ids:
             return []
 
+        start, end = _get_time_range_bounds(last_n_days)
+        testrig_labels = _build_testrig_label_map(metadata_rows)
         frames = []
         for testrig_id in testrig_ids:
-            df = get_tabular(
+            df = get_timeseries(
                 "sherlock",
                 "testrig_activity",
+                start=start,
+                end=end,
+                columns=SENSOR_KEYS,
+                time_column="time_ts",
                 filters={"testrig_id": str(testrig_id)},
             )
             if not df.empty:
+                df = df.copy()
+                df["testrig_id"] = str(testrig_id)
+                df["testrig_label"] = testrig_labels.get(str(testrig_id), str(testrig_id))
                 frames.append(df)
 
         if not frames:
-            return []
+            return [], False
 
         merged_df = pd.concat(frames, ignore_index=True)
-        return merged_df.drop_duplicates().to_dict("records")
+        return merged_df.drop_duplicates().to_dict("records"), False
 
     @callback(
         Output(f"{ns}-plot-uCell-loading-overlay", "visible"),
@@ -352,101 +421,15 @@ def create_test_rig_activity_page(ns: str):
         Output(f"{ns}-plot-pCtdeOut-wrapper", "style"),
         Output(f"{ns}-plot-tAndeIn-wrapper", "style"),
         Output(f"{ns}-plot-vfAndeIn-wrapper", "style"),
-        Input(f"{ns}-activity-testrig-filter", "value"),
-        Input(f"{ns}-activity-raw-store", "data"),
-        Input(f"{ns}-plot-uCell", "figure"),
-        Input(f"{ns}-plot-jStck", "figure"),
-        Input(f"{ns}-plot-pAndeIn", "figure"),
-        Input(f"{ns}-plot-pCtdeOut", "figure"),
-        Input(f"{ns}-plot-tAndeIn", "figure"),
-        Input(f"{ns}-plot-vfAndeIn", "figure"),
-        Input(f"{ns}-plot-uCell", "loading_state"),
-        Input(f"{ns}-plot-jStck", "loading_state"),
-        Input(f"{ns}-plot-pAndeIn", "loading_state"),
-        Input(f"{ns}-plot-pCtdeOut", "loading_state"),
-        Input(f"{ns}-plot-tAndeIn", "loading_state"),
-        Input(f"{ns}-plot-vfAndeIn", "loading_state"),
+        Input(f"{ns}-activity-is-fetching", "data"),
     )
-    def sync_plots_loading_state(
-        _,
-        data,
-        ucell_fig,
-        jstck_fig,
-        pandein_fig,
-        pctdeout_fig,
-        tandein_fig,
-        vfandein_fig,
-        ucell_loading,
-        jstck_loading,
-        pandein_loading,
-        pctdeout_loading,
-        tandein_loading,
-        vfandein_loading,
-    ):
-        ctx = callback_context
-        triggered_prop = ctx.triggered[0]["prop_id"] if ctx.triggered else ""
-
-        # Show loader immediately when filter selection changes.
-        if triggered_prop == f"{ns}-activity-testrig-filter.value":
+    def sync_plots_loading_state(is_fetching):
+        if is_fetching:
             return (
                 True, True, True, True, True, True,
-                {"opacity": 0},
-                {"opacity": 0},
-                {"opacity": 0},
-                {"opacity": 0},
-                {"opacity": 0},
-                {"opacity": 0},
+                {"opacity": 0}, {"opacity": 0}, {"opacity": 0},
+                {"opacity": 0}, {"opacity": 0}, {"opacity": 0},
             )
-
-        if data is None:
-            return (
-                True, True, True, True, True, True,
-                {"opacity": 0},
-                {"opacity": 0},
-                {"opacity": 0},
-                {"opacity": 0},
-                {"opacity": 0},
-                {"opacity": 0},
-            )
-
-        figure_states = [
-            ucell_fig,
-            jstck_fig,
-            pandein_fig,
-            pctdeout_fig,
-            tandein_fig,
-            vfandein_fig,
-        ]
-        if any(fig is None for fig in figure_states):
-            return (
-                True, True, True, True, True, True,
-                {"opacity": 0},
-                {"opacity": 0},
-                {"opacity": 0},
-                {"opacity": 0},
-                {"opacity": 0},
-                {"opacity": 0},
-            )
-
-        plot_loading_states = [
-            ucell_loading,
-            jstck_loading,
-            pandein_loading,
-            pctdeout_loading,
-            tandein_loading,
-            vfandein_loading,
-        ]
-        if any((state or {}).get("is_loading", False) for state in plot_loading_states):
-            return (
-                True, True, True, True, True, True,
-                {"opacity": 0},
-                {"opacity": 0},
-                {"opacity": 0},
-                {"opacity": 0},
-                {"opacity": 0},
-                {"opacity": 0},
-            )
-
         return (
             False, False, False, False, False, False,
             {"opacity": 1, "transition": "opacity 120ms ease"},
@@ -488,7 +471,6 @@ def create_test_rig_activity_page(ns: str):
         Output(f"{ns}-plot-tAndeIn", "figure"),
         Output(f"{ns}-plot-vfAndeIn", "figure"),
         Input(f"{ns}-activity-raw-store", "data"),
-        Input(f"{ns}-activity-date-range", "value"),
         Input("theme-store", "data"),
         Input(f"{ns}-plot-uCell", "relayoutData"),
         Input(f"{ns}-plot-jStck", "relayoutData"),
@@ -498,7 +480,7 @@ def create_test_rig_activity_page(ns: str):
         Input(f"{ns}-plot-vfAndeIn", "relayoutData"),
         State(f"{ns}-activity-testrig-filter", "value"),
     )
-    def update_plots(data, last_n_days, theme, r1, r2, r3, r4, r5, r6, testrig_ids):
+    def update_plots(data, theme, r1, r2, r3, r4, r5, r6, testrig_ids):
         FIG_HEIGHT = PLOT_HEIGHT_PX
         template = "plotly_dark" if theme == "dark" else "plotly"
 
@@ -522,17 +504,13 @@ def create_test_rig_activity_page(ns: str):
 
         # Locate time column
         time_col = next(
-            (c for c in ("time_ts", "time", "timestamp") if c in df.columns), None
+            (c for c in ("bucket_start", "time_ts", "time", "timestamp") if c in df.columns), None
         )
         if time_col is None:
             return tuple(empty_fig("No time column found") for _ in SENSOR_KEYS)
 
         df[time_col] = pd.to_datetime(df[time_col], utc=True, errors="coerce")
         df = df.dropna(subset=[time_col]).sort_values(time_col)
-
-        if last_n_days:
-            cutoff = datetime.now(timezone.utc) - timedelta(days=last_n_days)
-            df = df[df[time_col] >= cutoff]
 
         # ── Zoom sync ────────────────────────────────────────
         x_range = None
@@ -552,11 +530,12 @@ def create_test_rig_activity_page(ns: str):
         uirev_key = f"zoom-{x_range}-{selected_key}" if x_range else base_rev
 
         def make_fig(col):
-            if col not in df.columns:
+            value_col = _resolve_metric_column(df, col)
+            if value_col is None:
                 return empty_fig(f"{SENSORS[col]['title']} — column not available")
 
             trace_col = next(
-                (c for c in ("testrig_id", "testrig_label", "testrig_name") if c in df.columns),
+                (c for c in ("testrig_label", "testrig_id", "testrig_name") if c in df.columns),
                 None,
             )
 
@@ -565,7 +544,7 @@ def create_test_rig_activity_page(ns: str):
                 fig.add_trace(
                     go.Scatter(
                         x=df[time_col],
-                        y=df[col],
+                        y=df[value_col],
                         mode="lines",
                         name="Testrig",
                         line=dict(width=1.5),
@@ -580,7 +559,7 @@ def create_test_rig_activity_page(ns: str):
                     fig.add_trace(
                         go.Scatter(
                             x=group_df[time_col],
-                            y=group_df[col],
+                            y=group_df[value_col],
                             mode="lines",
                             name=str(trace_name),
                             line=dict(width=1.5),
@@ -600,6 +579,11 @@ def create_test_rig_activity_page(ns: str):
                 xaxis_title="Time",
                 yaxis_title=f"{col} [{SENSORS[col]['unit']}]",
                 hovermode="x unified",
+                hoverlabel=dict(
+                    bgcolor="#1a1b1e" if template == "plotly_dark" else "#ffffff",
+                    font_color="#c1c2c5" if template == "plotly_dark" else "#000000",
+                    bordercolor="#373a40" if template == "plotly_dark" else "#cccccc",
+                ),
                 template=template,
                 height=FIG_HEIGHT,
                 margin=dict(l=48, r=20, t=48, b=40),
