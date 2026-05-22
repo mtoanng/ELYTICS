@@ -244,6 +244,11 @@
       "pr": 907,
       "title": "fix(enola): Moved production overview to internal category",
       "date": "2026-05-22"
+    },
+    {
+      "pr": 908,
+      "title": "fix(sherlock): Improved speed of test rig activity page",
+      "date": "2026-05-22"
     }
   ],
   "releases": {}
