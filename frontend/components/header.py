@@ -11,6 +11,40 @@ from config.access_config import SPACE_ACCESS_MAP
 
 IS_DEVELOPMENT = os.getenv("ENVIRONMENT", "development").lower() == "development"
 
+SPACE_SELECTOR_META = {
+    "home": {"title": "Home", "subtitle": "", "icon": "tabler:home"},
+    "sherlock": {
+        "title": "Sherlock",
+        "subtitle": "asTested",
+        "icon": "tabler:flask",
+    },
+    "watson": {
+        "title": "Watson",
+        "subtitle": "asManufactured",
+        "icon": "tabler:shopping-bag-check",
+    },
+    "mycroft": {
+        "title": "Mycroft",
+        "subtitle": "asProduced",
+        "icon": "tabler:building-factory-2",
+    },
+    "enola": {
+        "title": "Enola",
+        "subtitle": "asManaged",
+        "icon": "tabler:eye",
+    },
+}
+
+
+def _space_option_label(space_name: str) -> str:
+    meta = SPACE_SELECTOR_META.get(space_name, {})
+    title = meta.get("title", space_name.capitalize())
+    return title
+
+
+def _space_subtitle(space_name: str) -> str:
+    return SPACE_SELECTOR_META.get(space_name, {}).get("subtitle", "")
+
 
 def _build_search_options():
     options = []
@@ -85,14 +119,10 @@ def _create_space_selector():
         data=[],
         placeholder="Select Space",
         leftSectionPointerEvents="none",
-        leftSection=html.Div(
-            html.Img(
-                id="space-logo-img",
-                src="/assets/sherlock_logo.png",
-                height="32px",
-                style={"marginLeft": "8px", "display": "block"},
-            ),
-            style={"display": "flex", "alignItems": "center", "height": "100%"},
+        leftSection=DashIconify(
+            id="space-selector-left-icon",
+            icon="tabler:home",
+            width=24,
         ),
         checkIconPosition="right",
         maxDropdownHeight=300,
@@ -142,6 +172,12 @@ def header_layout():
                 gap="md",
                 children=[
                     _create_space_selector(),
+                    dmc.Text(
+                        id="space-selector-subtitle",
+                        size="xs",
+                        c="dimmed",
+                        style={"fontStyle": "italic", "whiteSpace": "nowrap"},
+                    ),
                 ],
             ),
             *(
@@ -197,7 +233,7 @@ def update_space_selector(pathname, current_value):
         
         options = [
             {
-                "label": "Home",
+                "label": _space_option_label("home"),
                 "value": "home",
                 "disabled": False,
             },
@@ -208,7 +244,7 @@ def update_space_selector(pathname, current_value):
         ]
         options[1]["items"].extend(
             {
-                "label": space_path.strip("/").capitalize(),
+                "label": _space_option_label(space_path.strip("/")),
                 "value": space_path.strip("/"),
                 "disabled": False,
             }
@@ -230,7 +266,7 @@ def update_space_selector(pathname, current_value):
     # Build options from SPACE_ACCESS_MAP, grouped under "Spaces"
     options = [
         {
-            "label": "Home",
+            "label": _space_option_label("home"),
             "value": "home",
             "disabled": False,
         },
@@ -241,7 +277,7 @@ def update_space_selector(pathname, current_value):
     ]
     options[1]["items"].extend(
         {
-            "label": space_path.strip("/").capitalize(),
+            "label": _space_option_label(space_path.strip("/")),
             "value": space_path.strip("/"),
             "disabled": False,
         }
@@ -257,6 +293,26 @@ def update_space_selector(pathname, current_value):
     
     # Default to first space if no valid space in URL
     return options, "home"
+
+
+@callback(
+    Output("space-selector-left-icon", "icon"),
+    Input("space-selector", "value"),
+    prevent_initial_call=False,
+)
+def update_space_selector_icon(space):
+    selected = (space or "home").strip().lower()
+    return SPACE_SELECTOR_META.get(selected, SPACE_SELECTOR_META["home"])["icon"]
+
+
+@callback(
+    Output("space-selector-subtitle", "children"),
+    Input("space-selector", "value"),
+    prevent_initial_call=False,
+)
+def update_space_selector_subtitle(space):
+    selected = (space or "home").strip().lower()
+    return _space_subtitle(selected)
 
 
 @callback(
@@ -286,17 +342,6 @@ clientside_callback(
         // Don't do anything if space is null or undefined
         if (!space) {
             return window.dash_clientside.no_update;
-        }
-        
-        const logoMap = {
-            "mycroft": "/assets/mycroft_logo.png",
-            "sherlock": "/assets/sherlock_logo.png",
-            "enola": "/assets/enola_logo.png",
-            "watson": "/assets/watson_logo.png"
-        };
-        const img = document.getElementById('space-logo-img');
-        if (img && logoMap[space]) {
-            img.src = logoMap[space];
         }
         
         // Only navigate if user manually changed the selector AND current URL doesn't match
