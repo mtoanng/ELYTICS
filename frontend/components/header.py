@@ -124,9 +124,23 @@ def _create_space_selector():
             icon="tabler:home",
             width=24,
         ),
+        rightSectionPointerEvents="none",
+        rightSectionWidth=110,
+        rightSection=dmc.Text(
+            id="space-selector-subtitle",
+            size="xs",
+            c="dimmed",
+            style={
+                "fontStyle": "italic",
+                "whiteSpace": "nowrap",
+                "width": "100%",
+                "textAlign": "right",
+                "paddingRight": "10px",
+            },
+        ),
         checkIconPosition="right",
         maxDropdownHeight=300,
-        w=240,
+        w=300,
         size="md",
         value=None,
         styles={
@@ -172,12 +186,6 @@ def header_layout():
                 gap="md",
                 children=[
                     _create_space_selector(),
-                    dmc.Text(
-                        id="space-selector-subtitle",
-                        size="xs",
-                        c="dimmed",
-                        style={"fontStyle": "italic", "whiteSpace": "nowrap"},
-                    ),
                 ],
             ),
             *(
