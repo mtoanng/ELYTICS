@@ -1,4 +1,5 @@
 import os
+import logging
 import dash
 import plotly.io as pio
 
@@ -12,6 +13,25 @@ from dotenv import load_dotenv
 from waitress import serve
 
 load_dotenv()
+
+
+def configure_logging():
+    log_level = os.getenv("LOG_LEVEL", "INFO").upper()
+    numeric_level = getattr(logging, log_level, logging.INFO)
+
+    logging.basicConfig(
+        level=numeric_level,
+        format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+        force=True,
+    )
+
+    for logger_name in ("dash", "flask", "waitress", "werkzeug"):
+        logging.getLogger(logger_name).setLevel(numeric_level)
+
+    logging.getLogger(__name__).info("Frontend logging configured at level %s", log_level)
+
+
+configure_logging()
 
 pio.templates["plotly_dark"].layout.paper_bgcolor = "rgba(0,0,0,0)"
 pio.templates["plotly_dark"].layout.plot_bgcolor = "#1f1f1f"
@@ -51,9 +71,24 @@ app.layout = create_appshell()
 
 if __name__ == "__main__":
     use_dash_debug_server = os.getenv("USE_DASH_DEBUG_SERVER", "false").lower() == "true"
+    logging.getLogger(__name__).info(
+        "Starting frontend server (debug=%s, threads=%s, connection_limit=%s)",
+        use_dash_debug_server,
+        os.getenv("WAITRESS_THREADS", "4"),
+        os.getenv("WAITRESS_CONNECTION_LIMIT", "200"),
+    )
     if use_dash_debug_server:
         app.run(debug=True, host="0.0.0.0", port=8501, use_reloader=True)
     else:
-        serve(app.server, host="0.0.0.0", port=8501, 
-              trusted_proxy="*", 
-              trusted_proxy_count=1)
+        waitress_threads = int(os.getenv("WAITRESS_THREADS", "4"))
+        waitress_connection_limit = int(os.getenv("WAITRESS_CONNECTION_LIMIT", "200"))
+
+        serve(
+            app.server,
+            host="0.0.0.0",
+            port=8501,
+            trusted_proxy="*",
+            trusted_proxy_count=1,
+            threads=waitress_threads,
+            connection_limit=waitress_connection_limit,
+        )
