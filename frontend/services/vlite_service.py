@@ -246,9 +246,18 @@ def func_vlite13(inp, par, phys, NT):
 
     # Water temperature increase — NaN-safe: if modelQW is NaN (vfAndeIn missing),
     # DTW is set to 0 so temperature feedback does not corrupt V
-    raw_dtw = (out['V'] - phys.Vth) * modelAact_arr * modelj_arr / \
-          (phys.rhoW * phys.cW * modelQW_arr)
-    out['DTW'] = np.where(np.isnan(raw_dtw), 0.0, raw_dtw)
+    numerator = (out['V'] - phys.Vth) * modelAact_arr * modelj_arr
+    denominator = phys.rhoW * phys.cW * modelQW_arr
+    numerator_arr = np.asarray(numerator, dtype=float)
+    denominator_arr = np.asarray(denominator, dtype=float)
+
+    raw_dtw = np.divide(
+        numerator_arr,
+        denominator_arr,
+        out=np.zeros_like(numerator_arr, dtype=float),
+        where=np.isfinite(denominator_arr) & (denominator_arr != 0),
+    )
+    out['DTW'] = np.where(np.isfinite(raw_dtw), raw_dtw, 0.0)
 
     # Update T
     out['modelTcell'] = inp['modelTW'] + out['DTW'] / 2

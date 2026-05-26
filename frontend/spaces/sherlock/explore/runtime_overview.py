@@ -53,6 +53,44 @@ def _normalize_location_value(raw_value: str) -> str:
             return parts[-1]
     return value
 
+
+def _parse_mixed_epoch_series(series: pd.Series) -> pd.Series:
+    """Parse numeric epoch values that may be in s/ms/us/ns without overflow."""
+    numeric = pd.to_numeric(series, errors="coerce")
+    parsed = pd.Series(pd.NaT, index=series.index, dtype="datetime64[ns, UTC]")
+
+    if numeric.notna().any():
+        abs_numeric = numeric.abs()
+
+        # Magnitude-based unit detection keeps out-of-range values from hitting
+        # pandas' vectorized unit conversion path with impossible multipliers.
+        unit_masks = {
+            "s": (abs_numeric >= 1e8) & (abs_numeric < 1e11),
+            "ms": (abs_numeric >= 1e11) & (abs_numeric < 1e14),
+            "us": (abs_numeric >= 1e14) & (abs_numeric < 1e17),
+            "ns": (abs_numeric >= 1e17) & (abs_numeric < 1e20),
+        }
+
+        for unit, mask in unit_masks.items():
+            if mask.any():
+                parsed.loc[mask] = pd.to_datetime(numeric.loc[mask], errors="coerce", unit=unit, utc=True)
+
+        # Small values are treated as seconds (e.g., very old timestamps).
+        small_seconds_mask = numeric.notna() & (abs_numeric < 1e8)
+        if small_seconds_mask.any():
+            parsed.loc[small_seconds_mask] = pd.to_datetime(
+                numeric.loc[small_seconds_mask],
+                errors="coerce",
+                unit="s",
+                utc=True,
+            )
+
+    non_numeric_mask = numeric.isna() & series.notna()
+    if non_numeric_mask.any():
+        parsed.loc[non_numeric_mask] = pd.to_datetime(series.loc[non_numeric_mask], errors="coerce", utc=True)
+
+    return parsed
+
 def runtime_overview_layout():
     return dmc.Container(
         size="xl",
@@ -328,10 +366,7 @@ def _normalize_runtime_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     for col in ["start_time", "end_time"]:
         if col not in df.columns:
             continue
-        numeric_ts = pd.to_numeric(df[col], errors="coerce")
-        parsed_epoch = pd.to_datetime(numeric_ts, errors="coerce", unit="ms", utc=True)
-        parsed_string = pd.to_datetime(df[col], errors="coerce", utc=True)
-        df[col] = parsed_string.where(parsed_string.notna(), parsed_epoch)
+        df[col] = _parse_mixed_epoch_series(df[col])
 
     if "sample_id" in df.columns:
         # Only drop missing sample IDs when there are valid IDs to keep.
