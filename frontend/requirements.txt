@@ -4,9 +4,12 @@ dash-ag-grid
 dash-iconify
 dash-table
 dash-auth
+dash-leaflet
 authlib
 requests
 pandas
+numpy
+scipy
 python-dotenv
 databricks
 databricks-sql-connector

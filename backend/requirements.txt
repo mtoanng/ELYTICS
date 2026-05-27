@@ -1,11 +1,12 @@
 uvicorn
+gunicorn
 fastapi
-apscheduler
 pyjwt
-cachetools
 python-dotenv
 redis
 pandas
-databricks
-databricks-sql-connector
+databricks-sqlalchemy
+databricks-sdk
 cryptography
+pyarrow
+httpx

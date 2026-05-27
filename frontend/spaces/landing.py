@@ -1,12 +1,10 @@
-# TODO: update changelog parsing to accept generated log from changeset
-
 import dash_mantine_components as dmc
 from dash import register_page, Output, Input, clientside_callback, html, callback
 from dash_iconify import DashIconify
+from components.changelog import build_update_cards, load_changelog_json
 from config.access_config import SPACE_ACCESS_MAP
 from dash_auth import list_groups
 from pathlib import Path
-import re
 
 register_page(__name__, path="/", title="HOLMES - Home")
 
@@ -14,93 +12,81 @@ register_page(__name__, path="/", title="HOLMES - Home")
 SPACE_INFO = {
     "sherlock": {
         "title": "Sherlock",
-        "description": "Advanced analytics and AI/ML model management for predictive insights and data exploration.",
-        "version": "v2.1.0",
+        "subtitle": "asTested",
+        "description": "Single platform for all internal external testing data.",
+        "version": None,
         "color": "blue",
-        "icon": "tabler:chart-line",
+        "icon": "tabler:flask",
     },
     "watson": {
         "title": "Watson",
-        "description": "Intelligent data processing and natural language analysis for enhanced decision-making.",
-        "version": "v1.8.3",
+        "subtitle": "asManufactured",
+        "description": "Single platform for all customer related data analysis.",
+        "version": None,
         "color": "cyan",
-        "icon": "tabler:brain",
+        "icon": "tabler:shopping-bag-check",
     },
     "mycroft": {
         "title": "Mycroft",
-        "description": "Data visualization and reporting tools for comprehensive business intelligence.",
-        "version": "v2.0.1",
+        "subtitle": "asProduced",
+        "description": "Single platform for manufacturing data analysis.",
+        "version": None,
         "color": "grape",
-        "icon": "tabler:chart-bar",
+        "icon": "tabler:building-factory-2",
     },
     "enola": {
         "title": "Enola",
-        "description": "Management and administration tools for system configuration and user access control.",
-        "version": "v1.5.0",
+        "subtitle": "asManaged",
+        "description": "Management overview of test rig operations and customer data.",
+        "version": None,
         "color": "red",
-        "icon": "tabler:settings",
+        "icon": "tabler:eye",
     },
 }
 
-def _load_changelog(space_name: str):
-    base_path = Path(__file__).resolve().parents[1]
+ROOT_CHANGELOG_LABEL = "HOLMES"
+ROOT_CHANGELOG_COLOR = "blue"
 
-    changelog_path = (
-        base_path
-        / "spaces"
-        / space_name
-        / "CHANGELOG.md"
-    )
-    if not changelog_path.exists():
-        return []
 
-    text = changelog_path.read_text(encoding="utf-8")
-    entries = []
-    current = None
+def _extract_latest_version(changelog: dict) -> str:
+    releases = changelog.get("releases") or {}
+    candidates: list[tuple[str, str | None]] = []
 
-    header_re = re.compile(
-        r"^(?P<version>[^()—]+?)\s*(\((?P<status>[^)]+)\))?\s*(—\s*(?P<date>.+))?$"
-    )
+    if isinstance(releases, dict):
+        for version, payload in releases.items():
+            date = None
+            if isinstance(payload, dict):
+                date = (
+                    payload.get("date")
+                    or payload.get("released")
+                    or payload.get("released_at")
+                )
+            candidates.append((version, date))
+    elif isinstance(releases, list):
+        for payload in releases:
+            if not isinstance(payload, dict):
+                continue
+            version = payload.get("version") or payload.get("tag")
+            if not version:
+                continue
+            date = payload.get("date") or payload.get("released")
+            candidates.append((version, date))
 
-    for line in text.splitlines():
-        line = line.rstrip()
-        if line.startswith("## "):
-            if current:
-                entries.append(current)
-            header = line[3:].strip()
-            match = header_re.match(header)
-            if match:
-                version = match.group("version").strip()
-                status = (match.group("status") or "Released").strip()
-                date = (match.group("date") or "").strip() or None
-            else:
-                version = header
-                status = "Released"
-                date = None
+    if not candidates:
+        return "N/A"
 
-            current = {
-                "version": version,
-                "status": status,
-                "date": date,
-                "changes": [],
-            }
-        elif line.lstrip().startswith("- ") and current:
-            indent = len(line) - len(line.lstrip())
-            text_item = line.lstrip()[2:].strip()
-            if indent >= 2:
-                text_item = f"↳ {text_item}"
-            current["changes"].append(text_item)
+    dated = [item for item in candidates if item[1]]
+    if dated:
+        return max(dated, key=lambda item: item[1] or "")[0]
 
-    if current:
-        entries.append(current)
+    return max((version for version, _ in candidates), default="N/A")
 
-    return entries
 
-def _create_space_card(space_name, space_data, has_access=False):
+def _create_space_card(space_name, space_data, version, has_access=False):
     """Create a card for a single space."""
     required_groups = SPACE_ACCESS_MAP.get(f"/{space_name}", [])
     required_role = required_groups[0] if required_groups else "No role required"
-    
+
     # Determine icon and color based on access
     if has_access:
         access_icon = "tabler:circle-check"
@@ -114,7 +100,7 @@ def _create_space_card(space_name, space_data, has_access=False):
         button_text = "Request Access"
         button_icon = "tabler:lock-open"
         button_variant = "outline"
-    
+
     return dmc.Card(
         children=[
             dmc.CardSection(
@@ -128,7 +114,7 @@ def _create_space_card(space_name, space_data, has_access=False):
                             variant="light",
                         ),
                         dmc.Badge(
-                            space_data["version"],
+                            version,
                             color=space_data["color"],
                             variant="dot",
                         ),
@@ -140,9 +126,21 @@ def _create_space_card(space_name, space_data, has_access=False):
             ),
             dmc.Stack(
                 [
-                    dmc.Title(
-                        space_data["title"],
-                        order=3,
+                    dmc.Group(
+                        [
+                            dmc.Title(
+                                space_data["title"],
+                                order=3,
+                            ),
+                            dmc.Text(
+                                space_data.get("subtitle", ""),
+                                size="xs",
+                                c="dimmed",
+                                style={"fontStyle": "italic"},
+                            ),
+                        ],
+                        gap="xs",
+                        align="baseline",
                     ),
                     dmc.Text(
                         space_data["description"],
@@ -155,7 +153,7 @@ def _create_space_card(space_name, space_data, has_access=False):
                             DashIconify(icon=access_icon, width=16, color=access_color),
                             dmc.Code(
                                 required_role,
-                                style={"fontSize": "11px"},
+                                style={"fontSize": "11px", "background": "rgba(128,128,128,0.14)"},
                             ),
                         ],
                         gap="xs",
@@ -183,79 +181,32 @@ def _create_space_card(space_name, space_data, has_access=False):
     )
 
 
-def _create_update_log_item(update, space_name: str):
-    """Create a single update log entry."""
-    status_lower = update["status"].lower()
-    is_wip = "work in progress" in status_lower or "wip" in status_lower
-    date_text = "N/A" if is_wip or not update["date"] else update["date"]
-
-    status_label = "Work in progress" if is_wip else "Released"
-    status_color = "yellow" if is_wip else "green"
-
-    return dmc.Paper(
-        [
-            dmc.Group(
-                [
-                    dmc.Group(
-                        [
-                            dmc.Badge(
-                                SPACE_INFO[space_name]["title"],
-                                color=SPACE_INFO[space_name]["color"],
-                                variant="light",
-                            ),
-                            dmc.Badge(
-                                status_label,
-                                color=status_color,
-                                variant="light",
-                            ),
-                            dmc.Badge(
-                                update["version"],
-                                color="green",
-                                variant="dot",
-                                size="lg",
-                            ),
-                        ],
-                        gap="xs",
-                    ),
-                    dmc.Text(
-                        date_text,
-                        size="sm",
-                        c="dimmed",
-                    ),
-                ],
-                justify="space-between",
-            ),
-            dmc.List(
-                [dmc.ListItem(change) for change in update["changes"]],
-                spacing="xs",
-                size="sm",
-                mt="sm",
-                icon=DashIconify(icon="tabler:circle-check", width=16, color="green"),
-            ),
-        ],
-        p="md",
-        radius="md",
-        withBorder=True,
-    )
-
-
 def create_landing():
     """Create the landing page layout."""
+    base_path = Path(__file__).resolve().parents[1]
+
+    space_versions = {}
+    for space_name in SPACE_INFO.keys():
+        space_path = base_path / "spaces" / space_name / "changelog.json"
+        space_changelog = load_changelog_json(space_path)
+        space_versions[space_name] = _extract_latest_version(space_changelog)
+
     # Get current user's groups
     user_groups = list_groups()
-    
+
     # Determine which spaces the user has access to
     user_access = {}
     for space_name in SPACE_INFO.keys():
         required_groups = SPACE_ACCESS_MAP.get(f"/{space_name}", [])
-        has_access = user_groups and any(group in user_groups for group in required_groups)
+        has_access = user_groups and any(
+            group in user_groups for group in required_groups
+        )
         user_access[space_name] = has_access
-    
+
     return dmc.Container(
         [
             # Hidden div for callback output
             html.Div(id="landing-nav-trigger", style={"display": "none"}),
-            
             # Header section
             dmc.Stack(
                 [
@@ -267,6 +218,33 @@ def create_landing():
                                     order=1,
                                     style={"textAlign": "center"},
                                 ),
+                                dmc.Stack(
+                                    [
+                                        dmc.Text(
+                                            "“It is a capital mistake to theorize before one has data.  "
+                                            "Insensibly one begins to twist facts to suit theories, instead of theories to suit facts.”",
+                                            ta="center",
+                                            style={"fontStyle": "italic"},
+                                        ),
+                                        dmc.Text(
+                                            "- Arthur Conan Doyle, from “The Complete Sherlock Holmes, Vol 2”",
+                                            ta="center",
+                                            c="dimmed",
+                                            size="sm",
+                                        ),
+                                    ],
+                                    gap=2,
+                                ),
+                                dmc.Text(
+                                    "The Holmes application Suite is your central hub for navigating, visualizing, and understanding all ELY related stack data at Bosch. Effortlessly browse and search through complex datasets, generate insightful summaries, and uncover trends with advanced analytics and AI-powered tools.",
+                                    size="md",
+                                    ta="center",
+                                ),
+                                dmc.Divider(
+                                    label="Application spaces",
+                                    labelPosition="center",
+                                    my="xs",
+                                ),
                                 dmc.Text(
                                     "Select a space to begin your journey",
                                     size="lg",
@@ -277,52 +255,191 @@ def create_landing():
                             gap="xs",
                         ),
                     ),
-                    
                     # Space cards grid
                     dmc.SimpleGrid(
                         cols={"base": 1, "sm": 2, "lg": 4},
                         spacing="lg",
                         children=[
-                            _create_space_card(space_name, space_data, user_access.get(space_name, False))
+                            _create_space_card(
+                                space_name,
+                                space_data,
+                                space_versions.get(space_name) or "N/A",
+                                user_access.get(space_name, False),
+                            )
                             for space_name, space_data in SPACE_INFO.items()
                         ],
                     ),
-                    
-                    # Divider
-                    dmc.Divider(
-                        label="Application Updates",
-                        labelPosition="center",
-                        my="xl",
-                    ),
-
-                    # Filter
-                    dmc.MultiSelect(
-                        id="changelog-space-filter",
-                        data=[
-                            {"value": space_name, "label": SPACE_INFO[space_name]["title"]}
-                            for space_name in SPACE_INFO.keys()
-                        ],
-                        value=list(SPACE_INFO.keys()),
-                        label="Filter by space",
-                        placeholder="Select spaces",
-                        searchable=True,
-                        clearable=False,
-                        w="100%",
-                    ),
-                    
-                    # Update log section (flat list)
                     dmc.Stack(
                         [
-                            dmc.Title(
-                                "Updates",
-                                order=2,
+                            dmc.Divider(
+                                label="Additional sources & documentation",
+                                labelPosition="center",
+                                my="sm",
+                            ),
+                            dmc.Group(
+                                [
+                                    dmc.Stack(
+                                        [
+                                            html.A(
+                                                [
+                                                    dmc.Image(
+                                                        id="docupedia-logo-img",
+                                                        src="/assets/docupedia_logo.png",
+                                                        w=120,
+                                                        h="auto",
+                                                        lightHidden=False,
+                                                        darkHidden=True,
+                                                    ),
+                                                    dmc.Image(
+                                                        id="docupedia-logo-img-dark",
+                                                        src="/assets/docupedia_logo.png",
+                                                        w=120,
+                                                        h="auto",
+                                                        style={
+                                                            "filter": "invert(1) hue-rotate(180deg)"
+                                                        },
+                                                        lightHidden=True,
+                                                        darkHidden=False,
+                                                    ),
+                                                ],
+                                                href="https://inside-docupedia.bosch.com/confluence/spaces/ELYSTACK/pages/2693376926/ELY+Data",
+                                                target="_blank",
+                                                style={
+                                                    "display": "flex",
+                                                    "justifyContent": "center",
+                                                    "alignItems": "center",
+                                                },
+                                            ),
+                                            dmc.Text(
+                                                "ELY Data documentation and resources",
+                                                size="sm",
+                                                ta="center",
+                                            ),
+                                        ],
+                                        gap="xs",
+                                        align="center",
+                                        style={"width": "250px", "maxWidth": "250px"},
+                                    ),
+                                    dmc.Divider(orientation="vertical", size="sm", h=64),
+                                    dmc.Stack(
+                                        [
+                                            html.A(
+                                                [
+                                                    dmc.Image(
+                                                        id="leepa-logo-img",
+                                                        src="/assets/leepa_logo.png",
+                                                        w=120,
+                                                        h="auto",
+                                                        lightHidden=False,
+                                                        darkHidden=True,
+                                                    ),
+                                                    dmc.Image(
+                                                        id="leepa-logo-img-dark",
+                                                        src="/assets/leepa_logo.png",
+                                                        w=120,
+                                                        h="auto",
+                                                        style={
+                                                            "filter": "invert(1) hue-rotate(180deg)"
+                                                        },
+                                                        lightHidden=True,
+                                                        darkHidden=False,
+                                                    ),
+                                                ],
+                                                href="https://leepa.app.bosch.com/en/bapmfe/",
+                                                target="_blank",
+                                                style={
+                                                    "display": "flex",
+                                                    "justifyContent": "center",
+                                                    "alignItems": "center",
+                                                },
+                                            ),
+                                            dmc.Text("Test & Order Management", size="sm", ta="center"),
+                                        ],
+                                        gap="xs",
+                                        align="center",
+                                        style={"width": "250px", "maxWidth": "250px"},
+                                    ),
+                                    dmc.Divider(orientation="vertical", size="sm", h=64),
+                                    dmc.Stack(
+                                        [
+                                            html.A(
+                                                [
+                                                    dmc.Image(
+                                                        id="outsystems-logo-img",
+                                                        src="/assets/outsystems_logo.png",
+                                                        w=120,
+                                                        h="auto",
+                                                        lightHidden=False,
+                                                        darkHidden=True,
+                                                    ),
+                                                    dmc.Image(
+                                                        id="outsystems-logo-img-dark",
+                                                        src="/assets/outsystems_logo_dark.png",
+                                                        w=120,
+                                                        h="auto",
+                                                        style={
+                                                            "filter": "invert(1) hue-rotate(180deg)"
+                                                        },
+                                                        lightHidden=True,
+                                                        darkHidden=False,
+                                                    ),
+                                                ],
+                                                href="https://apps-p-p3-outsystems.de.bosch.com/pemely/Main?inp_Id=0&inp_Screen=MainPage",
+                                                target="_blank",
+                                                style={
+                                                    "display": "flex",
+                                                    "justifyContent": "center",
+                                                    "alignItems": "center",
+                                                },
+                                            ),
+                                            dmc.Text("Sample & Stack Browser", size="sm", ta="center"),
+                                        ],
+                                        gap="xs",
+                                        align="center",
+                                        style={"width": "250px", "maxWidth": "250px"},
+                                    ),
+                                ],
+                                gap="xl",
+                                justify="center",
+                                align="center",
+                                wrap="wrap",
+                            ),
+                            dmc.Divider(
+                                label="Application Updates",
+                                labelPosition="center",
+                                my="sm",
+                            ),
+                            dmc.MultiSelect(
+                                id="changelog-space-filter",
+                                data=[
+                                    {
+                                        "value": space_name,
+                                        "label": SPACE_INFO[space_name]["title"],
+                                    }
+                                    for space_name in SPACE_INFO.keys()
+                                ],
+                                value=list(SPACE_INFO.keys()),
+                                label="Filter by space",
+                                placeholder="Select spaces",
+                                searchable=True,
+                                clearable=False,
+                                w="100%",
                             ),
                             dmc.Stack(
-                                id="changelog-list",
-                                gap="md",
+                                [
+                                    dmc.Title(
+                                        "Updates",
+                                        order=2,
+                                    ),
+                                    dmc.Stack(
+                                        id="changelog-list",
+                                        gap="md",
+                                    ),
+                                ],
+                                gap="lg",
                             ),
                         ],
-                        gap="lg",
+                        gap="sm",
                     ),
                 ],
                 gap="xl",
@@ -335,21 +452,35 @@ def create_landing():
 
 layout = create_landing
 
+
 @callback(
     Output("changelog-list", "children"),
     Input("changelog-space-filter", "value"),
-    prevent_initial_call=False
+    prevent_initial_call=False,
 )
 def update_changelog_list(selected_spaces):
     selected_spaces = selected_spaces or []
     cards = []
 
+    base_path = Path(__file__).resolve().parents[1]
+    root_changelog = load_changelog_json(base_path / "changelog.json")
+    cards.extend(
+        build_update_cards(root_changelog, ROOT_CHANGELOG_LABEL, ROOT_CHANGELOG_COLOR)
+    )
+
     for space_name in selected_spaces:
-        updates = _load_changelog(space_name)
-        for update in updates:
-            cards.append(_create_update_log_item(update, space_name))
+        space_path = base_path / "spaces" / space_name / "changelog.json"
+        space_changelog = load_changelog_json(space_path)
+        cards.extend(
+            build_update_cards(
+                space_changelog,
+                SPACE_INFO[space_name]["title"],
+                SPACE_INFO[space_name]["color"],
+            )
+        )
 
     return cards
+
 
 # Navigation callback for space cards
 clientside_callback(

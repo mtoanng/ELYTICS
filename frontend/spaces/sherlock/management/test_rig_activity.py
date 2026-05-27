@@ -1,8 +1,11 @@
-from dash import html, register_page
+from dash import register_page
+from spaces.shared.test_rig_activity import create_test_rig_activity_page
 
-register_page(__name__, path="/sherlock/management/test-rig-activity", title="HOLMES - Sherlock - Test Rig Activity")
+register_page(
+    __name__,
+    path="/sherlock/management/test-rig-activity",
+    title="HOLMES - Sherlock - Test Rig Activity",
+    name="HOLMES - Sherlock - Test Rig Activity",
+)
 
-def test_rig_activity_layout():
-    return html.Div(f"welcome to test rig activity home, latest data:")
-
-layout = test_rig_activity_layout
+layout = create_test_rig_activity_page(ns="sherlock")

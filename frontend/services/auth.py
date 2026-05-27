@@ -1,5 +1,7 @@
 import jwt
 import time
+import os
+import requests
 from dash_auth.oidc_auth import OIDCAuth
 from flask import session, redirect
 
@@ -29,6 +31,8 @@ class OIDCAuthWithToken(OIDCAuth):
 
             if "access_token" in token:
                 session["access_token"] = token["access_token"]
+            if "refresh_token" in token:
+                session["refresh_token"] = token["refresh_token"]
 
             if self.log_signins:
                 import logging
@@ -47,7 +51,40 @@ def _is_access_token_expired():
         return exp < int(time.time())
     except Exception:
         return True
-    
+
+
+def _refresh_access_token():
+    """Attempt to get a new access token using the stored refresh token.
+    Returns True if successful, False otherwise."""
+    refresh_token = session.get("refresh_token")
+    if not refresh_token:
+        return False
+    try:
+        tenant_id = os.getenv("FRONTEND_AZURE_TENANT_ID")
+        client_id = os.getenv("FRONTEND_AZURE_CLIENT_ID")
+        client_secret = os.getenv("FRONTEND_AZURE_CLIENT_SECRET")
+        backend_client_id = os.getenv("BACKEND_AZURE_CLIENT_ID")
+        token_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
+        data = {
+            "grant_type": "refresh_token",
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "refresh_token": refresh_token,
+            "scope": f"openid profile email offline_access api://{backend_client_id}/user_impersonation",
+        }
+        response = requests.post(token_url, data=data, timeout=10)
+        if response.status_code == 200:
+            new_token = response.json()
+            if "access_token" in new_token:
+                session["access_token"] = new_token["access_token"]
+            if "refresh_token" in new_token:
+                session["refresh_token"] = new_token["refresh_token"]
+            return True
+        return False
+    except Exception:
+        return False
+
+
 def check_access(groups=None):
     """
     Check if user has access based on groups. 
@@ -57,8 +94,9 @@ def check_access(groups=None):
     - needs_login: True if token expired and needs re-authentication
     """
     if _is_access_token_expired():
-        session.clear()
-        return False, None, True
+        if not _refresh_access_token():
+            session.clear()
+            return False, None, True
     
     user = session.get("user")
     if not user:

@@ -1,22 +1,38 @@
 {
-  "name": "TBP-HOLMES Dev Container",
-  "build": {
-    "dockerfile": "Dockerfile",
-    "context": ".."
-  },
-  "postStartCommand": "redis-server --daemonize yes",
+  "name": "TBP-HOLMES Dev",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "dev",
+  "runServices": [
+    "dev",
+    "backend",
+    "frontend",
+    "redis"
+  ],
+  "containerUser": "root",
+  "remoteUser": "root",
+  "updateRemoteUserUID": false,
+  "workspaceFolder": "/workspace",
   "forwardPorts": [
+    8000,
     8501,
-    8000
+    8089,
+    6379
   ],
   "portsAttributes": {
+    "8000": {
+      "label": "FastAPI Backend",
+      "onAutoForward": "openBrowser"
+    },
     "8501": {
       "label": "Dash Frontend",
       "onAutoForward": "openBrowser"
     },
-    "8000": {
-      "label": "FastAPI Backend",
-      "onAutoForward": "notify"
+    "8089": {
+      "label": "Locust Load Testing UI",
+      "onAutoForward": "openBrowser"
+    },
+    "6379": {
+      "label": "Redis"
     }
   },
   "customizations": {
@@ -27,7 +43,8 @@
         "ms-python.black-formatter",
         "ms-python.isort",
         "njpwerner.autodocstring",
-        "github.copilot"
+        "GitHub.copilot",
+        "GitHub.copilot-chat"
       ],
       "settings": {
         "python.defaultInterpreterPath": "/usr/local/bin/python",
@@ -35,9 +52,11 @@
         "python.formatting.provider": "none",
         "editor.formatOnSave": true,
         "[python]": {
-          "editor.defaultFormatter": "ms-python.python"
+          "editor.defaultFormatter": "ms-python.black-formatter"
         }
       }
     }
-  }
+  },
+  "shutdownAction": "stopCompose",
+  "postCreateCommand": "pip install -r /workspace/backend/requirements.txt -r /workspace/frontend/requirements.txt"
 }
