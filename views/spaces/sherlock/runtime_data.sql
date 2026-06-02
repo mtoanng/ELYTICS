@@ -1,7 +1,6 @@
 -- Runtime data (1)
 SELECT
   ORDR.order_id AS order_id,
-  EXPLODED.test_id AS test_id,
   first_value(SAMP.sample_id) AS sample_id,
   first_value(SAMP.name) AS sample_name,
   first_value(SAMP.leepa_number) AS leepa_number,
@@ -9,7 +8,7 @@ SELECT
   first_value(SAMP.active_area_per_cell) AS active_area_per_cell,
   first_value(SAMP.ptl_name) AS PTL_name,
   first_value(SAMP.gdl_name) AS GDL_name,
-  SUM(TS.timeFacRun) AS total_runtime,
+  MAX(TS.calc.time_run) AS total_runtime,
   MIN(TS.time) AS start_time,
   MAX(TS.time) AS end_time,
   last_value(ORDR.testrig_id) AS testrig_id,
@@ -48,17 +47,14 @@ SELECT
     )
   ) AS testrig_label
 FROM
-  ps_xplatform_dev.pemely_ops.gold_genericstack_timeseries_1hr TS
-    LEFT JOIN ps_xplatform_dev.pemely_ops.gold_genericstack_order ORDR
+  ps_xplatform_prod.pemely_ops.gold_timeseries_1h TS
+    LEFT JOIN ps_xplatform_prod.pemely_ops.gold_order ORDR
       ON TS.order_id = ORDR.order_id
-    LEFT JOIN ps_xplatform_dev.pemely_ops.gold_sample SAMP
+    LEFT JOIN ps_xplatform_prod.pemely_ops.gold_sample SAMP
       ON ORDR.sample_id = SAMP.sample_id
     LEFT JOIN ps_xplatform_prod.pemely_dev.silver_dim_testrig TR
       ON ORDR.testrig_id = TR.testrig_id
-  LATERAL VIEW explode(ORDR.test_id) EXPLODED AS test_id
 GROUP BY
-  ORDR.order_id,
-  EXPLODED.test_id
+  ORDR.order_id
 ORDER BY
-  EXPLODED.test_id,
   start_time

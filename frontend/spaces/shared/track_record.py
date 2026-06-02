@@ -13,10 +13,25 @@ import plotly.graph_objects as go
 import pandas as pd
 from typing import List
 
+from config.signals import (
+    get_signal_label,
+    get_signal_title,
+    get_signal_unit,
+)
 from services.backend_service import get_metadata, get_tabular
 
 PLOT_COLS = ["sample_name", "run_hours"]
-DETAIL_COLS = ["order_id", "hours_run", "time", "date", "uCell", "concO2H2", "concH2O2"]
+DETAIL_COLS = [
+    "order_id",
+    "hours_run",
+    "runtime_hour",
+    "run_hours",
+    "time",
+    "date",
+    "u_cell_avg",
+    "c_o2inh2",
+    "c_h2ino2",
+]
 X_AXIS_OPTIONS = [
     {"label": "Hours run", "value": "hours_run"},
     {"label": "Date", "value": "time"},
@@ -34,10 +49,10 @@ PLOT_HOVER_COLS = [
 ]
 
 USAGE_BLOCKQUOTE_TEXT = [
-    "The top chart shows total runtime for GEN 1 Proto 1 stacks.",
-    "Each bar corresponds to one sample.",
+    "The top chart shows total runtime for GEN 1 Proto 1 stacks from column run_hours.",
+    "Each bar corresponds to one sample_name.",
     "Hover on a bar to inspect runtime and stack metadata.",
-    "Select a sample name from the filter or by clicking on the plot bars to load detailed data shown below.",
+    "Select a sample name below to load detailed u_cell_avg, c_o2inh2, and c_h2ino2 data from track_record tabular data.",
     "Use the x-axis toggle to switch the lower charts between runtime hours and date when a time column is available.",
     "NOTE: Current in-depth plots show the full timeseries (1hr) data. The conditioning events are not yet available in the data sources.",
 ]
@@ -135,9 +150,7 @@ def get_order_id_color(order_id, order_ids_list):
 
 def build_detail_plot(
     df: pd.DataFrame,
-    value_col: str,
-    yaxis_title: str,
-    hover_label: str,
+    signal_name: str,
     x_axis_mode: str,
     theme: str,
     uirevision: str,
@@ -146,13 +159,38 @@ def build_detail_plot(
     y_multiplier: float = 1.0,
 ) -> go.Figure:
     plot_df = df.copy()
+    value_col = signal_name if signal_name in plot_df.columns else None
+
+    yaxis_title = get_signal_title(signal_name)
+    unit = get_signal_unit(signal_name)
+    hover_label = get_signal_label(signal_name)
+
+    if not value_col:
+        fig = go.Figure()
+        fig.add_annotation(
+            text=f"No data column available for {yaxis_title}",
+            x=0.5,
+            y=0.5,
+            xref="paper",
+            yref="paper",
+            showarrow=False,
+        )
+        fig.update_layout(
+            xaxis_title="Hours run [hr]",
+            yaxis_title=f"{yaxis_title}{f' [{unit}]' if unit and unit != '-' else ''}",
+            margin=dict(l=40, r=20, t=12, b=margin_bottom),
+            showlegend=False,
+            uirevision=uirevision,
+        )
+        return apply_theme(fig, theme)
+
     plot_df[value_col] = pd.to_numeric(plot_df[value_col], errors="coerce")
     if y_multiplier != 1.0:
         plot_df[value_col] = plot_df[value_col] * y_multiplier
     plot_df["order_id"] = plot_df["order_id"].fillna("Unknown").astype(str).str.strip()
 
     if x_axis_mode == "time":
-        x_col = "time"
+        x_col = "time" if "time" in plot_df.columns else "date"
         x_title = "Date"
         if x_col not in plot_df.columns:
             plot_df = pd.DataFrame(columns=[value_col])
@@ -160,7 +198,12 @@ def build_detail_plot(
             plot_df[x_col] = pd.to_datetime(plot_df[x_col], errors="coerce")
             plot_df = plot_df.dropna(subset=[x_col, value_col]).sort_values(x_col)
     else:
-        x_col = "hours_run"
+        if "runtime_hour" in plot_df.columns:
+            x_col = "runtime_hour"
+        elif "hours_run" in plot_df.columns:
+            x_col = "hours_run"
+        else:
+            x_col = "run_hours"
         x_title = "Hours run [hr]"
         plot_df[x_col] = pd.to_numeric(plot_df[x_col], errors="coerce")
         plot_df = plot_df.dropna(subset=[x_col, value_col]).sort_values(x_col)
@@ -204,7 +247,7 @@ def build_detail_plot(
 
     layout_dict = dict(
         xaxis_title=x_title,
-        yaxis_title=yaxis_title,
+        yaxis_title=f"{yaxis_title}{f' [{unit}]' if unit and unit != '-' else ''}",
         margin=dict(l=40, r=20, t=12, b=margin_bottom),
         showlegend=True,
         uirevision=uirevision,
@@ -239,23 +282,23 @@ def create_track_record_page(ns: str):
 
     fig_uCell = go.Figure()
     fig_uCell.update_layout(
-        title="uCell",
+        title=get_signal_title("u_cell_avg"),
         xaxis_title="Hours run [hr]",
-        yaxis_title="uCell",
+        yaxis_title=get_signal_title("u_cell_avg"),
     )
 
     fig_concO2H2 = go.Figure()
     fig_concO2H2.update_layout(
-        title="concO2H2",
+        title=get_signal_title("c_o2inh2"),
         xaxis_title="Hours run [hr]",
-        yaxis_title="concO2H2 [%]",
+        yaxis_title=get_signal_title("c_o2inh2"),
     )
 
     fig_concH2O2 = go.Figure()
     fig_concH2O2.update_layout(
-        title="concH2O2",
+        title=get_signal_title("c_h2ino2"),
         xaxis_title="Hours run [hr]",
-        yaxis_title="concH2O2 [%]",
+        yaxis_title=get_signal_title("c_h2ino2"),
     )
 
     layout = dmc.Container(
@@ -287,7 +330,7 @@ def create_track_record_page(ns: str):
                                 ],
                             ),
                             dmc.Text(
-                                "Total runtime for GEN 1 Proto 1 stacks by sample name (based on cloud data).",
+                                "Total runtime for GEN 1 Proto 1 stacks by sample name (based on cloud data)",
                                 c="dimmed",
                             ),
                             dmc.Collapse(
@@ -553,13 +596,16 @@ def create_track_record_page(ns: str):
                 "sherlock",
                 "track_record",
                 filters={"sample_name": sample_name},
-                sort_by="hours_run",
-                sort_dir="asc",
             )
         except Exception:
             return []
 
         df = _ensure_columns(df, DETAIL_COLS)
+        sort_candidates = ["runtime_hour", "hours_run", "run_hours"]
+        sort_col = next((col for col in sort_candidates if col in df.columns), None)
+        if sort_col:
+            df[sort_col] = pd.to_numeric(df[sort_col], errors="coerce")
+            df = df.sort_values(sort_col, ascending=True, na_position="last")
         return df.to_dict("records")
 
     @callback(
@@ -577,9 +623,7 @@ def create_track_record_page(ns: str):
 
         ucell_fig = build_detail_plot(
             df=df,
-            value_col="uCell",
-            yaxis_title="uCell",
-            hover_label="uCell",
+            signal_name="u_cell_avg",
             x_axis_mode=x_axis_mode,
             theme=theme,
             uirevision=uirevision,
@@ -587,9 +631,7 @@ def create_track_record_page(ns: str):
         )
         conco2h2_fig = build_detail_plot(
             df=df,
-            value_col="concO2H2",
-            yaxis_title="concO2H2 [ppm]",
-            hover_label="concO2H2",
+            signal_name="c_o2inh2",
             x_axis_mode=x_axis_mode,
             theme=theme,
             uirevision=uirevision,
@@ -597,9 +639,7 @@ def create_track_record_page(ns: str):
         )
         conch2o2_fig = build_detail_plot(
             df=df,
-            value_col="concH2O2",
-            yaxis_title="concH2O2 [%]",
-            hover_label="concH2O2",
+            signal_name="c_h2ino2",
             x_axis_mode=x_axis_mode,
             theme=theme,
             uirevision=uirevision,

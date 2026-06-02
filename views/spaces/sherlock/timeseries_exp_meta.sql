@@ -33,8 +33,8 @@ WITH filtered_ts AS (
       END
     ) AS testrig_label
   FROM
-    ps_xplatform_dev.pemely_ops.gold_genericstack_timeseries_1s ts
-      INNER JOIN ps_xplatform_dev.pemely_ops.gold_genericstack_order o
+    ps_xplatform_prod.pemely_ops.gold_timeseries_1s ts
+      INNER JOIN ps_xplatform_prod.pemely_ops.gold_order o
         ON ts.order_id = o.order_id
       LEFT JOIN ps_xplatform_prod.pemely_dev.silver_dim_testrig tr
         ON o.testrig_id = tr.testrig_id

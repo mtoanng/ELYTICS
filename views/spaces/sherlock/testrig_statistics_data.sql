@@ -4,7 +4,7 @@ WITH base AS (
     year(ts.time) AS year,
     ts.order_id,
     -- operational condition
-    ts.iStck,
+    ts.i,
     -- order metadata
     o.testrig_id,
     o.sample_type,
@@ -13,8 +13,8 @@ WITH base AS (
     -- raw location
     tr.location AS raw_location
   FROM
-    ps_xplatform_dev.pemely_ops.gold_genericstack_timeseries_1hr ts
-      INNER JOIN ps_xplatform_dev.pemely_ops.gold_genericstack_order o
+    ps_xplatform_prod.pemely_ops.gold_timeseries_1h ts
+      INNER JOIN ps_xplatform_prod.pemely_ops.gold_order o
         ON ts.order_id = o.order_id
       LEFT JOIN ps_xplatform_prod.pemely_dev.silver_dim_testrig tr
         ON o.testrig_id = tr.testrig_id
@@ -52,7 +52,7 @@ filtered AS (
     number_of_cells,
     -- hourly operational runtime
     CASE
-      WHEN iStck > 0.1 THEN 1.0
+      WHEN i > 0.1 THEN 1.0
       ELSE 0.0
     END AS run_hour
   FROM

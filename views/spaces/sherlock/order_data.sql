@@ -1,3 +1,6 @@
+
+-- need clarification on some stuff in here like u_cell_avg in max 
+
 SELECT
   o.order_id,
   o.sample_name,
@@ -15,91 +18,90 @@ SELECT
   o.number_of_cells,
   o.testrig_id,
   o.short_description,
-  t.time_total,
-  t.timeFacTest,
-  t.timeFacRun,
-  t.startCnt,
+  t.time_test,
+  t.time_run,
+  t.start_count,
   e.polcurve_count,
-  s.jStack_max,
-  s.uCell_max,
-  s.tAndeIn_max,
-  s.tAndeOut_max,
-  s.pCtdeOut_max,
-  s.pAndeIn_max,
-  s.vfAndeIn_max,
-  t.maxh2out
+  s.j_max,
+  s.u_cell_max,
+  s.t_an_in_max,
+  s.t_an_out_max,
+  s.p_cat_out_max,
+  s.p_an_in_max,
+  s.vf_an_in_max,
+  t.mf_h2_max
 FROM
-  ps_xplatform_dev.pemely_ops.gold_genericstack_order o
-    LEFT JOIN ps_xplatform_dev.pemely_ops.gold_sample samp
+  ps_xplatform_prod.pemely_ops.gold_order o
+    LEFT JOIN ps_xplatform_prod.pemely_ops.gold_sample samp
       ON o.sample_id = samp.sample_id
     INNER JOIN (
-      SELECT
+SELECT
         order_id,
         MAX(
           CASE
             WHEN
-              jStck_max IS NOT NULL
-              AND jStck_max != 'NaN'
+              max.j IS NOT NULL
+              AND max.j != 'NaN'
             THEN
-              jStck_max
+              max.j
           END
-        ) AS jStack_max,
+        ) AS j_max,
         MAX(
           CASE
             WHEN
-              uCell_max IS NOT NULL
-              AND uCell_max != 'NaN'
+              max.u_cell_avg IS NOT NULL
+              AND max.u_cell_avg != 'NaN'
             THEN
-              uCell_max
+              max.u_cell_avg
           END
-        ) AS uCell_max,
+        ) AS u_cell_max,
         MAX(
           CASE
             WHEN
-              tAndeIn_max IS NOT NULL
-              AND tAndeIn_max != 'NaN'
+              max.t_an_in IS NOT NULL
+              AND max.t_an_in != 'NaN'
             THEN
-              tAndeIn_max
+              max.t_an_in
           END
-        ) AS tAndeIn_max,
+        ) AS t_an_in_max,
         MAX(
           CASE
             WHEN
-              tAndeOut_max IS NOT NULL
-              AND tAndeOut_max != 'NaN'
+              max.t_an_out IS NOT NULL
+              AND max.t_an_out != 'NaN'
             THEN
-              tAndeOut_max
+              max.t_an_out
           END
-        ) AS tAndeOut_max,
+        ) AS t_an_out_max,
         MAX(
           CASE
             WHEN
-              pCtdeOut_max IS NOT NULL
-              AND pCtdeOut_max != 'NaN'
+              max.p_cat_out IS NOT NULL
+              AND max.p_cat_out != 'NaN'
             THEN
-              pCtdeOut_max
+              max.p_cat_out
           END
-        ) AS pCtdeOut_max,
+        ) AS p_cat_out_max,
         MAX(
           CASE
             WHEN
-              pAndeIn_max IS NOT NULL
-              AND pAndeIn_max != 'NaN'
+              max.p_an_in IS NOT NULL
+              AND max.p_an_in != 'NaN'
             THEN
-              pAndeIn_max
+              max.p_an_in
           END
-        ) AS pAndeIn_max,
+        ) AS p_an_in_max,
         MAX(
           CASE
             WHEN
-              vfAndeIn_max IS NOT NULL
-              AND vfAndeIn_max != 'NaN'
+              max.vf_an_in IS NOT NULL
+              AND max.vf_an_in != 'NaN'
             THEN
-              vfAndeIn_max
+              max.vf_an_in
           END
-        ) AS vfAndeIn_max
+        ) AS vf_an_in_max
       FROM
-        ps_xplatform_dev.pemely_ops.gold_genericstack_static
+        ps_xplatform_prod.pemely_ops.gold_timeseries_wide_static
       GROUP BY
         order_id
     ) s
@@ -107,13 +109,12 @@ FROM
     LEFT JOIN (
       SELECT
         order_id,
-        datediff(HOUR, min(time), max(time)) as time_total,
-        CEIL(SUM(timeFacTest)) AS timeFacTest,
-        CEIL(SUM(timeFacRun)) AS timeFacRun,
-        sum(startCnt) as startCnt,
-        max(mfH2Out) as maxh2out
+        CEIL(MAX(calc.time_test)) AS time_test,
+        CEIL(MAX(calc.time_run)) AS time_run,
+        sum(calc.count_start) as start_count,
+        max(max.mf_h2) as mf_h2_max
       FROM
-        ps_xplatform_dev.pemely_ops.gold_genericstack_timeseries_1hr
+        ps_xplatform_prod.pemely_ops.gold_timeseries_1h
       GROUP BY
         order_id
     ) t
@@ -123,7 +124,7 @@ FROM
         order_id,
         count(event_id) as polcurve_count
       FROM
-        ps_xplatform_dev.pemely_ops.gold_genericstack_event
+        ps_xplatform_dev.pemely_ops.vav1tb_gold_event
       WHERE
         event_type = 'ivcurve'
       GROUP BY

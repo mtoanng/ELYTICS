@@ -33,7 +33,7 @@ def _register_metadata_routes(space: str, configs: list[MetadataConfig]) -> None
 def _bind_route(space: str, cfg: MetadataConfig) -> None:
     def route_handler(token: dict = Depends(require_groups(cfg.auth_groups))):
         _ = token
-        effective_ttl = 0 if LOCAL_SQL else cfg.ttl
+        effective_ttl = cfg.ttl
         r = get_redis_client()
         try:
             query_source, cache_source = resolve_query_source(space=space, data_kind="metadata", table_name=cfg.table_name)

@@ -12,6 +12,7 @@ from dash import (
 import dash_mantine_components as dmc
 from dash_iconify import DashIconify
 import pandas as pd
+from config.signals import get_signal_label, get_signal_unit
 from services.backend_service import get_metadata, get_tabular
 
 register_page(
@@ -21,11 +22,15 @@ register_page(
 )
 
 USAGE_BLOCKQUOTE_TEXT = [
-    "This page allows you to explore and compare polarization curve data.",
+    "This page allows you to explore polarization curve data.",
+    "Select at least one filter to load and plot data.",
     "Download the data as CSV using the Download CSV button below the filters.",
 ]
 
-
+POLCURVE_TEMP_SIGNAL = "t_an_in"
+POLCURVE_PRESSURE_SIGNAL = "p_cat_out"
+POLCURVE_X_SIGNAL = "j"
+POLCURVE_Y_SIGNAL = "u_cell_avg"
 def _get_slider_config(df, col):
     if col not in df.columns:
         return 0, 1, [0, 1], {0: "0", 1: "1"}
@@ -47,11 +52,16 @@ def _get_slider_config(df, col):
 
 
 def _apply_local_polcurve_filters(df, tSp_range, pCtSp_range, filter_type):
-    if "tAndeIn" in df.columns and tSp_range and len(tSp_range) == 2:
-        t_numeric = pd.to_numeric(df["tAndeIn"], errors="coerce")
+    temp_col = POLCURVE_TEMP_SIGNAL if POLCURVE_TEMP_SIGNAL in df.columns else None
+    pressure_col = (
+        POLCURVE_PRESSURE_SIGNAL if POLCURVE_PRESSURE_SIGNAL in df.columns else None
+    )
+
+    if temp_col and tSp_range and len(tSp_range) == 2:
+        t_numeric = pd.to_numeric(df[temp_col], errors="coerce")
         df = df[(t_numeric >= tSp_range[0]) & (t_numeric <= tSp_range[1])]
-    if "pCtdeOut" in df.columns and pCtSp_range and len(pCtSp_range) == 2:
-        p_numeric = pd.to_numeric(df["pCtdeOut"], errors="coerce")
+    if pressure_col and pCtSp_range and len(pCtSp_range) == 2:
+        p_numeric = pd.to_numeric(df[pressure_col], errors="coerce")
         df = df[(p_numeric >= pCtSp_range[0]) & (p_numeric <= pCtSp_range[1])]
     if "is_rising" in df.columns:
         if filter_type == "rising":
@@ -137,7 +147,7 @@ layout = dmc.Container(
                                     dcc.Dropdown(
                                         id="polcurve-order-id-filter",
                                         multi=True,
-                                        placeholder="Select one or more order IDs",
+                                        placeholder="Order ID",
                                         style={"width": "100%"},
                                     ),
                                     label="Order ID",
@@ -150,7 +160,7 @@ layout = dmc.Container(
                                     dcc.Dropdown(
                                         id="polcurve-sample-name-filter",
                                         multi=True,
-                                        placeholder="Select one or more sample names",
+                                        placeholder="Sample Name",
                                         style={"width": "100%"},
                                     ),
                                     label="Sample Name",
@@ -163,7 +173,7 @@ layout = dmc.Container(
                                     dcc.Dropdown(
                                         id="polcurve-testrig-id-filter",
                                         multi=True,
-                                        placeholder="Select one or more testrig IDs",
+                                        placeholder="Testrig ID",
                                         style={"width": "100%"},
                                     ),
                                     label="Testrig ID",
@@ -551,12 +561,16 @@ def populate_data_driven_filter_options(data, is_rising):
 
     # Apply direction filter
     df = _apply_local_polcurve_filters(df, None, None, (is_rising or "both").lower())
-    t_min, t_max, t_value, _ = _get_slider_config(df, "tAndeIn")
-    p_min, p_max, p_value, _ = _get_slider_config(df, "pCtdeOut")
+    temp_col = POLCURVE_TEMP_SIGNAL if POLCURVE_TEMP_SIGNAL in df.columns else None
+    pressure_col = (
+        POLCURVE_PRESSURE_SIGNAL if POLCURVE_PRESSURE_SIGNAL in df.columns else None
+    )
+    t_min, t_max, t_value, _ = _get_slider_config(df, temp_col or "")
+    p_min, p_max, p_value, _ = _get_slider_config(df, pressure_col or "")
 
-    temp_bubble_data, temp_bubble_range = _build_bubble_distribution(df.get("tAndeIn"))
+    temp_bubble_data, temp_bubble_range = _build_bubble_distribution(df.get(temp_col))
     pressure_bubble_data, pressure_bubble_range = _build_bubble_distribution(
-        df.get("pCtdeOut")
+        df.get(pressure_col)
     )
 
     return (
@@ -617,24 +631,26 @@ def update_polcurve_plot(data, theme, tSp, pCtSp, is_rising):
         return {}, "No plot available for selected data."
     df = pd.DataFrame(data)
     df = _apply_local_polcurve_filters(df, tSp, pCtSp, (is_rising or "both").lower())
-    if "uCell" in df and "jStck" in df:
+    x_col = POLCURVE_X_SIGNAL if POLCURVE_X_SIGNAL in df.columns else None
+    y_col = POLCURVE_Y_SIGNAL if POLCURVE_Y_SIGNAL in df.columns else None
+    if x_col and y_col:
         color_col = "event_short_id" if "event_short_id" in df else None
-        plot_df = df.dropna(subset=["uCell", "jStck"])
+        plot_df = df.dropna(subset=[y_col, x_col])
         if plot_df.empty:
             return {}, "No plot available for selected data."
         plotly_template = "plotly_dark" if theme == "dark" else "plotly"
         fig = px.line(
             (
-                plot_df.sort_values([color_col, "jStck"])
+                plot_df.sort_values([color_col, x_col])
                 if color_col
-                else plot_df.sort_values("jStck")
+                else plot_df.sort_values(x_col)
             ),
-            x="jStck",
-            y="uCell",
+            x=x_col,
+            y=y_col,
             color=color_col,
             labels={
-                "jStck": "Current Density [A/cm^2]",
-                "uCell": "Cell Voltage [V]",
+                x_col: f"{get_signal_label(POLCURVE_X_SIGNAL)} [{get_signal_unit(POLCURVE_X_SIGNAL)}]",
+                y_col: f"{get_signal_label(POLCURVE_Y_SIGNAL)} [{get_signal_unit(POLCURVE_Y_SIGNAL)}]",
             },
             template=plotly_template,
         )

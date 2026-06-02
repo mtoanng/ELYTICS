@@ -5,6 +5,7 @@ Layout helpers and UI constants for the Sherlock SOH page.
 from __future__ import annotations
 
 import pandas as pd
+from config.signals import get_signal_title
 
 
 IS_RISING_OPTIONS = [
@@ -15,8 +16,8 @@ IS_RISING_OPTIONS = [
 
 COLOR_BY_OPTIONS = [
     {"label": "Default", "value": "none"},
-    {"label": "Anode Inlet Temperature (tAndeIn)", "value": "tAndeIn"},
-    {"label": "Cathode Outlet Pressure (pCtdeOut)", "value": "pCtdeOut"},
+    {"label": get_signal_title("t_an_in"), "value": "t_an_in"},
+    {"label": get_signal_title("p_cat_out"), "value": "p_cat_out"},
     {"label": "Up/Down Pol Curve (is_rising)", "value": "is_rising"},
     {"label": "Fitting Error (model_min_obj_stack)", "value": "fitting_error_binned"},
 ]

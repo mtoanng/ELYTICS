@@ -15,6 +15,7 @@ import pandas as pd
 from datetime import datetime, timedelta, timezone
 from dash_iconify import DashIconify
 
+from config.signals import get_signal_title, get_signal_unit
 from services.backend_service import get_metadata, get_timeseries
 
 # -------------------------------------------------
@@ -22,15 +23,15 @@ from services.backend_service import get_metadata, get_timeseries
 # -------------------------------------------------
 
 SENSORS = {
-    "pAndeIn": {"title": "Pressure Anode Inlet (pAndeIn)", "unit": "bar"},
-    "pCtdeOut": {"title": "Pressure Cathode Outlet (pCtdeOut)", "unit": "bar"},
-    "uCell": {"title": "Cell Voltage (uCell)", "unit": "V"},
-    "jStck": {"title": "Current Density (jStck)", "unit": "A/cm²"},
-    "tAndeIn": {"title": "Temperature Anode Inlet (tAndeIn)", "unit": "°C"},
-    "vfAndeIn": {"title": "Volume Flow Anode Inlet (vfAndeIn)", "unit": "L/min"},
+    "u_cell_avg": {"title": get_signal_title("u_cell_avg"), "unit": get_signal_unit("u_cell_avg")},
+    "j": {"title": get_signal_title("j"), "unit": get_signal_unit("j")},
+    "p_an_in": {"title": get_signal_title("p_an_in"), "unit": get_signal_unit("p_an_in")},
+    "p_cat_out": {"title": get_signal_title("p_cat_out"), "unit": get_signal_unit("p_cat_out")},
+    "t_an_in": {"title": get_signal_title("t_an_in"), "unit": get_signal_unit("t_an_in")},
+    "vf_an_in": {"title": get_signal_title("vf_an_in"), "unit": get_signal_unit("vf_an_in")},
 }
 
-SENSOR_KEYS = ["uCell", "jStck", "pAndeIn", "pCtdeOut", "tAndeIn", "vfAndeIn"]
+SENSOR_KEYS = list(SENSORS.keys())
 PLOT_HEIGHT_PX = 360
 
 USAGE_BLOCKQUOTE_TEXT = [
@@ -81,13 +82,6 @@ def _build_testrig_label_map(meta: list[dict] | None) -> dict[str, str]:
     return label_map
 
 
-def _resolve_metric_column(df: pd.DataFrame, sensor_key: str) -> str | None:
-    for candidate in (f"{sensor_key}_avg", sensor_key, f"{sensor_key}_max", f"{sensor_key}_min"):
-        if candidate in df.columns:
-            return candidate
-    return None
-
-
 def create_test_rig_activity_page(ns: str):
     """Factory to create a test rig activity page with namespaced component IDs.
 
@@ -99,14 +93,7 @@ def create_test_rig_activity_page(ns: str):
     """
 
     # Build plot IDs with namespace
-    PLOT_IDS = [
-        f"{ns}-plot-uCell",
-        f"{ns}-plot-jStck",
-        f"{ns}-plot-pAndeIn",
-        f"{ns}-plot-pCtdeOut",
-        f"{ns}-plot-tAndeIn",
-        f"{ns}-plot-vfAndeIn",
-    ]
+    PLOT_IDS = [f"{ns}-plot-{key}" for key in SENSOR_KEYS]
 
     # -------------------------------------------------
     # LAYOUT
@@ -409,18 +396,8 @@ def create_test_rig_activity_page(ns: str):
         return merged_df.drop_duplicates().to_dict("records"), False
 
     @callback(
-        Output(f"{ns}-plot-uCell-loading-overlay", "visible"),
-        Output(f"{ns}-plot-jStck-loading-overlay", "visible"),
-        Output(f"{ns}-plot-pAndeIn-loading-overlay", "visible"),
-        Output(f"{ns}-plot-pCtdeOut-loading-overlay", "visible"),
-        Output(f"{ns}-plot-tAndeIn-loading-overlay", "visible"),
-        Output(f"{ns}-plot-vfAndeIn-loading-overlay", "visible"),
-        Output(f"{ns}-plot-uCell-wrapper", "style"),
-        Output(f"{ns}-plot-jStck-wrapper", "style"),
-        Output(f"{ns}-plot-pAndeIn-wrapper", "style"),
-        Output(f"{ns}-plot-pCtdeOut-wrapper", "style"),
-        Output(f"{ns}-plot-tAndeIn-wrapper", "style"),
-        Output(f"{ns}-plot-vfAndeIn-wrapper", "style"),
+        *[Output(f"{ns}-plot-{key}-loading-overlay", "visible") for key in SENSOR_KEYS],
+        *[Output(f"{ns}-plot-{key}-wrapper", "style") for key in SENSOR_KEYS],
         Input(f"{ns}-activity-is-fetching", "data"),
     )
     def sync_plots_loading_state(is_fetching):
@@ -464,23 +441,15 @@ def create_test_rig_activity_page(ns: str):
     # =========================================================
 
     @callback(
-        Output(f"{ns}-plot-uCell", "figure"),
-        Output(f"{ns}-plot-jStck", "figure"),
-        Output(f"{ns}-plot-pAndeIn", "figure"),
-        Output(f"{ns}-plot-pCtdeOut", "figure"),
-        Output(f"{ns}-plot-tAndeIn", "figure"),
-        Output(f"{ns}-plot-vfAndeIn", "figure"),
+        *[Output(f"{ns}-plot-{key}", "figure") for key in SENSOR_KEYS],
         Input(f"{ns}-activity-raw-store", "data"),
         Input("theme-store", "data"),
-        Input(f"{ns}-plot-uCell", "relayoutData"),
-        Input(f"{ns}-plot-jStck", "relayoutData"),
-        Input(f"{ns}-plot-pAndeIn", "relayoutData"),
-        Input(f"{ns}-plot-pCtdeOut", "relayoutData"),
-        Input(f"{ns}-plot-tAndeIn", "relayoutData"),
-        Input(f"{ns}-plot-vfAndeIn", "relayoutData"),
+        *[Input(f"{ns}-plot-{key}", "relayoutData") for key in SENSOR_KEYS],
         State(f"{ns}-activity-testrig-filter", "value"),
     )
-    def update_plots(data, theme, r1, r2, r3, r4, r5, r6, testrig_ids):
+    def update_plots(data, theme, *relayout_and_testrig):
+        relayout_data = relayout_and_testrig[:-1]
+        testrig_ids = relayout_and_testrig[-1]
         FIG_HEIGHT = PLOT_HEIGHT_PX
         template = "plotly_dark" if theme == "dark" else "plotly"
 
@@ -530,8 +499,9 @@ def create_test_rig_activity_page(ns: str):
         uirev_key = f"zoom-{x_range}-{selected_key}" if x_range else base_rev
 
         def make_fig(col):
-            value_col = _resolve_metric_column(df, col)
-            if value_col is None:
+            # backend auto aggregates for bucketing
+            data_col = f"{col}_avg"
+            if data_col not in df.columns:
                 return empty_fig(f"{SENSORS[col]['title']} — column not available")
 
             trace_col = next(
@@ -544,12 +514,12 @@ def create_test_rig_activity_page(ns: str):
                 fig.add_trace(
                     go.Scatter(
                         x=df[time_col],
-                        y=df[value_col],
+                        y=df[data_col],
                         mode="lines",
                         name="Testrig",
                         line=dict(width=1.5),
                         hovertemplate=(
-                            f"<b>{col}</b>: %{{y:.3f}} {SENSORS[col]['unit']}<br>"
+                            f"<b>{SENSORS[col]['title']}</b>: %{{y:.3f}} {SENSORS[col]['unit']}<br>"
                             "Time: %{x}<extra></extra>"
                         ),
                     )
@@ -559,12 +529,12 @@ def create_test_rig_activity_page(ns: str):
                     fig.add_trace(
                         go.Scatter(
                             x=group_df[time_col],
-                            y=group_df[value_col],
+                            y=group_df[data_col],
                             mode="lines",
                             name=str(trace_name),
                             line=dict(width=1.5),
                             hovertemplate=(
-                                f"<b>{col}</b>: %{{y:.3f}} {SENSORS[col]['unit']}<br>"
+                                f"<b>{SENSORS[col]['title']}</b>: %{{y:.3f}} {SENSORS[col]['unit']}<br>"
                                 "Time: %{x}<extra></extra>"
                             ),
                         )
@@ -577,7 +547,7 @@ def create_test_rig_activity_page(ns: str):
                     pad=dict(t=0),
                 ),
                 xaxis_title="Time",
-                yaxis_title=f"{col} [{SENSORS[col]['unit']}]",
+                yaxis_title=f"{SENSORS[col]['title']} [{SENSORS[col]['unit']}]",
                 hovermode="x unified",
                 hoverlabel=dict(
                     bgcolor="#1a1b1e" if template == "plotly_dark" else "#ffffff",
