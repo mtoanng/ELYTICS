@@ -30,7 +30,7 @@ USAGE_BLOCKQUOTE_TEXT = [
     ),
     dmc.Text(
         [
-            "Information on how State of Health (SOH) is obtained via the ",
+            "Information on how the State of Health (SOH) is obtained via the ",
             html.Strong("virtual sensor"),
             " is available ",
             html.A(
@@ -77,9 +77,9 @@ def _empty_figure(theme_data: str | None) -> go.Figure:
 
 
 def _normalize_bool_filter(selection: str | None) -> bool | None:
-    if selection == "rising":
+    if selection in {"rising", "true", "True", True}:
         return True
-    if selection == "falling":
+    if selection in {"falling", "false", "False", False}:
         return False
     return None
 
@@ -431,7 +431,7 @@ layout = dmc.Container(
                                                     dcc.Dropdown(
                                                         id="soh-color-by",
                                                         options=soh_layout_service.COLOR_BY_OPTIONS,
-                                                        value="none",
+                                                        value="tAndeIn",
                                                         clearable=False,
                                                         style={"width": "100%"},
                                                     ),
@@ -642,7 +642,7 @@ def load_fleet_data(sample_name, number_of_cells, ccm_type, is_rising):
 
     df = get_tabular("sherlock", "soh_fleet", filters=filters, sort_by="runtime_hours")
     if df.empty:
-        return [], "No SOH fleet data found for the selected filters.", {"display": "block"}
+        return [], "⚠️ No data available for selected filters.", {"display": "block"}
     return df.to_dict("records"), "", {"display": "none"}
 
 
@@ -736,12 +736,14 @@ def update_soh_outputs(
 
     plotly_template = soh_service.get_plotly_template(theme_data)
 
-    if sample_name and color_by and color_by != "none":
+    selected_color_by = color_by or ("tAndeIn" if sample_name else None)
+
+    if sample_name and selected_color_by:
         colored_result = soh_service.create_colored_soh_plot(
             df_fleet,
             plot_df,
             xaxis_col,
-            color_by,
+            selected_color_by,
             theme_data,
             sample_name,
         )
@@ -819,7 +821,7 @@ def update_soh_outputs(
 def update_decomp_slider_and_visibility(stack_data, sample_name):
     defaults = ({"display": "none"}, "", 0, 1, {}, [0, 1])
     if not sample_name:
-        return {"display": "none"}, "Select a sample name to view decomposition and load-cycle plots.", 0, 1, {}, [0, 1]
+        return {"display": "none"}, "ℹ️ Select a sample name to view the SOH decomposition in IV-plot.", 0, 1, {}, [0, 1]
     if not stack_data:
         return defaults
 
@@ -922,7 +924,7 @@ def update_decomp_and_load_cycle_plots(
 def update_cell_based_soh_time_plot(stack_data, xaxis_col, sample_name, click_data, theme_data):
     empty_fig = _empty_figure(theme_data)
     if not sample_name:
-        return empty_fig, "Select a sample name to view cell-level SOH data.", {"display": "none"}
+        return empty_fig, "ℹ️ Select a sample name to view cell-level SOH data.", {"display": "none"}
     if not stack_data:
         return empty_fig, "", {"display": "none"}
 

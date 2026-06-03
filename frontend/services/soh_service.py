@@ -434,10 +434,11 @@ def create_fleet_soh_plot(df_soh, dff, sample_name, xaxis_col, plotly_template):
 
     xaxis_label = "Runtime [h]" if xaxis_col == "runtime_hours" else "Timestamp"
     title_suffix = "Runtime Hours" if xaxis_col == "runtime_hours" else "Timestamp"
+    title_prefix = f"{sample_name}: " if sample_name else ""
     fig.update_layout(
         template=plotly_template,
         showlegend=len(dff["sample_name"].unique()) > 1,
-        title=dict(text=f"SOH over {title_suffix}", x=0.5, xanchor="center"),
+        title=dict(text=f"{title_prefix}SOH over {title_suffix}", x=0.5, xanchor="center"),
         margin=dict(l=40, r=20, t=40, b=40),
         legend=dict(orientation="v", yanchor="top", y=1, xanchor="left", x=1, font=dict(size=10)),
         autosize=True,
@@ -477,7 +478,7 @@ def create_lin_vs_kin_plot(dff, df_soh, plotly_template, sample_name):
                 line=dict(color=selected_color, width=3, dash="dash"), # Thicker line
                 hoverinfo="skip", showlegend=False
             ))
-        title = "SOH Trendline"
+        title = f"{sample_name}: SOH Trendline"
     else: # no sample name selected
         for other_sample in dff["sample_name"].unique():
             sample_data = dff[dff["sample_name"] == other_sample]
@@ -635,7 +636,7 @@ def create_polcurve_decomp_plot(dff, valid_ivs, slider_value, plotly_template, s
 
     fig_soh_split.update_layout(
         template=plotly_template,
-        title=dict(text=f"Pol Curve Change (@Ref OpCons) Related to Ageing", x=0.5, xanchor="center"),
+        title=dict(text=f"{f'{sample_name}: ' if sample_name else ''}Pol Curve Change (@Ref OpCons) Related to Ageing", x=0.5, xanchor="center"),
         xaxis_title="Current Density [A/cm²]",
         yaxis_title="Cell Voltage [V]",
         margin=dict(l=40, r=40, t=60, b=80),
@@ -759,9 +760,10 @@ def create_overpotential_plots(df_soh, dff, xaxis_col, theme_data, sample_name):
                 ), row=3, col=1)
 
     xaxis_label = "Runtime [h]" if xaxis_col == "runtime_hours" else "Timestamp"
+    title_prefix = f"{sample_name}: " if sample_name else ""
     fig.update_layout(
         template=plotly_template,
-        title=dict(text=f"Additional Overpotential (due to Ageing) over Time (@Ref OpCons)", x=0.5, xanchor="center"),
+        title=dict(text=f"{title_prefix}Additional Overpotential (due to Ageing) over Time (@Ref OpCons)", x=0.5, xanchor="center"),
         margin=dict(l=40, r=20, t=60, b=40),
         autosize=True,
         height=None,
@@ -842,7 +844,7 @@ def create_overpotential_lin_vs_kin_plot(dff, df_soh, plotly_template, sample_na
                         marker=dict(symbol="triangle-up", size=15, color=selected_color),
                         showlegend=False, hoverinfo="skip"
                     ))
-        title = "Overpotential Trendline"
+        title = f"{sample_name}: Overpotential Trendline"
     else: # no sample name selected
         for other_sample in dff["sample_name"].unique():
             sample_data = dff[dff["sample_name"] == other_sample]
@@ -1025,9 +1027,10 @@ def create_overpotential_plot_all_in_one(df_soh, dff, xaxis_col, theme_data, sam
     ))
 
     xaxis_label = "Runtime [h]" if xaxis_col == "runtime_hours" else "Timestamp"
+    title_prefix = f"{sample_name}: " if sample_name else ""
     fig.update_layout(
         template=plotly_template,
-        title=dict(text=f"Additional Overpotential (due to Ageing) over Time (@Ref OpCons)", x=0.5, xanchor="center"),
+        title=dict(text=f"{title_prefix}Additional Overpotential (due to Ageing) over Time (@Ref OpCons)", x=0.5, xanchor="center"),
         margin=dict(l=40, r=20, t=60, b=40),
         autosize=True,
         height=None,
@@ -1188,7 +1191,7 @@ def create_cell_based_soh_time_plot(dff, xaxis_col, click_data, theme_data, samp
     fig_soh_cells_time.update_layout(
         template=plotly_template,
         showlegend=True,
-        title=dict(text=f"Cell-based Overpotential over Time (@Ref OpCons)", x=0.5, xanchor="center"),
+        title=dict(text=f"{sample_name}: Cell-based Overpotential over Time (@Ref OpCons)", x=0.5, xanchor="center"),
         legend=dict(orientation="v", yanchor="top", y=1, xanchor="left", x=1, font=dict(size=10)),
         margin=dict(l=40, r=20, t=80, b=40),
         height=None
@@ -1336,7 +1339,7 @@ def create_cell_based_soh_across_height_plot(fig_soh_cells_across, dff, click_da
             
         fig_soh_cells_across.update_layout(
             template=plotly_template, showlegend=False,
-            title=dict(text=f"SOH Across Cells", x=0.5, xanchor="center"),
+            title=dict(text=f"{sample_name}: SOH Across Cells", x=0.5, xanchor="center"),
             margin=dict(l=40, r=40, t=80, b=40),
             annotations=[dict(
                 text=annotation_text, xref="paper", yref="paper", x=0.5, y=1.02,
@@ -1472,6 +1475,59 @@ def create_colored_soh_plot(df_soh, dff, xaxis_col, color_by, theme_data, sample
 
     return fig_colored_soh
 
+
+def compute_ageing_rate_subtitle(dff, iv_0, iv_1, rt_0, rt_1):
+    """
+    Compute trendline-based ageing-rate subtitle for Δη_tot, Δη_lin, Δη_kin between two IVs.
+    Returns None when required columns or valid IV rows are unavailable.
+    """
+    col_lin = "model_uCellAvg_BoL-lin_ref_jStck-3-0pAndeOut-2-5pCtdeOut-40tAndeIn-70vfAndeIn-5-2delta_Rohm-0_stack"
+    col_kin = "model_uCellAvg_BoL-kin_ref_jStck-3-0pAndeOut-2-5pCtdeOut-40tAndeIn-70vfAndeIn-5-2ECSA-1_stack"
+    col_pc = "model_uCellAvg_pc_3-0_stack"
+
+    if not {col_lin, col_kin, col_pc, "runtime_hours", "IVnumber"}.issubset(dff.columns):
+        return None
+
+    dt = rt_1 - rt_0
+    if dt == 0:
+        return None
+
+    row_iv0 = dff[dff["IVnumber"] == iv_0]
+    row_iv1 = dff[dff["IVnumber"] == iv_1]
+    if row_iv0.empty or row_iv1.empty:
+        return None
+
+    rt_early, rt_late = (rt_0, rt_1) if dt > 0 else (rt_1, rt_0)
+    dt_abs = abs(dt)
+
+    rt_all = np.asarray(dff["runtime_hours"].values, dtype=float)
+    finite_rt = np.isfinite(rt_all)
+    if finite_rt.sum() < 3:
+        return None
+
+    def _trend_rate(y_series):
+        y_vals = np.asarray(y_series, dtype=float)
+        x_fit, y_fit, coeffs = get_polyfit_smooth(rt_all, y_vals, degree=2)
+        _ = x_fit, y_fit
+        if coeffs is None:
+            return None
+        return (np.polyval(coeffs, rt_late) - np.polyval(coeffs, rt_early)) / dt_abs * 1000
+
+    tr_tot = _trend_rate(1000 * (-dff[col_lin] - dff[col_kin] + 2 * dff[col_pc]))
+    tr_lin = _trend_rate(1000 * (-dff[col_lin] + dff[col_pc]))
+    tr_kin = _trend_rate(1000 * (-dff[col_kin] + dff[col_pc]))
+
+    def _fmt(v):
+        if v is None or (isinstance(v, float) and np.isnan(v)):
+            return "N/A"
+        return f"{v:+.2f}"
+
+    return (
+        "Ageing Rate Estimation:  "
+        f"Δη<sub>tot</sub>/Δη<sub>lin</sub>/Δη<sub>kin</sub>: "
+        f"{_fmt(tr_tot)}/{_fmt(tr_lin)}/{_fmt(tr_kin)} µV/h"
+    )
+
 def create_load_cycle_plots(dff, theme_data, sample_name, slider_value, valid_ivs):
     plotly_template = get_plotly_template(theme_data)
     fig = make_subplots(
@@ -1509,6 +1565,7 @@ def create_load_cycle_plots(dff, theme_data, sample_name, slider_value, valid_iv
     rt_0 = row_0["runtime_hours"].iloc[0]
     rt_1 = row_1["runtime_hours"].iloc[0]
     rt_min, rt_max = min(rt_0, rt_1), max(rt_0, rt_1)
+    ageing_annotation = compute_ageing_rate_subtitle(dff, iv_0, iv_1, rt_0, rt_1)
 
     # Filter data between the two selected IVs (by runtime range)
     df_range = dff[(dff["runtime_hours"] >= rt_min) & (dff["runtime_hours"] <= rt_max)]
@@ -1559,10 +1616,12 @@ def create_load_cycle_plots(dff, theme_data, sample_name, slider_value, valid_iv
                 row=row, col=col,
             )
 
+    title_prefix = f"{sample_name}: " if sample_name else ""
+    ageing_part = f"  │  {ageing_annotation}" if ageing_annotation is not None else ""
     fig.update_layout(
         template=plotly_template,
         title=dict(
-            text=f"Load Cycle Histograms (IV {int(iv_0)} @ {rt_0:.0f}h → IV {int(iv_1)} @ {rt_1:.0f}h)",
+            text=f"{title_prefix}Load Cycle Histograms (IV {int(iv_0)} @ {rt_0:.0f}h → IV {int(iv_1)} @ {rt_1:.0f}h{ageing_part})",
             x=0.5, xanchor="center",
         ),
         margin=dict(l=40, r=20, t=80, b=40),
