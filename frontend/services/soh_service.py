@@ -679,7 +679,7 @@ def create_polcurve_decomp_plot(dff, valid_ivs, slider_value, plotly_template, s
         title=dict(text="Pol Curve Change (@Ref OpCons) Related to Ageing", x=0.5, xanchor="center"),
         xaxis_title="Current Density [A/cm²]",
         yaxis_title="Cell Voltage [V]",
-        margin=dict(l=40, r=40, t=80, b=80),
+        margin=dict(l=40, r=40, t=130, b=80),
         legend=dict(orientation="v", yanchor="top", y=1, xanchor="left", x=1.02),
         annotations=all_annotations,
         height=None
@@ -803,7 +803,7 @@ def create_overpotential_plots(df_soh, dff, xaxis_col, theme_data, sample_name):
     fig.update_layout(
         template=plotly_template,
         title=dict(text="Additional Overpotential (due to Ageing) over Time (@Ref OpCons)", x=0.5, xanchor="center"),
-        margin=dict(l=40, r=20, t=80, b=40),
+        margin=dict(l=40, r=20, t=110, b=40),
         autosize=True,
         height=None,
         width=None,
@@ -950,7 +950,7 @@ def create_overpotential_lin_vs_kin_plot(dff, df_soh, plotly_template, sample_na
     fig_lin_vs_lin.update_layout(
         template=plotly_template,
         title=dict(text=title, x=title_x, xanchor="center"),
-        margin=dict(l=40, r=20, t=80, b=40),
+        margin=dict(l=40, r=20, t=110, b=40),
         autosize=True,
         height=None,
         width=None,
@@ -1091,7 +1091,7 @@ def create_overpotential_plot_all_in_one(df_soh, dff, xaxis_col, theme_data, sam
     fig.update_layout(
         template=plotly_template,
         title=dict(text="Additional Overpotential (due to Ageing) over Time (@Ref OpCons)", x=0.5, xanchor="center"),
-        margin=dict(l=40, r=20, t=80, b=40),
+        margin=dict(l=40, r=20, t=130, b=40),
         autosize=True,
         height=None,
         width=None,
@@ -1695,14 +1695,14 @@ def create_load_cycle_plots(dff, theme_data, sample_name, slider_value, valid_iv
                 row=row, col=col,
             )
 
-    ageing_part = f"  │  {ageing_annotation}" if ageing_annotation is not None else ""
+    ageing_part = f"  <br>  {ageing_annotation}" if ageing_annotation is not None else ""
     fig.update_layout(
         template=plotly_template,
         title=dict(
             text=f"Load Cycle Histograms (IV {int(iv_0)} @ {rt_0:.0f}h → IV {int(iv_1)} @ {rt_1:.0f}h{ageing_part})",
             x=0.5, xanchor="center",
         ),
-        margin=dict(l=40, r=20, t=80, b=40),
+        margin=dict(l=40, r=20, t=120, b=40),
         showlegend=False,
         bargap=0.05,
         height=None,

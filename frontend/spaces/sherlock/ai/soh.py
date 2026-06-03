@@ -379,14 +379,17 @@ layout = dmc.Container(
                                                 ),
                                                 dmc.Space(h="xs"),
                                                 dmc.Text("Select IV Pair (by Runtime)", fw=500, size="sm"),
-                                                dcc.RangeSlider(
+                                                dmc.RangeSlider(
                                                     id="soh-decomp-diff-range-slider",
                                                     min=0,
                                                     max=1,
-                                                    step=1,
                                                     value=[0, 1],
-                                                    marks={},
-                                                    tooltip={"placement": "bottom", "always_visible": True},
+                                                    step=1,
+                                                    marks=[],
+                                                    labelAlwaysOn=True,
+                                                    minRange=1,
+                                                    thumbSize=16,
+                                                    size="sm",
                                                 ),
                                                 dmc.Space(h="md"),
                                                 dcc.Graph(
@@ -839,9 +842,9 @@ def update_soh_outputs(
     State("soh-sample-name-filter", "value"),
 )
 def update_decomp_slider_and_visibility(stack_data, sample_name):
-    defaults = ({"display": "none"}, "", 0, 1, {}, [0, 1])
+    defaults = ({"display": "none"}, "", 0, 1, [], [0, 1])
     if not sample_name:
-        return {"display": "none"}, "ℹ️ Select a sample name to view the SOH decomposition in IV-plot.", 0, 1, {}, [0, 1]
+        return {"display": "none"}, "ℹ️ Select a sample name to view the SOH decomposition in IV-plot.", 0, 1, [], [0, 1]
     if not stack_data:
         return defaults
 
@@ -864,10 +867,13 @@ def update_decomp_slider_and_visibility(stack_data, sample_name):
         indices = [round(i * (len(iv_numbers) - 1) / (n_marks - 1)) for i in range(n_marks)]
     else:
         indices = [0]
-    marks = {
-        int(valid_ivs.iloc[i]["IVnumber"]): f"{float(valid_ivs.iloc[i]['runtime_hours']):.0f}h"
+    marks = [
+        {
+            "value": int(valid_ivs.iloc[i]["IVnumber"]),
+            "label": f"{float(valid_ivs.iloc[i]['runtime_hours']):.0f}h",
+        }
         for i in indices
-    }
+    ]
     default_value = [int(iv_numbers[0]), int(iv_numbers[-1])]
     return {"display": "block"}, "", min_iv, max_iv, marks, default_value
 
