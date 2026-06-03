@@ -231,6 +231,13 @@ layout = dmc.Container(
                                     styles={"label": {"marginBottom": "6px"}},
                                     style={"flex": "1 1 220px", "minWidth": "200px"},
                                 ),
+                                dmc.Button(
+                                    "Clear",
+                                    id="soh-clear-filters-btn",
+                                    variant="light",
+                                    size="xs",
+                                    style={"alignSelf": "flex-end", "marginBottom": "2px"},
+                                ),
                             ],
                         ),
                         dmc.Space(h="sm"),
@@ -527,6 +534,19 @@ clientside_callback(
     Input("soh-accordion", "value"),
     Input("soh-decomp-plot-container", "style"),
 )
+
+
+@callback(
+    Output("soh-sample-name-filter", "value", allow_duplicate=True),
+    Output("soh-number-of-cells-filter", "value", allow_duplicate=True),
+    Output("soh-ccm-type-filter", "value", allow_duplicate=True),
+    Input("soh-clear-filters-btn", "n_clicks"),
+    prevent_initial_call=True,
+)
+def clear_soh_filters(n_clicks):
+    if not n_clicks:
+        raise PreventUpdate
+    return None, None, None
 
 
 @callback(
