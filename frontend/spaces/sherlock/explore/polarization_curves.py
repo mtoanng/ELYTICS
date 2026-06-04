@@ -116,6 +116,29 @@ def _to_options(values):
     return [{"label": str(value), "value": value} for value in values]
 
 
+def _empty_polcurve_figure(theme, message="No plot available for selected data."):
+    import plotly.graph_objects as go
+
+    is_dark = theme == "dark"
+    fig = go.Figure()
+    fig.update_layout(
+        template="plotly_dark" if is_dark else "plotly",
+        margin=dict(t=40, l=80, r=30, b=60),
+        annotations=[
+            dict(
+                text=message,
+                x=0.5,
+                y=0.5,
+                xref="paper",
+                yref="paper",
+                showarrow=False,
+                font=dict(size=14),
+            )
+        ],
+    )
+    return fig
+
+
 # ========== LAYOUT ==========
 
 layout = dmc.Container(
@@ -707,14 +730,14 @@ def update_polcurve_plot(data, theme, tSp, pCtSp, is_rising):
     import plotly.express as px
 
     if not data:
-        return {}, "No plot available for selected data."
+        return _empty_polcurve_figure(theme), "No plot available for selected data."
     df = pd.DataFrame(data)
     df = _apply_local_polcurve_filters(df, tSp, pCtSp, (is_rising or "both").lower())
     if "uCell" in df and "jStck" in df:
         color_col = "event_short_id" if "event_short_id" in df else None
         plot_df = df.dropna(subset=["uCell", "jStck"])
         if plot_df.empty:
-            return {}, "No plot available for selected data."
+            return _empty_polcurve_figure(theme), "No plot available for selected data."
         plotly_template = "plotly_dark" if theme == "dark" else "plotly"
         fig = px.line(
             (
@@ -732,7 +755,7 @@ def update_polcurve_plot(data, theme, tSp, pCtSp, is_rising):
             template=plotly_template,
         )
         return fig, ""
-    return {}, "No plot available for selected data."
+    return _empty_polcurve_figure(theme), "No plot available for selected data."
 
 
 # ========== DOWNLOAD CALLBACK ==========
