@@ -9,6 +9,7 @@ from dash import (
     html,
     clientside_callback,
 )
+from dash.exceptions import PreventUpdate
 import dash_mantine_components as dmc
 from dash_iconify import DashIconify
 import pandas as pd
@@ -158,6 +159,17 @@ layout = dmc.Container(
                                     className="dmc",
                                     styles={"label": {"marginBottom": "6px"}},
                                     style={"flex": 1, "minWidth": "180px"},
+                                ),
+                                dmc.Button(
+                                    "Clear",
+                                    id="polcurve-clear-filters-btn",
+                                    variant="light",
+                                    size="sm",
+                                    style={
+                                        "flex": "0 0 auto",
+                                        "whiteSpace": "nowrap",
+                                        "alignSelf": "flex-end",
+                                    },
                                 ),
                                 dmc.Button(
                                     [
@@ -351,6 +363,22 @@ layout = dmc.Container(
     ],
 )
 
+# ========== CLEAR FILTERS ==========
+
+
+@callback(
+    Output("polcurve-order-id-filter", "value", allow_duplicate=True),
+    Output("polcurve-sample-name-filter", "value", allow_duplicate=True),
+    Output("polcurve-is-rising-filter", "value", allow_duplicate=True),
+    Input("polcurve-clear-filters-btn", "n_clicks"),
+    prevent_initial_call=True,
+)
+def clear_polcurve_filters(n_clicks):
+    if not n_clicks:
+        raise PreventUpdate
+    return [], [], "Both"
+
+
 # ========== INFO PANEL COLLAPSE ==========
 
 
@@ -445,13 +473,13 @@ def set_default_order_id(order_options, current_value):
     if not order_options:
         return []
 
-    valid_order_ids = {opt["value"] for opt in order_options}
-    selected_order = current_value or []
-    selected_order = [oid for oid in selected_order if oid in valid_order_ids]
+    # current_value is None only on initial page load — auto-select the first order.
+    # If it's an empty list the user (or clear button) explicitly cleared the selection.
+    if current_value is None:
+        return [order_options[0]["value"]]
 
-    if selected_order:
-        return selected_order
-    return [order_options[0]["value"]]
+    valid_order_ids = {opt["value"] for opt in order_options}
+    return [oid for oid in current_value if oid in valid_order_ids]
 
 
 # ========== LAZY LOAD DATA WHEN FILTERS SELECTED ==========
