@@ -159,19 +159,6 @@ layout = dmc.Container(
                                     styles={"label": {"marginBottom": "6px"}},
                                     style={"flex": 1, "minWidth": "180px"},
                                 ),
-                                dmc.InputWrapper(
-                                    dcc.Dropdown(
-                                        id="polcurve-testrig-id-filter",
-                                        multi=True,
-                                        placeholder="Select one or more testrig IDs",
-                                        style={"width": "100%"},
-                                    ),
-                                    label="Testrig ID",
-                                    htmlFor="polcurve-testrig-id-filter",
-                                    className="dmc",
-                                    styles={"label": {"marginBottom": "6px"}},
-                                    style={"flex": 1, "minWidth": "180px"},
-                                ),
                                 dmc.Button(
                                     [
                                         html.I(
@@ -404,18 +391,22 @@ def load_polcurve_metadata(_):
 @callback(
     Output("polcurve-order-id-filter", "options"),
     Input("polcurve-metadata-store", "data"),
+    Input("polcurve-sample-name-filter", "value"),
 )
-def populate_order_id_options(meta):
+def populate_order_id_options(meta, sample_name):
     if not meta:
         return []
     df = pd.DataFrame(meta)
-    # Order ID options (always all)
+    dff = df.copy()
+    if sample_name:
+        dff = dff[dff["sample_name"].isin(sample_name)]
+    # Order ID options narrowed by selected sample name(s)
     order_id_options = (
         [
             {"label": str(oid), "value": oid}
-            for oid in sorted(df["order_id"].dropna().unique(), reverse=True)
+            for oid in sorted(dff["order_id"].dropna().unique(), reverse=True)
         ]
-        if "order_id" in df
+        if "order_id" in dff
         else []
     )
     return order_id_options
@@ -423,15 +414,14 @@ def populate_order_id_options(meta):
 
 @callback(
     Output("polcurve-sample-name-filter", "options"),
-    Output("polcurve-testrig-id-filter", "options"),
     Input("polcurve-metadata-store", "data"),
     Input("polcurve-order-id-filter", "value"),
 )
-def populate_cascading_filter_options(meta, order_id):
+def populate_sample_name_options(meta, order_id):
     if not meta:
-        return [], []
+        return []
     df = pd.DataFrame(meta)
-    # Filter sample names and testrig ids by selected order_id(s)
+    # Filter sample names by selected order_id(s)
     dff = df.copy()
     if order_id:
         dff = dff[dff["order_id"].isin(order_id)]
@@ -443,15 +433,7 @@ def populate_cascading_filter_options(meta, order_id):
         if "sample_name" in dff
         else []
     )
-    testrig_id_options = (
-        [
-            {"label": str(t), "value": t}
-            for t in sorted(dff["testrig_id"].dropna().unique())
-        ]
-        if "testrig_id" in dff
-        else []
-    )
-    return sample_name_options, testrig_id_options
+    return sample_name_options
 
 
 @callback(
@@ -481,18 +463,19 @@ def set_default_order_id(order_options, current_value):
     Output("polcurve-empty-message", "style"),
     Input("polcurve-order-id-filter", "value"),
     Input("polcurve-sample-name-filter", "value"),
-    Input("polcurve-testrig-id-filter", "value"),
 )
-def fetch_polcurve_data(order_id, sample_name, testrig_id):
+def fetch_polcurve_data(order_id, sample_name):
     filters = {}
     if order_id:
         filters["order_id"] = order_id
     if sample_name:
         filters["sample_name"] = sample_name
-    if testrig_id:
-        filters["testrig_id"] = testrig_id
     if not filters:
-        return [], "Select at least one filter to load data.", {"display": "block"}
+        return (
+            [],
+            "Select at least one order ID or sample name to load data.",
+            {"display": "block"},
+        )
     df = get_tabular("sherlock", "polcurve", filters=filters)
     if df.empty:
         return [], "No data found for selected filters.", {"display": "block"}
