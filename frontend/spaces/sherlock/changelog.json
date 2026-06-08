@@ -1,5 +1,11 @@
 {
-  "unreleased": [],
+  "unreleased": [
+    {
+      "pr": 940,
+      "title": "fix(sherlock): Polcurve explorer filters",
+      "date": "2026-06-08"
+    }
+  ],
   "releases": {
     "1.0.0": [
       {
