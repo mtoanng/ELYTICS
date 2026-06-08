@@ -1,11 +1,5 @@
 {
-  "unreleased": [
-    {
-      "pr": 940,
-      "title": "fix(sherlock): Polcurve explorer filters",
-      "date": "2026-06-08"
-    }
-  ],
+  "unreleased": [],
   "releases": {
     "1.0.0": [
       {
@@ -197,6 +191,13 @@
         "pr": 914,
         "title": "fix(sherlock): Fixed FloatingPointError & divide by zero",
         "date": "2026-05-26"
+      }
+    ],
+    "1.0.1": [
+      {
+        "pr": 940,
+        "title": "fix(sherlock): Polcurve explorer filters",
+        "date": "2026-06-08"
       }
     ]
   }
