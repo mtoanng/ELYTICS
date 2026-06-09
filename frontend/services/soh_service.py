@@ -1454,7 +1454,7 @@ def create_cell_based_soh_across_height_plot(fig_soh_cells_across, dff, click_da
         if sample_name:
             _annotations.append(dict(
                 text=sample_name, xref="paper", yref="paper",
-                x=0.5, y=1.08, showarrow=False,
+                x=0.5, y=1.05, showarrow=False,
                 font=dict(size=11, color="gray"), xanchor="center", yanchor="bottom",
             ))
         fig_soh_cells_across.update_layout(
