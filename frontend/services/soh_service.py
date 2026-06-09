@@ -165,6 +165,61 @@ def get_polyfit_smooth(x_vals, y_vals, degree=3, n_points=200):
             return None, None, None
     return None, None, None
 
+
+def _add_curve_arrowhead(fig, x_vals, y_vals, color, line_width=2):
+    """Draw a line-based arrowhead from the last three finite points of a curve."""
+    x_arr = np.asarray(x_vals, dtype=float)
+    y_arr = np.asarray(y_vals, dtype=float)
+    valid_mask = np.isfinite(x_arr) & np.isfinite(y_arr)
+    if valid_mask.sum() < 3:
+        return
+
+    x_valid = x_arr[valid_mask]
+    y_valid = y_arr[valid_mask]
+    x_min, x_max = np.min(x_valid), np.max(x_valid)
+    y_min, y_max = np.min(y_valid), np.max(y_valid)
+    x_span = x_max - x_min
+    y_span = y_max - y_min
+    if x_span == 0 and y_span == 0:
+        return
+
+    # Work in normalized axis space so the arrowhead size stays visually similar
+    # across curves with different scales while preserving the tail direction.
+    x_scale = x_span if x_span > 0 else 1.0
+    y_scale = y_span if y_span > 0 else 1.0
+
+    tip = np.array([(x_valid[-1] - x_min) / x_scale, (y_valid[-1] - y_min) / y_scale], dtype=float)
+    prev = np.array([(x_valid[-2] - x_min) / x_scale, (y_valid[-2] - y_min) / y_scale], dtype=float)
+    prev_prev = np.array([(x_valid[-3] - x_min) / x_scale, (y_valid[-3] - y_min) / y_scale], dtype=float)
+
+    direction = tip - prev_prev
+    direction_norm = np.linalg.norm(direction)
+    if direction_norm == 0:
+        direction = tip - prev
+        direction_norm = np.linalg.norm(direction)
+    if direction_norm == 0:
+        return
+
+    direction = direction / direction_norm
+    perp = np.array([-direction[1], direction[0]])
+    arrow_length = 0.055
+    arrow_width = 0.025
+    wing_1 = tip - direction * arrow_length + perp * arrow_width
+    wing_2 = tip - direction * arrow_length - perp * arrow_width
+
+    wing_1 = np.array([wing_1[0] * x_scale + x_min, wing_1[1] * y_scale + y_min], dtype=float)
+    tip = np.array([tip[0] * x_scale + x_min, tip[1] * y_scale + y_min], dtype=float)
+    wing_2 = np.array([wing_2[0] * x_scale + x_min, wing_2[1] * y_scale + y_min], dtype=float)
+
+    fig.add_trace(go.Scattergl(
+        x=[wing_1[0], tip[0], wing_2[0]],
+        y=[wing_1[1], tip[1], wing_2[1]],
+        mode="lines",
+        line=dict(color=color, width=line_width),
+        hoverinfo="skip",
+        showlegend=False,
+    ))
+
 def make_soh_colored_subplot(template, sample_name, xaxis_col, color_label_name):
     """
     Creates a standard 2-row subplot figure for SOH kinetic and linear plots.
@@ -652,7 +707,7 @@ def create_polcurve_decomp_plot(dff, valid_ivs, slider_value, plotly_template, s
                 xref="x", yref="y", axref="x", ayref="y",
                 showarrow=True, arrowhead=1, arrowsize=1, arrowwidth=2,
                 arrowcolor="green",
-                standoff=0, startstandoff=0
+                standoff=0, startstandoff=0,
             ))
         # Kinetic arrow (purple): from (pc_0[j] - lin_delta_diff[j]) to (pc_0[j] - lin_delta_diff[j] - kin_delta_diff[j])
         start_y_kin = float(pc_0[j_idx] - lin_delta_diff[j_idx])
@@ -893,13 +948,7 @@ def create_overpotential_lin_vs_kin_plot(dff, df_soh, plotly_template, sample_na
                     line=dict(color=selected_color, width=2, dash="dash"),
                     hoverinfo="skip", showlegend=False
                 ))
-                if len(x_curve) > 0 and len(y_curve) > 0:
-                    fig_lin_vs_lin.add_trace(go.Scattergl(
-                        x=[x_curve[-1]], y=[y_curve[-1]],
-                        mode="markers",
-                        marker=dict(symbol="triangle-up", size=15, color=selected_color),
-                        showlegend=False, hoverinfo="skip"
-                    ))
+                _add_curve_arrowhead(fig_lin_vs_lin, x_curve, y_curve, selected_color, line_width=2)
         title = "Overpotential Trendlines"
     else:  # no sample name selected
         for other_sample in dff["sample_name"].unique():
@@ -922,13 +971,7 @@ def create_overpotential_lin_vs_kin_plot(dff, df_soh, plotly_template, sample_na
                         name=other_sample,
                         hovertemplate="<b>Sample</b>: "+other_sample+"<extra></extra>"
                     ))
-                    if len(x_curve) > 0 and len(y_curve) > 0:
-                        fig_lin_vs_lin.add_trace(go.Scattergl(
-                            x=[x_curve[-1]], y=[y_curve[-1]],
-                            mode="markers",
-                            marker=dict(symbol="triangle-up", size=15, color=color),
-                            showlegend=False, hoverinfo="skip"
-                        ))
+                    _add_curve_arrowhead(fig_lin_vs_lin, x_curve, y_curve, color, line_width=2)
             else:
                 # Fallback: fit directly on kin vs lin.
                 x_fit, y_fit, _ = get_polyfit_smooth(eta_kin, eta_lin)
@@ -939,12 +982,7 @@ def create_overpotential_lin_vs_kin_plot(dff, df_soh, plotly_template, sample_na
                         name=other_sample,
                         hovertemplate="<b>Sample</b>: "+other_sample+"<extra></extra>"
                     ))
-                    fig_lin_vs_lin.add_trace(go.Scattergl(
-                        x=[x_fit[-1]], y=[y_fit[-1]],
-                        mode="markers",
-                        marker=dict(symbol="triangle-up", size=15, color=color),
-                        showlegend=False, hoverinfo="skip"
-                    ))
+                    _add_curve_arrowhead(fig_lin_vs_lin, x_fit, y_fit, color, line_width=2)
         title = "Overpotential Trendlines"
 
     fig_lin_vs_lin.update_layout(
