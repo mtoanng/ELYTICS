@@ -106,6 +106,30 @@ def _filter_stack_dataframe(
     return filtered
 
 
+def _filter_soh_metadata(
+    df: pd.DataFrame,
+    sample_name: str | None = None,
+    number_of_cells: int | None = None,
+    ccm_type: str | None = None,
+) -> pd.DataFrame:
+    if df.empty:
+        return df
+
+    filtered = df
+
+    if sample_name and "sample_name" in filtered.columns:
+        filtered = filtered[filtered["sample_name"].astype(str) == str(sample_name)]
+
+    if number_of_cells is not None and "number_of_cells" in filtered.columns:
+        num_cells = pd.to_numeric(filtered["number_of_cells"], errors="coerce")
+        filtered = filtered[num_cells.eq(number_of_cells)]
+
+    if ccm_type and "ccm_type" in filtered.columns:
+        filtered = filtered[filtered["ccm_type"].astype(str) == str(ccm_type)]
+
+    return filtered
+
+
 def _section_panel(title: str, children: list, icon_number: int | None = None) -> dmc.AccordionItem:
     icon = None
     if icon_number is not None:
@@ -593,12 +617,34 @@ def load_metadata(_):
 @callback(
     Output("soh-sample-name-filter", "options"),
     Input("soh-metadata-store", "data"),
+    Input("soh-number-of-cells-filter", "value"),
+    Input("soh-ccm-type-filter", "value"),
 )
-def update_sample_options(metadata_store):
+def update_sample_options(metadata_store, number_of_cells, ccm_type):
     if not metadata_store:
         return []
-    values = pd.Series(metadata_store.get("sample_name", [])).dropna().unique().tolist()
-    return [{"label": str(v), "value": str(v)} for v in sorted(values)]
+
+    df = pd.DataFrame(metadata_store)
+    if df.empty:
+        return []
+
+    df = _filter_soh_metadata(df, number_of_cells=number_of_cells, ccm_type=ccm_type)
+
+    values = pd.Series(df.get("sample_name", [])).dropna().astype(str).unique().tolist()
+    return [{"label": value, "value": value} for value in sorted(values)]
+
+
+@callback(
+    Output("soh-sample-name-filter", "value", allow_duplicate=True),
+    Input("soh-sample-name-filter", "options"),
+    State("soh-sample-name-filter", "value"),
+    prevent_initial_call=True,
+)
+def sync_sample_value_with_options(options, current_sample_name):
+    valid_values = {option["value"] for option in options or []}
+    if current_sample_name in valid_values or current_sample_name is None:
+        return no_update
+    return None
 
 
 @callback(
@@ -606,23 +652,26 @@ def update_sample_options(metadata_store):
     Output("soh-ccm-type-filter", "options"),
     Input("soh-metadata-store", "data"),
     Input("soh-sample-name-filter", "value"),
+    Input("soh-number-of-cells-filter", "value"),
+    Input("soh-ccm-type-filter", "value"),
 )
-def update_secondary_filter_options(metadata_store, sample_name):
+def update_secondary_filter_options(metadata_store, sample_name, number_of_cells, ccm_type):
     if not metadata_store:
         return [], []
     df = pd.DataFrame(metadata_store)
     if df.empty:
         return [], []
-    if sample_name and "sample_name" in df.columns:
-        df = df[df["sample_name"] == sample_name]
+
+    num_cells_df = _filter_soh_metadata(df, sample_name=sample_name, ccm_type=ccm_type)
+    ccm_type_df = _filter_soh_metadata(df, sample_name=sample_name, number_of_cells=number_of_cells)
 
     num_cells = []
     ccm_types = []
-    if "number_of_cells" in df.columns:
-        vals = pd.to_numeric(df["number_of_cells"], errors="coerce").dropna().astype(int)
+    if "number_of_cells" in num_cells_df.columns:
+        vals = pd.to_numeric(num_cells_df["number_of_cells"], errors="coerce").dropna().astype(int)
         num_cells = [{"label": str(v), "value": int(v)} for v in sorted(vals.unique().tolist())]
-    if "ccm_type" in df.columns:
-        vals = [str(v) for v in df["ccm_type"].dropna().unique().tolist()]
+    if "ccm_type" in ccm_type_df.columns:
+        vals = [str(v) for v in ccm_type_df["ccm_type"].dropna().unique().tolist()]
         ccm_types = [{"label": v, "value": v} for v in sorted(vals)]
     return num_cells, ccm_types
 
