@@ -641,8 +641,35 @@ def update_sample_options(metadata_store, number_of_cells, ccm_type):
     prevent_initial_call=True,
 )
 def sync_sample_value_with_options(options, current_sample_name):
-    valid_values = {option["value"] for option in options or []}
+    option_values = [option["value"] for option in options or []]
+    valid_values = set(option_values)
+
+    if len(option_values) == 1:
+        only_value = option_values[0]
+        if current_sample_name != only_value:
+            return only_value
+
     if current_sample_name in valid_values or current_sample_name is None:
+        return no_update
+    return None
+
+
+@callback(
+    Output("soh-ccm-type-filter", "value", allow_duplicate=True),
+    Input("soh-ccm-type-filter", "options"),
+    State("soh-ccm-type-filter", "value"),
+    prevent_initial_call=True,
+)
+def sync_ccm_type_value_with_options(options, current_ccm_type):
+    option_values = [option["value"] for option in options or []]
+    valid_values = set(option_values)
+
+    if len(option_values) == 1:
+        only_value = option_values[0]
+        if current_ccm_type != only_value:
+            return only_value
+
+    if current_ccm_type in valid_values or current_ccm_type is None:
         return no_update
     return None
 
@@ -674,6 +701,26 @@ def update_secondary_filter_options(metadata_store, sample_name, number_of_cells
         vals = [str(v) for v in ccm_type_df["ccm_type"].dropna().unique().tolist()]
         ccm_types = [{"label": v, "value": v} for v in sorted(vals)]
     return num_cells, ccm_types
+
+
+@callback(
+    Output("soh-number-of-cells-filter", "value", allow_duplicate=True),
+    Input("soh-number-of-cells-filter", "options"),
+    State("soh-number-of-cells-filter", "value"),
+    prevent_initial_call=True,
+)
+def sync_number_of_cells_value_with_options(options, current_number_of_cells):
+    option_values = [option["value"] for option in options or []]
+    valid_values = set(option_values)
+
+    if len(option_values) == 1:
+        only_value = option_values[0]
+        if current_number_of_cells != only_value:
+            return only_value
+
+    if current_number_of_cells in valid_values or current_number_of_cells is None:
+        return no_update
+    return None
 
 
 @callback(
