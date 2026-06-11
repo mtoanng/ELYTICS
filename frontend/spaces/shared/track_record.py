@@ -16,6 +16,10 @@ from typing import Callable, List
 
 from services.backend_service import get_metadata, get_tabular
 
+FILTER_WRAPPER_STYLE = {"flex": "1 1 0", "minWidth": "220px"}
+FILTER_DROPDOWN_STYLE = {"width": "100%"}
+LIMIT_INPUT_STYLES = {"input": {"height": "34px", "minHeight": "34px"}}
+
 PLOT_COLS = ["sample_name", "run_hours"]
 DETAIL_COLS = [
     "sample_name",
@@ -60,6 +64,22 @@ def _ensure_columns(df: pd.DataFrame, required_cols: List[str]) -> pd.DataFrame:
         if col not in out.columns:
             out[col] = None
     return out
+
+
+def _coerce_axis_range(lower, upper) -> list[float] | None:
+    if lower in (None, "") or upper in (None, ""):
+        return None
+
+    try:
+        lower_value = float(lower)
+        upper_value = float(upper)
+    except (TypeError, ValueError):
+        return None
+
+    if lower_value >= upper_value:
+        return None
+
+    return [lower_value, upper_value]
 
 
 def _sample_from_bar_interaction(click_data, selected_data):
@@ -533,28 +553,128 @@ def create_track_record_page(ns: str):
                                         dmc.Group(
                                             align="end",
                                             children=[
-                                                dmc.Select(
-                                                    id=f"{ns}-trackrecord-sample-filter",
+                                                dmc.InputWrapper(
+                                                    dcc.Dropdown(
+                                                        id=f"{ns}-trackrecord-sample-filter",
+                                                        placeholder="Select a sample name",
+                                                        clearable=True,
+                                                        searchable=True,
+                                                        className="trackrecord-filter-dropdown",
+                                                        style=FILTER_DROPDOWN_STYLE,
+                                                    ),
                                                     label="Sample name",
-                                                    placeholder="Select a sample name",
-                                                    searchable=True,
-                                                    clearable=True,
-                                                    data=[],
-                                                    nothingFoundMessage="No sample names",
-                                                    style={"flex": 1},
+                                                    htmlFor=f"{ns}-trackrecord-sample-filter",
+                                                    className="dmc",
+                                                    styles={"label": {"marginBottom": "6px"}},
+                                                    style=FILTER_WRAPPER_STYLE,
                                                 ),
                                                 dmc.InputWrapper(
                                                     dcc.Dropdown(
                                                         id=f"{ns}-trackrecord-order-filter",
                                                         placeholder="Select one or more order IDs",
                                                         multi=True,
-                                                        style={"width": "100%"},
+                                                        className="trackrecord-filter-dropdown",
+                                                        style=FILTER_DROPDOWN_STYLE,
                                                     ),
                                                     label="Order IDs",
                                                     htmlFor=f"{ns}-trackrecord-order-filter",
                                                     className="dmc",
                                                     styles={"label": {"marginBottom": "6px"}},
-                                                    style={"flex": 1},
+                                                    style=FILTER_WRAPPER_STYLE,
+                                                ),
+                                                dmc.Stack(
+                                                    gap=4,
+                                                    style={"width": "140px", "minWidth": "140px"},
+                                                    children=[
+                                                        dmc.Text("uCell y limit", fw=500, size="sm", ta="center"),
+                                                        dmc.Group(
+                                                            gap="xs",
+                                                            grow=True,
+                                                            children=[
+                                                                dmc.NumberInput(
+                                                                    id=f"{ns}-trackrecord-ucell-y-min",
+                                                                    placeholder="min",
+                                                                    size="sm",
+                                                                    hideControls=True,
+                                                                    styles=LIMIT_INPUT_STYLES,
+                                                                    style={"width": "100%"},
+                                                                ),
+                                                                dmc.NumberInput(
+                                                                    id=f"{ns}-trackrecord-ucell-y-max",
+                                                                    placeholder="max",
+                                                                    size="sm",
+                                                                    hideControls=True,
+                                                                    styles=LIMIT_INPUT_STYLES,
+                                                                    style={"width": "100%"},
+                                                                ),
+                                                            ],
+                                                        ),
+                                                    ],
+                                                ),
+                                                dmc.Stack(
+                                                    gap=4,
+                                                    style={"width": "140px", "minWidth": "140px"},
+                                                    children=[
+                                                        dmc.Text("H2 in O2 y limit", fw=500, size="sm", ta="center"),
+                                                        dmc.Group(
+                                                            gap="xs",
+                                                            grow=True,
+                                                            children=[
+                                                                dmc.NumberInput(
+                                                                    id=f"{ns}-trackrecord-h2ino2-y-min",
+                                                                    placeholder="min",
+                                                                    size="sm",
+                                                                    hideControls=True,
+                                                                    styles=LIMIT_INPUT_STYLES,
+                                                                    style={"width": "100%"},
+                                                                ),
+                                                                dmc.NumberInput(
+                                                                    id=f"{ns}-trackrecord-h2ino2-y-max",
+                                                                    placeholder="max",
+                                                                    size="sm",
+                                                                    hideControls=True,
+                                                                    styles=LIMIT_INPUT_STYLES,
+                                                                    style={"width": "100%"},
+                                                                ),
+                                                            ],
+                                                        ),
+                                                    ],
+                                                ),
+                                                dmc.Stack(
+                                                    gap=4,
+                                                    style={"width": "140px", "minWidth": "140px"},
+                                                    children=[
+                                                        dmc.Text("O2 in H2 y limit", fw=500, size="sm", ta="center"),
+                                                        dmc.Group(
+                                                            gap="xs",
+                                                            grow=True,
+                                                            children=[
+                                                                dmc.NumberInput(
+                                                                    id=f"{ns}-trackrecord-o2inh2-y-min",
+                                                                    placeholder="min",
+                                                                    size="sm",
+                                                                    hideControls=True,
+                                                                    styles=LIMIT_INPUT_STYLES,
+                                                                    style={"width": "100%"},
+                                                                ),
+                                                                dmc.NumberInput(
+                                                                    id=f"{ns}-trackrecord-o2inh2-y-max",
+                                                                    placeholder="max",
+                                                                    size="sm",
+                                                                    hideControls=True,
+                                                                    styles=LIMIT_INPUT_STYLES,
+                                                                    style={"width": "100%"},
+                                                                ),
+                                                            ],
+                                                        ),
+                                                    ],
+                                                ),
+                                                dmc.Button(
+                                                    "Reset limits",
+                                                    id=f"{ns}-trackrecord-reset-limits",
+                                                    variant="light",
+                                                    size="sm",
+                                                    style={"alignSelf": "end", "marginBottom": "1px"},
                                                 ),
                                             ],
                                         ),
@@ -634,7 +754,7 @@ def create_track_record_page(ns: str):
         return bool(is_open)
 
     @callback(
-        Output(f"{ns}-trackrecord-sample-filter", "data"),
+        Output(f"{ns}-trackrecord-sample-filter", "options"),
         Output(f"{ns}-trackrecord-sample-filter", "value"),
         Input(f"{ns}-track-meta-data", "data"),
         Input(f"{ns}-runtime-bar", "clickData"),
@@ -779,6 +899,21 @@ def create_track_record_page(ns: str):
         return options, order_ids
 
     @callback(
+        Output(f"{ns}-trackrecord-ucell-y-min", "value"),
+        Output(f"{ns}-trackrecord-ucell-y-max", "value"),
+        Output(f"{ns}-trackrecord-h2ino2-y-min", "value"),
+        Output(f"{ns}-trackrecord-h2ino2-y-max", "value"),
+        Output(f"{ns}-trackrecord-o2inh2-y-min", "value"),
+        Output(f"{ns}-trackrecord-o2inh2-y-max", "value"),
+        Input(f"{ns}-trackrecord-reset-limits", "n_clicks"),
+        prevent_initial_call=True,
+    )
+    def reset_y_limits(n_clicks):
+        if not n_clicks:
+            return no_update, no_update, no_update, no_update, no_update, no_update
+        return None, None, None, None, None, None
+
+    @callback(
         Output(f"{ns}-trackrecord-uCell-plot", "figure"),
         Output(f"{ns}-trackrecord-c-h2-ino2-plot", "figure"),
         Output(f"{ns}-trackrecord-c-o2-inh2-plot", "figure"),
@@ -786,15 +921,45 @@ def create_track_record_page(ns: str):
         Input(f"{ns}-trackrecord-sample-filter", "value"),
         Input(f"{ns}-trackrecord-order-filter", "value"),
         Input("theme-store", "data"),
+        Input(f"{ns}-trackrecord-ucell-y-min", "value"),
+        Input(f"{ns}-trackrecord-ucell-y-max", "value"),
+        Input(f"{ns}-trackrecord-h2ino2-y-min", "value"),
+        Input(f"{ns}-trackrecord-h2ino2-y-max", "value"),
+        Input(f"{ns}-trackrecord-o2inh2-y-min", "value"),
+        Input(f"{ns}-trackrecord-o2inh2-y-max", "value"),
         Input(f"{ns}-trackrecord-uCell-plot", "relayoutData"),
         Input(f"{ns}-trackrecord-c-h2-ino2-plot", "relayoutData"),
         Input(f"{ns}-trackrecord-c-o2-inh2-plot", "relayoutData"),
     )
-    def update_detail_plots(detail_rows, sample_name, selected_order_ids, theme, relayout_u, relayout_h2, relayout_o2):
+    def update_detail_plots(
+        detail_rows,
+        sample_name,
+        selected_order_ids,
+        theme,
+        ucell_y_min,
+        ucell_y_max,
+        h2ino2_y_min,
+        h2ino2_y_max,
+        o2inh2_y_min,
+        o2inh2_y_max,
+        relayout_u,
+        relayout_h2,
+        relayout_o2,
+    ):
         df = pd.DataFrame(detail_rows or [])
         df = _ensure_columns(df, DETAIL_COLS)
         normalized_order_ids = [str(order_id) for order_id in (selected_order_ids or []) if str(order_id).strip()]
-        uirevision = f"{ns}-trackrecord-{sample_name or 'none'}-{'|'.join(normalized_order_ids) or 'all'}"
+        ucell_y_range = _coerce_axis_range(ucell_y_min, ucell_y_max)
+        h2ino2_y_range = _coerce_axis_range(h2ino2_y_min, h2ino2_y_max)
+        o2inh2_y_range = _coerce_axis_range(o2inh2_y_min, o2inh2_y_max)
+        y_limit_key = "|".join(
+            [
+                f"ucell:{ucell_y_range[0]}:{ucell_y_range[1]}" if ucell_y_range else "ucell:auto",
+                f"h2:{h2ino2_y_range[0]}:{h2ino2_y_range[1]}" if h2ino2_y_range else "h2:auto",
+                f"o2:{o2inh2_y_range[0]}:{o2inh2_y_range[1]}" if o2inh2_y_range else "o2:auto",
+            ]
+        )
+        uirevision = f"{ns}-trackrecord-{sample_name or 'none'}-{'|'.join(normalized_order_ids) or 'all'}-{y_limit_key}"
 
         x_range = None
         reset_autorange = False
@@ -812,7 +977,7 @@ def create_track_record_page(ns: str):
             value_col="u_cell_avg",
             yaxis_title="uCell [V]",
             hover_label="uCell [V]",
-            yaxis_range=[1.8, 2.0],
+            yaxis_range=ucell_y_range,
             theme=theme,
             uirevision=uirevision,
             selected_order_ids=normalized_order_ids,
@@ -829,7 +994,7 @@ def create_track_record_page(ns: str):
             value_col="c_h2ino2",
             yaxis_title="H2 in O2 [vol%]",
             hover_label="H2 in O2 [vol%]",
-            yaxis_range=[0,1],
+            yaxis_range=h2ino2_y_range,
             theme=theme,
             uirevision=f"{uirevision}-c_h2_ino2",
             selected_order_ids=normalized_order_ids,
@@ -846,7 +1011,7 @@ def create_track_record_page(ns: str):
             value_col="c_o2inh2",
             yaxis_title="O2 in H2 [ppm]",
             hover_label="O2 in H2 [ppm]",
-            yaxis_range=[0,100],
+            yaxis_range=o2inh2_y_range,
             theme=theme,
             uirevision=f"{uirevision}-c_o2_inh2",
             selected_order_ids=normalized_order_ids,
