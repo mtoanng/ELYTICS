@@ -1,6 +1,7 @@
 from dash import (
     dcc,
     callback,
+    callback_context,
     Output,
     Input,
     State,
@@ -10,7 +11,8 @@ import dash_mantine_components as dmc
 from dash_iconify import DashIconify
 import plotly.graph_objects as go
 import pandas as pd
-from typing import List
+import numpy as np
+from typing import Callable, List
 
 from services.backend_service import get_metadata, get_tabular
 
@@ -20,6 +22,8 @@ DETAIL_COLS = [
     "order_id",
     "time",
     "u_cell_avg",
+    "c_h2_ino2",
+    "c_o2_inh2",
     "u",
     "j",
     "p_cat_out",
@@ -129,6 +133,16 @@ ORDER_ID_PALETTE = [
     "#17becf",
 ]
 
+# Target line functions based on hypothetical degradation trends. These can be adjusted based on real data insights.
+def _ucell_target_line(hours_run: pd.Series) -> np.ndarray:
+    return 1.835 + 4e-3 * np.log(hours_run) + 2.9e-6 * hours_run
+
+def _h2_in_o2_target_line(hours_run: pd.Series) -> np.ndarray:
+    return 0.5+hours_run*((0.8 - 0.5) / (80000 - 0))
+
+
+def _o2_in_h2_target_line(hours_run: pd.Series) -> np.ndarray:
+    return 30+hours_run*((200 - 30) / (80000 - 0))
 
 def get_order_id_color(order_id, order_ids_list):
     try:
@@ -185,8 +199,43 @@ def _build_analysis_time_run(
     return plot_df.sort_values(["analysis_time_run", "time", "order_id"], na_position="last")
 
 
+def _build_no_data_figure(
+    title: str,
+    yaxis_title: str,
+    theme: str,
+    uirevision: str,
+    margin_bottom: int = 0,
+    message: str = "No data available",
+    x_range: list | None = None,
+) -> go.Figure:
+    fig = go.Figure()
+    fig.update_layout(
+        title=title,
+        xaxis_title="Hours run [h]",
+        yaxis_title=yaxis_title,
+        margin=dict(l=40, r=20, t=32, b=margin_bottom),
+        showlegend=False,
+        uirevision=uirevision,
+        annotations=[
+            dict(
+                text=message,
+                x=0.5,
+                y=0.5,
+                xref="paper",
+                yref="paper",
+                showarrow=False,
+                font=dict(size=14),
+            )
+        ],
+    )
+    if x_range:
+        fig.update_xaxes(range=x_range)
+    return apply_theme(fig, theme)
+
+
 def build_detail_plot(
     df: pd.DataFrame,
+    title: str,
     value_col: str,
     yaxis_title: str,
     hover_label: str,
@@ -196,13 +245,34 @@ def build_detail_plot(
     margin_bottom: int = 0,
     yaxis_range: list | None = None,
     y_multiplier: float = 1.0,
+    target_line_function: Callable[[pd.Series], np.ndarray] | None = None,
+    target_line_name: str | None = None,
+    x_range: list | None = None,
+    reset_autorange: bool = False,
 ) -> go.Figure:
-    plot_df = df.copy()
-    plot_df[value_col] = pd.to_numeric(plot_df[value_col], errors="coerce")
+    full_plot_df = df.copy()
+    full_plot_df[value_col] = pd.to_numeric(full_plot_df[value_col], errors="coerce")
     if y_multiplier != 1.0:
-        plot_df[value_col] = plot_df[value_col] * y_multiplier
-    plot_df = _build_analysis_time_run(plot_df, selected_order_ids)
+        full_plot_df[value_col] = full_plot_df[value_col] * y_multiplier
+    full_plot_df = _build_analysis_time_run(full_plot_df, selected_order_ids)
+
+    default_x_range = None
+    full_sorted_time_run = full_plot_df["analysis_time_run"].dropna().sort_values()
+    if not full_sorted_time_run.empty:
+        default_x_range = [full_sorted_time_run.iloc[0], full_sorted_time_run.iloc[-1]]
+
+    plot_df = full_plot_df.copy()
     plot_df = plot_df.dropna(subset=[value_col])
+
+    if plot_df.empty:
+        return _build_no_data_figure(
+            title=title,
+            yaxis_title=yaxis_title,
+            theme=theme,
+            uirevision=uirevision,
+            margin_bottom=margin_bottom,
+            x_range=x_range or default_x_range,
+        )
 
     # set limits on datapoints:
     # j target
@@ -228,15 +298,12 @@ def build_detail_plot(
     t_low = t_target * (1 - tol)
     t_high = t_target * (1 + tol)
 
-    in_band_3    = (plot_df["j"] >= j_low) & (plot_df["j"] <= j_high) & (plot_df["p_cat_out"] >= p_low) & (plot_df["p_cat_out"] <= p_high) & (plot_df["t_an_in"] >= t_low) & (plot_df["t_an_in"] <= t_high)
-    in_band_06 = (plot_df["j"] >= j_l_low) & (plot_df["j"] <= j_l_high) & (plot_df["p_cat_out"] >= p_low) & (plot_df["p_cat_out"] <= p_high) & (plot_df["t_an_in"] >= t_low) & (plot_df["t_an_in"] <= t_high)
-
-
     x_col = "analysis_time_run"
     x_title = "Hours run [h]"
     scatter_mode = "markers"
 
     fig = go.Figure()
+    trace_count = 0
 
     if not plot_df.empty and "order_id" in plot_df.columns:
         unique_order_ids = sorted(plot_df["order_id"].dropna().unique())
@@ -262,26 +329,66 @@ def build_detail_plot(
 
             if not order_df.empty:
                 color = get_order_id_color(order_id, unique_order_ids)
-                fig.add_trace(
-                    go.Scatter(
-                        x=order_df_3[x_col],
-                        y=order_df_3[value_col],
-                        mode=scatter_mode,
-                        name=order_id,
-                        marker=dict(size=8, color=color),
-                        line=dict(width=2, color=color),
-                        hovertemplate=(
-                            f"Order ID: {order_id}<br>{x_title}: %{{x:.2f}}<br>{hover_label}: %{{y:.3f}}<extra></extra>"
-                        ),
+                if order_df_3.empty:
+                    continue
+                # for h2 in o2 we want to show the 0.6 filtered data, for the rest the 3.0 filtered data
+                if value_col == "c_h2ino2":
+                    fig.add_trace(
+                        go.Scatter(
+                            x=order_df_06[x_col],
+                            y=order_df_06[value_col],
+                            mode=scatter_mode,
+                            name=order_id,
+                            marker=dict(size=8, color=color),
+                            line=dict(width=2, color=color),
+                            hovertemplate=(
+                                f"Order ID: {order_id}<br>{x_title}: %{{x:.2f}}<br>{hover_label}: %{{y:.3f}}<extra></extra>"
+                            ),
+                        )
                     )
-                )
+                else:
+                    fig.add_trace(
+                        go.Scatter(
+                            x=order_df_3[x_col],
+                            y=order_df_3[value_col],
+                            mode=scatter_mode,
+                            name=order_id,
+                            marker=dict(size=8, color=color),
+                            line=dict(width=2, color=color),
+                            hovertemplate=(
+                                f"Order ID: {order_id}<br>{x_title}: %{{x:.2f}}<br>{hover_label}: %{{y:.3f}}<extra></extra>"
+                            ),
+                        )
+                    )
+                trace_count += 1
+
+    if trace_count == 0:
+        return _build_no_data_figure(
+            title=title,
+            yaxis_title=yaxis_title,
+            theme=theme,
+            uirevision=uirevision,
+            margin_bottom=margin_bottom,
+        )
+
+    if target_line_function is not None:
+        if not full_sorted_time_run.empty:
+            fig.add_trace(
+                go.Scattergl(
+                    x=full_sorted_time_run,
+                    y=target_line_function(full_sorted_time_run),
+                    mode="lines",
+                    line=dict(color="green", width=2, dash="dash"),
+                    name=target_line_name or "Target line",
+                ),
+            )
 
     is_dark = theme == "dark"
 
     layout_dict = dict(
         xaxis_title=x_title,
         yaxis_title=yaxis_title,
-        margin=dict(l=40, r=20, t=12, b=margin_bottom),
+        margin=dict(l=40, r=20, t=32, b=margin_bottom),
         showlegend=True,
         uirevision=uirevision,
         legend=dict(
@@ -300,6 +407,12 @@ def build_detail_plot(
     if yaxis_range is not None:
         layout_dict["yaxis"] = dict(range=yaxis_range)
     fig.update_layout(**layout_dict)
+    if x_range:
+        fig.update_xaxes(range=x_range)
+    elif reset_autorange:
+        fig.update_xaxes(autorange=True)
+    elif default_x_range:
+        fig.update_xaxes(range=default_x_range)
     return apply_theme(fig, theme)
 
 
@@ -318,6 +431,20 @@ def create_track_record_page(ns: str):
         title="uCell",
         xaxis_title="Hours run [h]",
         yaxis_title="uCell",
+    )
+
+    fig_h2_in_o2 = go.Figure()
+    fig_h2_in_o2.update_layout(
+        title="c_h2_ino2",
+        xaxis_title="Hours run [h]",
+        yaxis_title="c_h2_ino2 [vol%]",
+    )
+
+    fig_o2_in_h2 = go.Figure()
+    fig_o2_in_h2.update_layout(
+        title="c_o2_inh2",
+        xaxis_title="Hours run [h]",
+        yaxis_title="c_o2_inh2 [vol%]",
     )
 
     layout = dmc.Container(
@@ -440,6 +567,24 @@ def create_track_record_page(ns: str):
                                                     dcc.Graph(
                                                         id=f"{ns}-trackrecord-uCell-plot",
                                                         figure=fig_uCell,
+                                                        config={"responsive": True},
+                                                        style={
+                                                            "width": "100%",
+                                                            "height": "280px",
+                                                        },
+                                                    ),
+                                                    dcc.Graph(
+                                                        id=f"{ns}-trackrecord-c-h2-ino2-plot",
+                                                        figure=fig_h2_in_o2,
+                                                        config={"responsive": True},
+                                                        style={
+                                                            "width": "100%",
+                                                            "height": "280px",
+                                                        },
+                                                    ),
+                                                    dcc.Graph(
+                                                        id=f"{ns}-trackrecord-c-o2-inh2-plot",
+                                                        figure=fig_o2_in_h2,
                                                         config={"responsive": True},
                                                         style={
                                                             "width": "100%",
@@ -635,26 +780,82 @@ def create_track_record_page(ns: str):
 
     @callback(
         Output(f"{ns}-trackrecord-uCell-plot", "figure"),
+        Output(f"{ns}-trackrecord-c-h2-ino2-plot", "figure"),
+        Output(f"{ns}-trackrecord-c-o2-inh2-plot", "figure"),
         Input(f"{ns}-trackrecord-detail-data", "data"),
         Input(f"{ns}-trackrecord-sample-filter", "value"),
         Input(f"{ns}-trackrecord-order-filter", "value"),
         Input("theme-store", "data"),
+        Input(f"{ns}-trackrecord-uCell-plot", "relayoutData"),
+        Input(f"{ns}-trackrecord-c-h2-ino2-plot", "relayoutData"),
+        Input(f"{ns}-trackrecord-c-o2-inh2-plot", "relayoutData"),
     )
-    def update_detail_plots(detail_rows, sample_name, selected_order_ids, theme):
-        df = _ensure_columns(pd.DataFrame(detail_rows or []), DETAIL_COLS)
+    def update_detail_plots(detail_rows, sample_name, selected_order_ids, theme, relayout_u, relayout_h2, relayout_o2):
+        df = pd.DataFrame(detail_rows or [])
+        df = _ensure_columns(df, DETAIL_COLS)
         normalized_order_ids = [str(order_id) for order_id in (selected_order_ids or []) if str(order_id).strip()]
         uirevision = f"{ns}-trackrecord-{sample_name or 'none'}-{'|'.join(normalized_order_ids) or 'all'}"
 
+        x_range = None
+        reset_autorange = False
+        ctx = callback_context
+        if ctx.triggered and "relayoutData" in ctx.triggered[0]["prop_id"]:
+            relayout = ctx.triggered[0]["value"] or {}
+            if "xaxis.range[0]" in relayout:
+                x_range = [relayout["xaxis.range[0]"], relayout["xaxis.range[1]"]]
+            elif relayout.get("xaxis.autorange") is True:
+                reset_autorange = True
+
         ucell_fig = build_detail_plot(
             df=df,
+            title="uCell",
             value_col="u_cell_avg",
             yaxis_title="uCell [V]",
             hover_label="uCell [V]",
+            yaxis_range=[1.8, 2.0],
             theme=theme,
             uirevision=uirevision,
             selected_order_ids=normalized_order_ids,
             margin_bottom=0,
+            target_line_function=_ucell_target_line,
+            target_line_name="uCell target line 1.5%",
+            x_range=x_range,
+            reset_autorange=reset_autorange,
         )
-        return ucell_fig
+
+        h2_in_o2_fig = build_detail_plot(
+            df=df,
+            title="c_h2_ino2",
+            value_col="c_h2ino2",
+            yaxis_title="H2 in O2 [vol%]",
+            hover_label="H2 in O2 [vol%]",
+            yaxis_range=[0,1],
+            theme=theme,
+            uirevision=f"{uirevision}-c_h2_ino2",
+            selected_order_ids=normalized_order_ids,
+            margin_bottom=0,
+            target_line_function=_h2_in_o2_target_line,
+            target_line_name="H2 in O2 target line",
+            x_range=x_range,
+            reset_autorange=reset_autorange,
+        )
+
+        o2_in_h2_fig = build_detail_plot(
+            df=df,
+            title="c_o2_inh2",
+            value_col="c_o2inh2",
+            yaxis_title="O2 in H2 [ppm]",
+            hover_label="O2 in H2 [ppm]",
+            yaxis_range=[0,100],
+            theme=theme,
+            uirevision=f"{uirevision}-c_o2_inh2",
+            selected_order_ids=normalized_order_ids,
+            margin_bottom=0,
+            target_line_function=_o2_in_h2_target_line,
+            target_line_name="O2 in H2 target line",
+            x_range=x_range,
+            reset_autorange=reset_autorange,
+        )
+        return ucell_fig, h2_in_o2_fig, o2_in_h2_fig
 
     return layout

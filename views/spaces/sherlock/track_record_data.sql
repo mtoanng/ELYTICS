@@ -4,6 +4,8 @@ select
   cond.u_cell_avg,
   cond.u,
   cond.j,
+  cond.c_h2ino2,
+  cond.c_o2inh2,
   cond.p_cat_out,
   cond.t_an_in,
   cond.order_id,
