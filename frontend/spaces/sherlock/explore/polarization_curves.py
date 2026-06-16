@@ -9,6 +9,7 @@ from dash import (
     html,
     clientside_callback,
 )
+from dash.exceptions import PreventUpdate
 import dash_mantine_components as dmc
 from dash_iconify import DashIconify
 import pandas as pd
@@ -22,9 +23,10 @@ register_page(
 )
 
 USAGE_BLOCKQUOTE_TEXT = [
-    "This page allows you to explore polarization curve data.",
-    "Select at least one filter to load and plot data.",
-    "Download the data as CSV using the Download CSV button below the filters.",
+    "Data Load: Data will load only after selecting Order IDs or Sample Names",
+    "Find Test Rigs: Use the Testrig ID field to search or filter specific test rigs.",
+    "Refine Selection: Adjust the sliders for anode inlet temperature / cathode outlet pressure, and use the direction control to filter by rising, falling, or both curve types.",
+    "Export: Click Download CSV to save your filtered dataset",
 ]
 
 POLCURVE_TEMP_SIGNAL = "t_an_in"
@@ -69,6 +71,81 @@ def _apply_local_polcurve_filters(df, tSp_range, pCtSp_range, filter_type):
         elif filter_type == "falling":
             df = df[df["is_rising"] == False]
     return df
+
+
+def _as_list(value):
+    if value in (None, ""):
+        return []
+    if isinstance(value, (list, tuple, set)):
+        return list(value)
+    return [value]
+
+
+def _has_selection(value):
+    return value not in (None, "", [], (), set())
+
+
+def _resolve_testrig_column(df):
+    if "testrig_id" in df.columns:
+        return "testrig_id"
+    if "testrig_label" in df.columns:
+        return "testrig_label"
+    return None
+
+
+def _apply_polcurve_metadata_filters(
+    df, order_id=None, testrig_id=None, sample_name=None, exclude=None
+):
+    filtered = df
+
+    if exclude != "order_id" and _has_selection(order_id) and "order_id" in filtered.columns:
+        selected_orders = _as_list(order_id)
+        filtered = filtered[filtered["order_id"].isin(selected_orders)]
+
+    if exclude != "testrig_id" and _has_selection(testrig_id):
+        testrig_column = _resolve_testrig_column(filtered)
+        if testrig_column:
+            selected_testrigs = {str(value) for value in _as_list(testrig_id)}
+            filtered = filtered[
+                filtered[testrig_column].astype(str).isin(selected_testrigs)
+            ]
+
+    if (
+        exclude != "sample_name"
+        and _has_selection(sample_name)
+        and "sample_name" in filtered.columns
+    ):
+        selected_samples = _as_list(sample_name)
+        filtered = filtered[filtered["sample_name"].isin(selected_samples)]
+
+    return filtered
+
+
+def _to_options(values):
+    return [{"label": str(value), "value": value} for value in values]
+
+
+def _empty_polcurve_figure(theme, message="No plot available for selected data."):
+    import plotly.graph_objects as go
+
+    is_dark = theme == "dark"
+    fig = go.Figure()
+    fig.update_layout(
+        template="plotly_dark" if is_dark else "plotly",
+        margin=dict(t=40, l=80, r=30, b=60),
+        annotations=[
+            dict(
+                text=message,
+                x=0.5,
+                y=0.5,
+                xref="paper",
+                yref="paper",
+                showarrow=False,
+                font=dict(size=14),
+            )
+        ],
+    )
+    return fig
 
 
 # ========== LAYOUT ==========
@@ -156,6 +233,7 @@ layout = dmc.Container(
                                     styles={"label": {"marginBottom": "6px"}},
                                     style={"flex": 1, "minWidth": "180px"},
                                 ),
+                                
                                 dmc.InputWrapper(
                                     dcc.Dropdown(
                                         id="polcurve-sample-name-filter",
@@ -181,6 +259,17 @@ layout = dmc.Container(
                                     className="dmc",
                                     styles={"label": {"marginBottom": "6px"}},
                                     style={"flex": 1, "minWidth": "180px"},
+                                ),
+                                dmc.Button(
+                                    "Clear",
+                                    id="polcurve-clear-filters-btn",
+                                    variant="light",
+                                    size="sm",
+                                    style={
+                                        "flex": "0 0 auto",
+                                        "whiteSpace": "nowrap",
+                                        "alignSelf": "flex-end",
+                                    },
                                 ),
                                 dmc.Button(
                                     [
@@ -374,6 +463,23 @@ layout = dmc.Container(
     ],
 )
 
+# ========== CLEAR FILTERS ==========
+
+
+@callback(
+    Output("polcurve-order-id-filter", "value", allow_duplicate=True),
+    Output("polcurve-sample-name-filter", "value", allow_duplicate=True),
+    Output("polcurve-testrig-id-filter", "value", allow_duplicate=True),
+    Output("polcurve-is-rising-filter", "value", allow_duplicate=True),
+    Input("polcurve-clear-filters-btn", "n_clicks"),
+    prevent_initial_call=True,
+)
+def clear_polcurve_filters(n_clicks):
+    if not n_clicks:
+        raise PreventUpdate
+    return [], [], [], "Both"
+
+
 # ========== INFO PANEL COLLAPSE ==========
 
 
@@ -413,73 +519,81 @@ def load_polcurve_metadata(_):
 
 @callback(
     Output("polcurve-order-id-filter", "options"),
-    Input("polcurve-metadata-store", "data"),
-)
-def populate_order_id_options(meta):
-    if not meta:
-        return []
-    df = pd.DataFrame(meta)
-    # Order ID options (always all)
-    order_id_options = (
-        [
-            {"label": str(oid), "value": oid}
-            for oid in sorted(df["order_id"].dropna().unique(), reverse=True)
-        ]
-        if "order_id" in df
-        else []
-    )
-    return order_id_options
-
-
-@callback(
-    Output("polcurve-sample-name-filter", "options"),
+    Output("polcurve-order-id-filter", "value"),
     Output("polcurve-testrig-id-filter", "options"),
+    Output("polcurve-testrig-id-filter", "value"),
+    Output("polcurve-sample-name-filter", "options"),
+    Output("polcurve-sample-name-filter", "value"),
     Input("polcurve-metadata-store", "data"),
     Input("polcurve-order-id-filter", "value"),
+    Input("polcurve-sample-name-filter", "value"),
+    Input("polcurve-testrig-id-filter", "value"),
 )
-def populate_cascading_filter_options(meta, order_id):
+def sync_polcurve_filters(meta, current_order_id, current_sample_name, current_testrig_id):
     if not meta:
-        return [], []
+        return [], [], [], [], [], []
+
     df = pd.DataFrame(meta)
-    # Filter sample names and testrig ids by selected order_id(s)
-    dff = df.copy()
-    if order_id:
-        dff = dff[dff["order_id"].isin(order_id)]
-    sample_name_options = (
-        [
-            {"label": str(s), "value": s}
-            for s in sorted(dff["sample_name"].dropna().unique())
-        ]
-        if "sample_name" in dff
+
+    order_df = _apply_polcurve_metadata_filters(
+        df,
+        testrig_id=current_testrig_id,
+        sample_name=current_sample_name,
+        exclude="order_id",
+    )
+    order_values = (
+        sorted(order_df["order_id"].dropna().unique().tolist(), reverse=True)
+        if "order_id" in order_df.columns
         else []
     )
-    testrig_id_options = (
-        [
-            {"label": str(t), "value": t}
-            for t in sorted(dff["testrig_id"].dropna().unique())
-        ]
-        if "testrig_id" in dff
+
+    selected_order = [
+        value for value in _as_list(current_order_id) if value in order_values
+    ]
+    if not selected_order and current_order_id is None and current_sample_name is None and current_testrig_id is None:
+        selected_order = [order_values[0]] if order_values else []
+
+    testrig_df = _apply_polcurve_metadata_filters(
+        df,
+        order_id=selected_order,
+        sample_name=current_sample_name,
+        exclude="testrig_id",
+    )
+    testrig_column = _resolve_testrig_column(testrig_df)
+    testrig_values = (
+        sorted(testrig_df[testrig_column].dropna().unique().tolist(), key=str)
+        if testrig_column
         else []
     )
-    return sample_name_options, testrig_id_options
+    selected_testrig = [
+        value
+        for value in _as_list(current_testrig_id)
+        if str(value) in {str(option) for option in testrig_values}
+    ]
 
+    sample_df = _apply_polcurve_metadata_filters(
+        df,
+        order_id=selected_order,
+        testrig_id=selected_testrig,
+        exclude="sample_name",
+    )
+    sample_values = (
+        sorted(sample_df["sample_name"].dropna().unique().tolist(), key=str)
+        if "sample_name" in sample_df.columns
+        else []
+    )
+    selected_sample = [
+        value for value in _as_list(current_sample_name) if value in sample_values
+    ]
 
-@callback(
-    Output("polcurve-order-id-filter", "value"),
-    Input("polcurve-order-id-filter", "options"),
-    State("polcurve-order-id-filter", "value"),
-)
-def set_default_order_id(order_options, current_value):
-    if not order_options:
-        return []
-
-    valid_order_ids = {opt["value"] for opt in order_options}
-    selected_order = current_value or []
-    selected_order = [oid for oid in selected_order if oid in valid_order_ids]
-
-    if selected_order:
-        return selected_order
-    return [order_options[0]["value"]]
+    return (
+        _to_options(order_values),
+        selected_order,
+        _to_options(testrig_values),
+        selected_testrig,
+        _to_options(sample_values),
+        selected_sample,
+    )
 
 
 # ========== LAZY LOAD DATA WHEN FILTERS SELECTED ==========
@@ -491,18 +605,19 @@ def set_default_order_id(order_options, current_value):
     Output("polcurve-empty-message", "style"),
     Input("polcurve-order-id-filter", "value"),
     Input("polcurve-sample-name-filter", "value"),
-    Input("polcurve-testrig-id-filter", "value"),
 )
-def fetch_polcurve_data(order_id, sample_name, testrig_id):
+def fetch_polcurve_data(order_id, sample_name):
     filters = {}
     if order_id:
         filters["order_id"] = order_id
     if sample_name:
         filters["sample_name"] = sample_name
-    if testrig_id:
-        filters["testrig_id"] = testrig_id
     if not filters:
-        return [], "Select at least one filter to load data.", {"display": "block"}
+        return (
+            [],
+            "Select at least one order ID or sample name to load data.",
+            {"display": "block"},
+        )
     df = get_tabular("sherlock", "polcurve", filters=filters)
     if df.empty:
         return [], "No data found for selected filters.", {"display": "block"}
@@ -628,7 +743,7 @@ def update_polcurve_plot(data, theme, tSp, pCtSp, is_rising):
     import plotly.express as px
 
     if not data:
-        return {}, "No plot available for selected data."
+        return _empty_polcurve_figure(theme), "No plot available for selected data."
     df = pd.DataFrame(data)
     df = _apply_local_polcurve_filters(df, tSp, pCtSp, (is_rising or "both").lower())
     x_col = POLCURVE_X_SIGNAL if POLCURVE_X_SIGNAL in df.columns else None
@@ -637,7 +752,7 @@ def update_polcurve_plot(data, theme, tSp, pCtSp, is_rising):
         color_col = "event_short_id" if "event_short_id" in df else None
         plot_df = df.dropna(subset=[y_col, x_col])
         if plot_df.empty:
-            return {}, "No plot available for selected data."
+            return _empty_polcurve_figure(theme), "No plot available for selected data."
         plotly_template = "plotly_dark" if theme == "dark" else "plotly"
         fig = px.line(
             (
@@ -655,7 +770,7 @@ def update_polcurve_plot(data, theme, tSp, pCtSp, is_rising):
             template=plotly_template,
         )
         return fig, ""
-    return {}, "No plot available for selected data."
+    return _empty_polcurve_figure(theme), "No plot available for selected data."
 
 
 # ========== DOWNLOAD CALLBACK ==========
