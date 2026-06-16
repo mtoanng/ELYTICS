@@ -411,18 +411,6 @@ def build_detail_plot(
         margin=dict(l=40, r=20, t=32, b=margin_bottom),
         showlegend=True,
         uirevision=uirevision,
-        legend=dict(
-            x=0.98,
-            y=0.98,
-            xanchor="right",
-            yanchor="top",
-            bgcolor="rgba(20, 24, 28, 0.85)" if is_dark else "rgba(255, 255, 255, 0.9)",
-            bordercolor=(
-                "rgba(255, 255, 255, 0.20)" if is_dark else "rgba(0, 0, 0, 0.15)"
-            ),
-            borderwidth=1,
-            font=dict(color="#f1f3f5" if is_dark else "#1f2937"),
-        ),
     )
     if yaxis_range is not None:
         layout_dict["yaxis"] = dict(range=yaxis_range)
