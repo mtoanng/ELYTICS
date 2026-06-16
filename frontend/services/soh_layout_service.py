@@ -8,9 +8,9 @@ import pandas as pd
 
 
 IS_RISING_OPTIONS = [
-    {"label": "All", "value": "all"},
-    {"label": "True", "value": "true"},
-    {"label": "False", "value": "false"},
+    {"label": "Both", "value": "both"},
+    {"label": "Rising", "value": "rising"},
+    {"label": "Falling", "value": "falling"},
 ]
 
 COLOR_BY_OPTIONS = [
