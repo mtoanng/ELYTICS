@@ -301,7 +301,7 @@ layout = dmc.Container(
                                                 dmc.SegmentedControl(
                                                     id="soh-is-rising-filter",
                                                     data=soh_layout_service.IS_RISING_OPTIONS,
-                                                    value="all",
+                                                    value="both",
                                                     style={"width": "fit-content"},
                                                 ),
                                             ],
