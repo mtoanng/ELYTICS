@@ -20,7 +20,7 @@ SPACE_INFO = {
     },
     "watson": {
         "title": "Watson",
-        "subtitle": "asManufactured",
+        "subtitle": "asOperated",
         "description": "Single platform for all customer related data analysis.",
         "version": None,
         "color": "cyan",

@@ -165,6 +165,61 @@ def get_polyfit_smooth(x_vals, y_vals, degree=3, n_points=200):
             return None, None, None
     return None, None, None
 
+
+def _add_curve_arrowhead(fig, x_vals, y_vals, color, line_width=2):
+    """Draw a line-based arrowhead from the last three finite points of a curve."""
+    x_arr = np.asarray(x_vals, dtype=float)
+    y_arr = np.asarray(y_vals, dtype=float)
+    valid_mask = np.isfinite(x_arr) & np.isfinite(y_arr)
+    if valid_mask.sum() < 3:
+        return
+
+    x_valid = x_arr[valid_mask]
+    y_valid = y_arr[valid_mask]
+    x_min, x_max = np.min(x_valid), np.max(x_valid)
+    y_min, y_max = np.min(y_valid), np.max(y_valid)
+    x_span = x_max - x_min
+    y_span = y_max - y_min
+    if x_span == 0 and y_span == 0:
+        return
+
+    # Work in normalized axis space so the arrowhead size stays visually similar
+    # across curves with different scales while preserving the tail direction.
+    x_scale = x_span if x_span > 0 else 1.0
+    y_scale = y_span if y_span > 0 else 1.0
+
+    tip = np.array([(x_valid[-1] - x_min) / x_scale, (y_valid[-1] - y_min) / y_scale], dtype=float)
+    prev = np.array([(x_valid[-2] - x_min) / x_scale, (y_valid[-2] - y_min) / y_scale], dtype=float)
+    prev_prev = np.array([(x_valid[-3] - x_min) / x_scale, (y_valid[-3] - y_min) / y_scale], dtype=float)
+
+    direction = tip - prev_prev
+    direction_norm = np.linalg.norm(direction)
+    if direction_norm == 0:
+        direction = tip - prev
+        direction_norm = np.linalg.norm(direction)
+    if direction_norm == 0:
+        return
+
+    direction = direction / direction_norm
+    perp = np.array([-direction[1], direction[0]])
+    arrow_length = 0.055
+    arrow_width = 0.025
+    wing_1 = tip - direction * arrow_length + perp * arrow_width
+    wing_2 = tip - direction * arrow_length - perp * arrow_width
+
+    wing_1 = np.array([wing_1[0] * x_scale + x_min, wing_1[1] * y_scale + y_min], dtype=float)
+    tip = np.array([tip[0] * x_scale + x_min, tip[1] * y_scale + y_min], dtype=float)
+    wing_2 = np.array([wing_2[0] * x_scale + x_min, wing_2[1] * y_scale + y_min], dtype=float)
+
+    fig.add_trace(go.Scattergl(
+        x=[wing_1[0], tip[0], wing_2[0]],
+        y=[wing_1[1], tip[1], wing_2[1]],
+        mode="lines",
+        line=dict(color=color, width=line_width),
+        hoverinfo="skip",
+        showlegend=False,
+    ))
+
 def make_soh_colored_subplot(template, sample_name, xaxis_col, color_label_name):
     """
     Creates a standard 2-row subplot figure for SOH kinetic and linear plots.
@@ -175,9 +230,15 @@ def make_soh_colored_subplot(template, sample_name, xaxis_col, color_label_name)
         showlegend=True,
         title=dict(text=f"Stack SOH colored by {color_label_name}", x=0.5, xanchor="center"),
         legend=dict(orientation="v", yanchor="top", y=1, xanchor="left", x=0.98),
-        margin=dict(l=40, r=120, t=60, b=40),
+        margin=dict(l=40, r=120, t=80, b=40),
         height=None,
     )
+    if sample_name:
+        fig.add_annotation(
+            text=sample_name, xref="paper", yref="paper",
+            x=0.5, y=1.04, showarrow=False,
+            font=dict(size=11, color="gray"), xanchor="center", yanchor="bottom",
+        )
     fig.update_xaxes(title_text="", row=1, col=1)
     fig.update_xaxes(title_text="Runtime [h]" if xaxis_col == "runtime_hours" else "Timestamp", row=2, col=1)
     fig.update_yaxes(title_text="SOH Kinetic [-]", row=1, col=1)
@@ -438,12 +499,18 @@ def create_fleet_soh_plot(df_soh, dff, sample_name, xaxis_col, plotly_template):
         template=plotly_template,
         showlegend=len(dff["sample_name"].unique()) > 1,
         title=dict(text=f"SOH over {title_suffix}", x=0.5, xanchor="center"),
-        margin=dict(l=40, r=20, t=40, b=40),
+        margin=dict(l=40, r=20, t=70, b=40),
         legend=dict(orientation="v", yanchor="top", y=1, xanchor="left", x=1, font=dict(size=10)),
         autosize=True,
         height=None,
         width=None,
     )
+    if sample_name:
+        fig.add_annotation(
+            text=sample_name, xref="paper", yref="paper",
+            x=0.5, y=1.04, showarrow=False,
+            font=dict(size=11, color="gray"), xanchor="center", yanchor="bottom",
+        )
     fig.update_yaxes(title_text="SOH Kinetic [-]", row=1, col=1)
     fig.update_yaxes(title_text="SOH Linear [mΩ·cm²]", row=2, col=1)
     fig.update_xaxes(title_text=xaxis_label, row=2, col=1)
@@ -451,6 +518,8 @@ def create_fleet_soh_plot(df_soh, dff, sample_name, xaxis_col, plotly_template):
 
 def create_lin_vs_kin_plot(dff, df_soh, plotly_template, sample_name):
     fig_lin_vs_lin = go.Figure().update_layout(template=plotly_template)
+    has_runtime_colorbar = bool(sample_name and sample_name in dff["sample_name"].unique())
+    title_x = 0.39 if has_runtime_colorbar else 0.5
 
     if sample_name and sample_name in dff["sample_name"].unique():
         sample_data = dff[dff["sample_name"] == sample_name]
@@ -463,7 +532,15 @@ def create_lin_vs_kin_plot(dff, df_soh, plotly_template, sample_name):
             mode="markers",
             marker=dict(
                 size=6, color=runtime_vals, colorscale='Turbo',
-                colorbar=dict(title="Runtime [h]", thickness=20)
+                colorbar=dict(
+                    title=dict(text="Runtime [h]", side="right"),
+                    thickness=20,
+                    len=0.82,
+                    y=0.5,
+                    yanchor="middle",
+                    x=1.02,
+                    xanchor="left",
+                )
             ),
             hovertemplate="<b>Sample</b>: "+sample_name+"<br>SOH Linear: %{x:.3f}<br>SOH Kinetic: %{y:.3f}<br>Runtime: %{marker.color:.1f}h<extra></extra>",
             showlegend=False
@@ -496,8 +573,8 @@ def create_lin_vs_kin_plot(dff, df_soh, plotly_template, sample_name):
         
     fig_lin_vs_lin.update_layout(
         template=plotly_template,
-        title=dict(text=title, x=0.5, xanchor="center"),
-        margin=dict(l=40, r=40, t=60, b=40),
+        title=dict(text=title, x=title_x, xanchor="center"),
+        margin=dict(l=40, r=20, t=80, b=40),
         autosize=True,
         height=None,
         width=None,
@@ -505,6 +582,18 @@ def create_lin_vs_kin_plot(dff, df_soh, plotly_template, sample_name):
         yaxis_title="SOH Kinetic [-]",
         showlegend=False
     )
+    if sample_name:
+        fig_lin_vs_lin.add_annotation(
+            text=sample_name,
+            xref="paper",
+            yref="paper",
+            x=title_x,
+            y=1.04,
+            showarrow=False,
+            font=dict(size=11, color="gray"),
+            xanchor="center",
+            yanchor="bottom",
+        )
     return fig_lin_vs_lin
 
 def create_polcurve_decomp_plot(dff, valid_ivs, slider_value, plotly_template, sample_name):
@@ -618,7 +707,7 @@ def create_polcurve_decomp_plot(dff, valid_ivs, slider_value, plotly_template, s
                 xref="x", yref="y", axref="x", ayref="y",
                 showarrow=True, arrowhead=1, arrowsize=1, arrowwidth=2,
                 arrowcolor="green",
-                standoff=0, startstandoff=0
+                standoff=0, startstandoff=0,
             ))
         # Kinetic arrow (purple): from (pc_0[j] - lin_delta_diff[j]) to (pc_0[j] - lin_delta_diff[j] - kin_delta_diff[j])
         start_y_kin = float(pc_0[j_idx] - lin_delta_diff[j_idx])
@@ -633,14 +722,21 @@ def create_polcurve_decomp_plot(dff, valid_ivs, slider_value, plotly_template, s
                 standoff=0, startstandoff=0
             ))
 
+    all_annotations = list(annotations)
+    if sample_name:
+        all_annotations.append(dict(
+            text=sample_name, xref="paper", yref="paper",
+            x=0.5, y=1.04, showarrow=False,
+            font=dict(size=11, color="gray"), xanchor="center", yanchor="bottom",
+        ))
     fig_soh_split.update_layout(
         template=plotly_template,
-        title=dict(text=f"Pol Curve Change (@Ref OpCons) Related to Ageing", x=0.5, xanchor="center"),
+        title=dict(text="Pol Curve Change (@Ref OpCons) Related to Ageing", x=0.5, xanchor="center"),
         xaxis_title="Current Density [A/cm²]",
         yaxis_title="Cell Voltage [V]",
-        margin=dict(l=40, r=40, t=60, b=80),
+        margin=dict(l=40, r=40, t=130, b=40),
         legend=dict(orientation="v", yanchor="top", y=1, xanchor="left", x=1.02),
-        annotations=annotations,
+        annotations=all_annotations,
         height=None
     )
     return fig_soh_split
@@ -761,14 +857,20 @@ def create_overpotential_plots(df_soh, dff, xaxis_col, theme_data, sample_name):
     xaxis_label = "Runtime [h]" if xaxis_col == "runtime_hours" else "Timestamp"
     fig.update_layout(
         template=plotly_template,
-        title=dict(text=f"Additional Overpotential (due to Ageing) over Time (@Ref OpCons)", x=0.5, xanchor="center"),
-        margin=dict(l=40, r=20, t=60, b=40),
+        title=dict(text="Additional Overpotential (due to Ageing) over Time (@Ref OpCons)", x=0.5, xanchor="center"),
+        margin=dict(l=40, r=20, t=110, b=40),
         autosize=True,
         height=None,
         width=None,
         showlegend=True,
         legend=dict(orientation="v", yanchor="top", y=1, xanchor="left", x=1, font=dict(size=10)),
     )
+    if sample_name:
+        fig.add_annotation(
+            text=sample_name, xref="paper", yref="paper",
+            x=0.5, y=1.04, showarrow=False,
+            font=dict(size=11, color="gray"), xanchor="center", yanchor="bottom",
+        )
     # Add 3 mV/h degradation reference line + shaded area (row 1 = Δη_tot)
     _add_degradation_rate_fill(fig, dff, xaxis_col, rate_uv_per_h=3.0, row=1, col=1)
 
@@ -783,6 +885,8 @@ def create_overpotential_plots(df_soh, dff, xaxis_col, theme_data, sample_name):
 
 def create_overpotential_lin_vs_kin_plot(dff, df_soh, plotly_template, sample_name, fit_coeffs=None):
     fig_lin_vs_lin = go.Figure().update_layout(template=plotly_template)
+    has_runtime_colorbar = bool(sample_name and sample_name in dff["sample_name"].unique())
+    title_x = 0.46 if has_runtime_colorbar else 0.5
 
     col_bol_lin = "model_uCellAvg_BoL-lin_ref_jStck-3-0pAndeOut-2-5pCtdeOut-40tAndeIn-70vfAndeIn-5-2delta_Rohm-0_stack"
     col_bol_kin = "model_uCellAvg_BoL-kin_ref_jStck-3-0pAndeOut-2-5pCtdeOut-40tAndeIn-70vfAndeIn-5-2ECSA-1_stack"
@@ -804,20 +908,29 @@ def create_overpotential_lin_vs_kin_plot(dff, df_soh, plotly_template, sample_na
                 size=7,
                 color=runtime_vals,
                 colorscale="Turbo",
-                colorbar=dict(title="Runtime [h]", thickness=18),
+                colorbar=dict(
+                    title=dict(text="Runtime [h]", side="right"),
+                    thickness=18,
+                    len=0.82,
+                    y=0.5,
+                    yanchor="middle",
+                    x=1.02,
+                    xanchor="left",
+                ),
             ),
             hovertemplate="<b>Sample</b>: "+sample_name+"<br>Kinetic: %{x:.3f} mV<br>Linear: %{y:.3f} mV<br>Runtime: %{customdata:.1f}h<extra></extra>",
             customdata=runtime_vals,
             showlegend=False
         ))
+
         # Plot parametric trendline from fit coefficients (kin(t) vs lin(t)).
         # Fallback to direct fit on selected sample data if coefficients were not provided.
         sc = fit_coeffs.get(sample_name) if fit_coeffs else None
         if (not sc or "kin" not in sc or "lin" not in sc) and len(sample_data) >= 3:
-            runtime_vals = sample_data["runtime_hours"].values
-            if np.isfinite(runtime_vals).sum() >= 3:
-                _, _, coeffs_lin_runtime = get_polyfit_smooth(runtime_vals, eta_kin.values, degree=2)
-                _, _, coeffs_kin_runtime = get_polyfit_smooth(runtime_vals, eta_lin.values, degree=2)
+            runtime_vals_np = sample_data["runtime_hours"].values
+            if np.isfinite(runtime_vals_np).sum() >= 3:
+                _, _, coeffs_lin_runtime = get_polyfit_smooth(runtime_vals_np, eta_kin.values, degree=2)
+                _, _, coeffs_kin_runtime = get_polyfit_smooth(runtime_vals_np, eta_lin.values, degree=2)
                 if coeffs_lin_runtime is not None and coeffs_kin_runtime is not None:
                     sc = {"lin": coeffs_lin_runtime, "kin": coeffs_kin_runtime}
 
@@ -835,21 +948,16 @@ def create_overpotential_lin_vs_kin_plot(dff, df_soh, plotly_template, sample_na
                     line=dict(color=selected_color, width=2, dash="dash"),
                     hoverinfo="skip", showlegend=False
                 ))
-                if len(x_curve) > 0 and len(y_curve) > 0:
-                    fig_lin_vs_lin.add_trace(go.Scattergl(
-                        x=[x_curve[-1]], y=[y_curve[-1]],
-                        mode="markers",
-                        marker=dict(symbol="triangle-up", size=15, color=selected_color),
-                        showlegend=False, hoverinfo="skip"
-                    ))
-        title = "Overpotential Trendline"
-    else: # no sample name selected
+                _add_curve_arrowhead(fig_lin_vs_lin, x_curve, y_curve, selected_color, line_width=2)
+        title = "Overpotential Trendlines"
+    else:  # no sample name selected
         for other_sample in dff["sample_name"].unique():
             sample_data = dff[dff["sample_name"] == other_sample]
             color = _sample_color(other_sample, plotly_template=plotly_template)
             eta_kin = 1000 * (-sample_data[col_bol_kin] + sample_data[col_pc])
             eta_lin = 1000 * (-sample_data[col_bol_lin] + sample_data[col_pc])
-            # Use fit coefficients for parametric curve if available
+
+            # Use fit coefficients for parametric curve if available.
             if fit_coeffs and other_sample in fit_coeffs:
                 sc = fit_coeffs[other_sample]
                 if "kin" in sc and "lin" in sc:
@@ -863,16 +971,9 @@ def create_overpotential_lin_vs_kin_plot(dff, df_soh, plotly_template, sample_na
                         name=other_sample,
                         hovertemplate="<b>Sample</b>: "+other_sample+"<extra></extra>"
                     ))
-                    # Overlay a large triangle-up marker at the end of the trendline for visibility
-                    if len(x_curve) > 0 and len(y_curve) > 0:
-                        fig_lin_vs_lin.add_trace(go.Scattergl(
-                            x=[x_curve[-1]], y=[y_curve[-1]],
-                            mode="markers",
-                            marker=dict(symbol="triangle-up", size=15, color=color),
-                            showlegend=False, hoverinfo="skip"
-                        ))
+                    _add_curve_arrowhead(fig_lin_vs_lin, x_curve, y_curve, color, line_width=2)
             else:
-                # Fallback: fit directly on kin vs lin
+                # Fallback: fit directly on kin vs lin.
                 x_fit, y_fit, _ = get_polyfit_smooth(eta_kin, eta_lin)
                 if x_fit is not None and len(x_fit) > 0 and len(y_fit) > 0:
                     fig_lin_vs_lin.add_trace(go.Scattergl(
@@ -881,19 +982,13 @@ def create_overpotential_lin_vs_kin_plot(dff, df_soh, plotly_template, sample_na
                         name=other_sample,
                         hovertemplate="<b>Sample</b>: "+other_sample+"<extra></extra>"
                     ))
-                    # Overlay a large triangle-up marker at the end of the trendline for visibility
-                    fig_lin_vs_lin.add_trace(go.Scattergl(
-                        x=[x_fit[-1]], y=[y_fit[-1]],
-                        mode="markers",
-                        marker=dict(symbol="triangle-up", size=15, color=color),
-                        showlegend=False, hoverinfo="skip"
-                    ))
+                    _add_curve_arrowhead(fig_lin_vs_lin, x_fit, y_fit, color, line_width=2)
         title = "Overpotential Trendlines"
-        
+
     fig_lin_vs_lin.update_layout(
         template=plotly_template,
-        title=dict(text=title, x=0.5, xanchor="center"),
-        margin=dict(l=40, r=40, t=60, b=60),
+        title=dict(text=title, x=title_x, xanchor="center"),
+        margin=dict(l=40, r=20, t=110, b=40),
         autosize=True,
         height=None,
         width=None,
@@ -901,6 +996,12 @@ def create_overpotential_lin_vs_kin_plot(dff, df_soh, plotly_template, sample_na
         yaxis_title="Δη<sub>lin</sub> [mV]",
         showlegend=False,
     )
+    if sample_name:
+        fig_lin_vs_lin.add_annotation(
+            text=sample_name, xref="paper", yref="paper",
+            x=title_x, y=1.04, showarrow=False,
+            font=dict(size=11, color="gray"), xanchor="center", yanchor="bottom",
+        )
     return fig_lin_vs_lin
 
 def create_overpotential_plot_all_in_one(df_soh, dff, xaxis_col, theme_data, sample_name, slider_value=None, valid_ivs=None):
@@ -1027,8 +1128,8 @@ def create_overpotential_plot_all_in_one(df_soh, dff, xaxis_col, theme_data, sam
     xaxis_label = "Runtime [h]" if xaxis_col == "runtime_hours" else "Timestamp"
     fig.update_layout(
         template=plotly_template,
-        title=dict(text=f"Additional Overpotential (due to Ageing) over Time (@Ref OpCons)", x=0.5, xanchor="center"),
-        margin=dict(l=40, r=20, t=60, b=40),
+        title=dict(text="Additional Overpotential (due to Ageing) over Time (@Ref OpCons)", x=0.5, xanchor="center"),
+        margin=dict(l=40, r=20, t=130, b=40),
         autosize=True,
         height=None,
         width=None,
@@ -1040,6 +1141,12 @@ def create_overpotential_plot_all_in_one(df_soh, dff, xaxis_col, theme_data, sam
             borderwidth=0,
         ),
     )
+    if sample_name:
+        fig.add_annotation(
+            text=sample_name, xref="paper", yref="paper",
+            x=0.5, y=1.04, showarrow=False,
+            font=dict(size=11, color="gray"), xanchor="center", yanchor="bottom",
+        )
     # Add 3 mV/h degradation reference line + shaded area
     _add_degradation_rate_fill(fig, dff, xaxis_col, rate_uv_per_h=3.0)
 
@@ -1188,11 +1295,17 @@ def create_cell_based_soh_time_plot(dff, xaxis_col, click_data, theme_data, samp
     fig_soh_cells_time.update_layout(
         template=plotly_template,
         showlegend=True,
-        title=dict(text=f"Cell-based Overpotential over Time (@Ref OpCons)", x=0.5, xanchor="center"),
+        title=dict(text="Cell-based Overpotential over Time (@Ref OpCons)", x=0.5, xanchor="center"),
         legend=dict(orientation="v", yanchor="top", y=1, xanchor="left", x=1, font=dict(size=10)),
         margin=dict(l=40, r=20, t=80, b=40),
         height=None
     )
+    if sample_name:
+        fig_soh_cells_time.add_annotation(
+            text=sample_name, xref="paper", yref="paper",
+            x=0.5, y=1.04, showarrow=False,
+            font=dict(size=11, color="gray"), xanchor="center", yanchor="bottom",
+        )
     fig_soh_cells_time.update_yaxes(title_text="Δη<sub>tot</sub> [mV]", row=1, col=1)
     fig_soh_cells_time.update_yaxes(title_text="Δη<sub>lin</sub> [mV]", row=2, col=1)
     fig_soh_cells_time.update_yaxes(title_text="Δη<sub>kin</sub> [mV]", row=3, col=1)
@@ -1334,14 +1447,21 @@ def create_cell_based_soh_across_height_plot(fig_soh_cells_across, dff, click_da
         if iv_number is not None and pd.notna(iv_number):
             annotation_text += f", IV number: {int(iv_number)}"
             
+        _annotations = [dict(
+            text=annotation_text, xref="paper", yref="paper", x=0.5, y=1.02,
+            showarrow=False, font=dict(size=11, color="#666")
+        )]
+        if sample_name:
+            _annotations.append(dict(
+                text=sample_name, xref="paper", yref="paper",
+                x=0.5, y=1.05, showarrow=False,
+                font=dict(size=11, color="gray"), xanchor="center", yanchor="bottom",
+            ))
         fig_soh_cells_across.update_layout(
             template=plotly_template, showlegend=False,
-            title=dict(text=f"SOH Across Cells", x=0.5, xanchor="center"),
+            title=dict(text="SOH Across Cells", x=0.5, xanchor="center"),
             margin=dict(l=40, r=40, t=80, b=40),
-            annotations=[dict(
-                text=annotation_text, xref="paper", yref="paper", x=0.5, y=1.02,
-                showarrow=False, font=dict(size=11, color="#666")
-            )]
+            annotations=_annotations
         )
         fig_soh_cells_across.update_xaxes(title_text="Δη<sub>tot</sub> [mV]", row=1, col=1)
         fig_soh_cells_across.update_xaxes(title_text="Δη<sub>lin</sub> [mV]", row=1, col=2)
@@ -1472,6 +1592,59 @@ def create_colored_soh_plot(df_soh, dff, xaxis_col, color_by, theme_data, sample
 
     return fig_colored_soh
 
+
+def compute_ageing_rate_subtitle(dff, iv_0, iv_1, rt_0, rt_1):
+    """
+    Compute trendline-based ageing-rate subtitle for Δη_tot, Δη_lin, Δη_kin between two IVs.
+    Returns None when required columns or valid IV rows are unavailable.
+    """
+    col_lin = "model_uCellAvg_BoL-lin_ref_jStck-3-0pAndeOut-2-5pCtdeOut-40tAndeIn-70vfAndeIn-5-2delta_Rohm-0_stack"
+    col_kin = "model_uCellAvg_BoL-kin_ref_jStck-3-0pAndeOut-2-5pCtdeOut-40tAndeIn-70vfAndeIn-5-2ECSA-1_stack"
+    col_pc = "model_uCellAvg_pc_3-0_stack"
+
+    if not {col_lin, col_kin, col_pc, "runtime_hours", "IVnumber"}.issubset(dff.columns):
+        return None
+
+    dt = rt_1 - rt_0
+    if dt == 0:
+        return None
+
+    row_iv0 = dff[dff["IVnumber"] == iv_0]
+    row_iv1 = dff[dff["IVnumber"] == iv_1]
+    if row_iv0.empty or row_iv1.empty:
+        return None
+
+    rt_early, rt_late = (rt_0, rt_1) if dt > 0 else (rt_1, rt_0)
+    dt_abs = abs(dt)
+
+    rt_all = np.asarray(dff["runtime_hours"].values, dtype=float)
+    finite_rt = np.isfinite(rt_all)
+    if finite_rt.sum() < 3:
+        return None
+
+    def _trend_rate(y_series):
+        y_vals = np.asarray(y_series, dtype=float)
+        x_fit, y_fit, coeffs = get_polyfit_smooth(rt_all, y_vals, degree=2)
+        _ = x_fit, y_fit
+        if coeffs is None:
+            return None
+        return (np.polyval(coeffs, rt_late) - np.polyval(coeffs, rt_early)) / dt_abs * 1000
+
+    tr_tot = _trend_rate(1000 * (-dff[col_lin] - dff[col_kin] + 2 * dff[col_pc]))
+    tr_lin = _trend_rate(1000 * (-dff[col_lin] + dff[col_pc]))
+    tr_kin = _trend_rate(1000 * (-dff[col_kin] + dff[col_pc]))
+
+    def _fmt(v):
+        if v is None or (isinstance(v, float) and np.isnan(v)):
+            return "N/A"
+        return f"{v:+.2f}"
+
+    return (
+        "Ageing Rate Estimation:  "
+        f"Δη<sub>tot</sub>/Δη<sub>lin</sub>/Δη<sub>kin</sub>: "
+        f"{_fmt(tr_tot)}/{_fmt(tr_lin)}/{_fmt(tr_kin)} µV/h"
+    )
+
 def create_load_cycle_plots(dff, theme_data, sample_name, slider_value, valid_ivs):
     plotly_template = get_plotly_template(theme_data)
     fig = make_subplots(
@@ -1509,6 +1682,7 @@ def create_load_cycle_plots(dff, theme_data, sample_name, slider_value, valid_iv
     rt_0 = row_0["runtime_hours"].iloc[0]
     rt_1 = row_1["runtime_hours"].iloc[0]
     rt_min, rt_max = min(rt_0, rt_1), max(rt_0, rt_1)
+    ageing_annotation = compute_ageing_rate_subtitle(dff, iv_0, iv_1, rt_0, rt_1)
 
     # Filter data between the two selected IVs (by runtime range)
     df_range = dff[(dff["runtime_hours"] >= rt_min) & (dff["runtime_hours"] <= rt_max)]
@@ -1559,16 +1733,22 @@ def create_load_cycle_plots(dff, theme_data, sample_name, slider_value, valid_iv
                 row=row, col=col,
             )
 
+    ageing_part = f"  <br>  {ageing_annotation}" if ageing_annotation is not None else ""
     fig.update_layout(
         template=plotly_template,
         title=dict(
-            text=f"Load Cycle Histograms (IV {int(iv_0)} @ {rt_0:.0f}h → IV {int(iv_1)} @ {rt_1:.0f}h)",
+            text=f"Load Cycle Histograms (IV {int(iv_0)} @ {rt_0:.0f}h → IV {int(iv_1)} @ {rt_1:.0f}h{ageing_part})",
             x=0.5, xanchor="center",
         ),
-        margin=dict(l=40, r=20, t=80, b=40),
+        margin=dict(l=40, r=20, t=140, b=40),
         showlegend=False,
         bargap=0.05,
         height=None,
     )
-
+    if sample_name:
+        fig.add_annotation(
+            text=sample_name, xref="paper", yref="paper",
+            x=0.5, y=1.08, showarrow=False,
+            font=dict(size=11, color="gray"), xanchor="center", yanchor="bottom",
+        )
     return fig

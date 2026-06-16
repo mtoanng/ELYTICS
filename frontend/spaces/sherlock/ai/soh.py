@@ -30,7 +30,7 @@ USAGE_BLOCKQUOTE_TEXT = [
     ),
     dmc.Text(
         [
-            "Information on how State of Health (SOH) is obtained via the ",
+            "Information on how the State of Health (SOH) is obtained via the ",
             html.Strong("virtual sensor"),
             " is available ",
             html.A(
@@ -77,9 +77,9 @@ def _empty_figure(theme_data: str | None) -> go.Figure:
 
 
 def _normalize_bool_filter(selection: str | None) -> bool | None:
-    if selection == "rising":
+    if selection in {"rising", "true", "True", True}:
         return True
-    if selection == "falling":
+    if selection in {"falling", "false", "False", False}:
         return False
     return None
 
@@ -102,6 +102,30 @@ def _filter_stack_dataframe(
             filtered["is_rising"].eq(rising_value)
             | lowered.isin(truthy if rising_value else falsy)
         ]
+
+    return filtered
+
+
+def _filter_soh_metadata(
+    df: pd.DataFrame,
+    sample_name: str | None = None,
+    number_of_cells: int | None = None,
+    ccm_type: str | None = None,
+) -> pd.DataFrame:
+    if df.empty:
+        return df
+
+    filtered = df
+
+    if sample_name and "sample_name" in filtered.columns:
+        filtered = filtered[filtered["sample_name"].astype(str) == str(sample_name)]
+
+    if number_of_cells is not None and "number_of_cells" in filtered.columns:
+        num_cells = pd.to_numeric(filtered["number_of_cells"], errors="coerce")
+        filtered = filtered[num_cells.eq(number_of_cells)]
+
+    if ccm_type and "ccm_type" in filtered.columns:
+        filtered = filtered[filtered["ccm_type"].astype(str) == str(ccm_type)]
 
     return filtered
 
@@ -231,6 +255,13 @@ layout = dmc.Container(
                                     styles={"label": {"marginBottom": "6px"}},
                                     style={"flex": "1 1 220px", "minWidth": "200px"},
                                 ),
+                                dmc.Button(
+                                    "Clear",
+                                    id="soh-clear-filters-btn",
+                                    variant="light",
+                                    size="xs",
+                                    style={"alignSelf": "flex-end", "marginBottom": "2px"},
+                                ),
                             ],
                         ),
                         dmc.Space(h="sm"),
@@ -270,7 +301,7 @@ layout = dmc.Container(
                                                 dmc.SegmentedControl(
                                                     id="soh-is-rising-filter",
                                                     data=soh_layout_service.IS_RISING_OPTIONS,
-                                                    value="all",
+                                                    value="both",
                                                     style={"width": "fit-content"},
                                                 ),
                                             ],
@@ -372,14 +403,17 @@ layout = dmc.Container(
                                                 ),
                                                 dmc.Space(h="xs"),
                                                 dmc.Text("Select IV Pair (by Runtime)", fw=500, size="sm"),
-                                                dcc.RangeSlider(
+                                                dmc.RangeSlider(
                                                     id="soh-decomp-diff-range-slider",
                                                     min=0,
                                                     max=1,
-                                                    step=1,
                                                     value=[0, 1],
-                                                    marks={},
-                                                    tooltip={"placement": "bottom", "always_visible": True},
+                                                    step=1,
+                                                    marks=[],
+                                                    labelAlwaysOn=True,
+                                                    minRange=1,
+                                                    thumbSize=16,
+                                                    size="sm",
                                                 ),
                                                 dmc.Space(h="md"),
                                                 dcc.Graph(
@@ -431,7 +465,7 @@ layout = dmc.Container(
                                                     dcc.Dropdown(
                                                         id="soh-color-by",
                                                         options=soh_layout_service.COLOR_BY_OPTIONS,
-                                                        value="none",
+                                                        value="tAndeIn",
                                                         clearable=False,
                                                         style={"width": "100%"},
                                                     ),
@@ -530,6 +564,19 @@ clientside_callback(
 
 
 @callback(
+    Output("soh-sample-name-filter", "value", allow_duplicate=True),
+    Output("soh-number-of-cells-filter", "value", allow_duplicate=True),
+    Output("soh-ccm-type-filter", "value", allow_duplicate=True),
+    Input("soh-clear-filters-btn", "n_clicks"),
+    prevent_initial_call=True,
+)
+def clear_soh_filters(n_clicks):
+    if not n_clicks:
+        raise PreventUpdate
+    return None, None, None
+
+
+@callback(
     Output("soh-usage-open", "data"),
     Input("soh-usage-toggle", "n_clicks"),
     State("soh-usage-open", "data"),
@@ -570,12 +617,61 @@ def load_metadata(_):
 @callback(
     Output("soh-sample-name-filter", "options"),
     Input("soh-metadata-store", "data"),
+    Input("soh-number-of-cells-filter", "value"),
+    Input("soh-ccm-type-filter", "value"),
 )
-def update_sample_options(metadata_store):
+def update_sample_options(metadata_store, number_of_cells, ccm_type):
     if not metadata_store:
         return []
-    values = pd.Series(metadata_store.get("sample_name", [])).dropna().unique().tolist()
-    return [{"label": str(v), "value": str(v)} for v in sorted(values)]
+
+    df = pd.DataFrame(metadata_store)
+    if df.empty:
+        return []
+
+    df = _filter_soh_metadata(df, number_of_cells=number_of_cells, ccm_type=ccm_type)
+
+    values = pd.Series(df.get("sample_name", [])).dropna().astype(str).unique().tolist()
+    return [{"label": value, "value": value} for value in sorted(values)]
+
+
+@callback(
+    Output("soh-sample-name-filter", "value", allow_duplicate=True),
+    Input("soh-sample-name-filter", "options"),
+    State("soh-sample-name-filter", "value"),
+    prevent_initial_call=True,
+)
+def sync_sample_value_with_options(options, current_sample_name):
+    option_values = [option["value"] for option in options or []]
+    valid_values = set(option_values)
+
+    if len(option_values) == 1:
+        only_value = option_values[0]
+        if current_sample_name != only_value:
+            return only_value
+
+    if current_sample_name in valid_values or current_sample_name is None:
+        return no_update
+    return None
+
+
+@callback(
+    Output("soh-ccm-type-filter", "value", allow_duplicate=True),
+    Input("soh-ccm-type-filter", "options"),
+    State("soh-ccm-type-filter", "value"),
+    prevent_initial_call=True,
+)
+def sync_ccm_type_value_with_options(options, current_ccm_type):
+    option_values = [option["value"] for option in options or []]
+    valid_values = set(option_values)
+
+    if len(option_values) == 1:
+        only_value = option_values[0]
+        if current_ccm_type != only_value:
+            return only_value
+
+    if current_ccm_type in valid_values or current_ccm_type is None:
+        return no_update
+    return None
 
 
 @callback(
@@ -583,25 +679,48 @@ def update_sample_options(metadata_store):
     Output("soh-ccm-type-filter", "options"),
     Input("soh-metadata-store", "data"),
     Input("soh-sample-name-filter", "value"),
+    Input("soh-number-of-cells-filter", "value"),
+    Input("soh-ccm-type-filter", "value"),
 )
-def update_secondary_filter_options(metadata_store, sample_name):
+def update_secondary_filter_options(metadata_store, sample_name, number_of_cells, ccm_type):
     if not metadata_store:
         return [], []
     df = pd.DataFrame(metadata_store)
     if df.empty:
         return [], []
-    if sample_name and "sample_name" in df.columns:
-        df = df[df["sample_name"] == sample_name]
+
+    num_cells_df = _filter_soh_metadata(df, sample_name=sample_name, ccm_type=ccm_type)
+    ccm_type_df = _filter_soh_metadata(df, sample_name=sample_name, number_of_cells=number_of_cells)
 
     num_cells = []
     ccm_types = []
-    if "number_of_cells" in df.columns:
-        vals = pd.to_numeric(df["number_of_cells"], errors="coerce").dropna().astype(int)
+    if "number_of_cells" in num_cells_df.columns:
+        vals = pd.to_numeric(num_cells_df["number_of_cells"], errors="coerce").dropna().astype(int)
         num_cells = [{"label": str(v), "value": int(v)} for v in sorted(vals.unique().tolist())]
-    if "ccm_type" in df.columns:
-        vals = [str(v) for v in df["ccm_type"].dropna().unique().tolist()]
+    if "ccm_type" in ccm_type_df.columns:
+        vals = [str(v) for v in ccm_type_df["ccm_type"].dropna().unique().tolist()]
         ccm_types = [{"label": v, "value": v} for v in sorted(vals)]
     return num_cells, ccm_types
+
+
+@callback(
+    Output("soh-number-of-cells-filter", "value", allow_duplicate=True),
+    Input("soh-number-of-cells-filter", "options"),
+    State("soh-number-of-cells-filter", "value"),
+    prevent_initial_call=True,
+)
+def sync_number_of_cells_value_with_options(options, current_number_of_cells):
+    option_values = [option["value"] for option in options or []]
+    valid_values = set(option_values)
+
+    if len(option_values) == 1:
+        only_value = option_values[0]
+        if current_number_of_cells != only_value:
+            return only_value
+
+    if current_number_of_cells in valid_values or current_number_of_cells is None:
+        return no_update
+    return None
 
 
 @callback(
@@ -642,7 +761,7 @@ def load_fleet_data(sample_name, number_of_cells, ccm_type, is_rising):
 
     df = get_tabular("sherlock", "soh_fleet", filters=filters, sort_by="runtime_hours")
     if df.empty:
-        return [], "No SOH fleet data found for the selected filters.", {"display": "block"}
+        return [], "⚠️ No data available for selected filters.", {"display": "block"}
     return df.to_dict("records"), "", {"display": "none"}
 
 
@@ -736,12 +855,14 @@ def update_soh_outputs(
 
     plotly_template = soh_service.get_plotly_template(theme_data)
 
-    if sample_name and color_by and color_by != "none":
+    selected_color_by = color_by or ("tAndeIn" if sample_name else None)
+
+    if sample_name and selected_color_by:
         colored_result = soh_service.create_colored_soh_plot(
             df_fleet,
             plot_df,
             xaxis_col,
-            color_by,
+            selected_color_by,
             theme_data,
             sample_name,
         )
@@ -817,9 +938,9 @@ def update_soh_outputs(
     State("soh-sample-name-filter", "value"),
 )
 def update_decomp_slider_and_visibility(stack_data, sample_name):
-    defaults = ({"display": "none"}, "", 0, 1, {}, [0, 1])
+    defaults = ({"display": "none"}, "", 0, 1, [], [0, 1])
     if not sample_name:
-        return {"display": "none"}, "Select a sample name to view decomposition and load-cycle plots.", 0, 1, {}, [0, 1]
+        return {"display": "none"}, "ℹ️ Select a sample name to view the SOH decomposition in IV-plot.", 0, 1, [], [0, 1]
     if not stack_data:
         return defaults
 
@@ -842,10 +963,13 @@ def update_decomp_slider_and_visibility(stack_data, sample_name):
         indices = [round(i * (len(iv_numbers) - 1) / (n_marks - 1)) for i in range(n_marks)]
     else:
         indices = [0]
-    marks = {
-        int(valid_ivs.iloc[i]["IVnumber"]): f"{float(valid_ivs.iloc[i]['runtime_hours']):.0f}h"
+    marks = [
+        {
+            "value": int(valid_ivs.iloc[i]["IVnumber"]),
+            "label": f"{float(valid_ivs.iloc[i]['runtime_hours']):.0f}h",
+        }
         for i in indices
-    }
+    ]
     default_value = [int(iv_numbers[0]), int(iv_numbers[-1])]
     return {"display": "block"}, "", min_iv, max_iv, marks, default_value
 
@@ -922,7 +1046,7 @@ def update_decomp_and_load_cycle_plots(
 def update_cell_based_soh_time_plot(stack_data, xaxis_col, sample_name, click_data, theme_data):
     empty_fig = _empty_figure(theme_data)
     if not sample_name:
-        return empty_fig, "Select a sample name to view cell-level SOH data.", {"display": "none"}
+        return empty_fig, "ℹ️ Select a sample name to view cell-level SOH data.", {"display": "none"}
     if not stack_data:
         return empty_fig, "", {"display": "none"}
 
