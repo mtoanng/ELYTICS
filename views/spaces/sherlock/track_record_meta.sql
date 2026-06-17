@@ -4,11 +4,11 @@ WITH runtime_per_sample AS (
     MAX(o.sample_type) AS sample_type,
     MAX(o.sample_state) AS sample_state,
     CONCAT(MAX(o.sample_type), ' - ', MAX(o.sample_state)) AS sample_type_state,
-    ceil(sum(hr.timeFacRun)) AS run_hours,
+    ceil(sum(hr.calc.time_fac_run)) AS run_hours,
     MAX(o.number_of_cells) AS number_of_cells
   FROM
-    ps_xplatform_dev.pemely_ops.gold_genericstack_timeseries_1hr hr
-      INNER JOIN ps_xplatform_dev.pemely_ops.gold_genericstack_order o
+    ps_xplatform_prod.pemely_ops.gold_timeseries_1h hr
+      INNER JOIN ps_xplatform_prod.pemely_ops.gold_order o
         ON hr.order_id = o.order_id
   WHERE
     o.sample_type = 'Gen 1'
@@ -36,7 +36,7 @@ sample_metadata AS (
     MAX(s.gdl_name) AS gdl_name,
     MAX(s.active_area_per_cell) AS active_area_per_cell
   FROM
-    ps_xplatform_dev.pemely_ops.gold_sample s
+    ps_xplatform_prod.pemely_ops.gold_sample s
   GROUP BY
     s.name
 )
