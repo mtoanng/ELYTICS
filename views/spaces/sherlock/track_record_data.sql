@@ -14,7 +14,7 @@ select
   cond.calc.time_run / 3600 as time_run
 from
   ps_xplatform_dev.pemely_ops.vav1tb_gold_conditioning_event cond
-  left join ps_xplatform_dev.pemely_ops.gold_sample samp
+  left join ps_xplatform_prod.pemely_ops.gold_sample samp
     on cond.sample_id = samp.sample_id
 order by sample_name, cond.calc.time_run
 

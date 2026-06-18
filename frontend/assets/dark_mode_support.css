@@ -9,35 +9,6 @@
     --Dash-Text-Weak: var(--mantine-color-dimmed);
 }
 
-.trackrecord-filter-dropdown .Select-control {
-    height: 36px;
-    min-height: 36px;
-    border-color: var(--mantine-color-default-border);
-    border-radius: var(--mantine-radius-sm);
-    background-color: var(--mantine-color-body);
-    color: var(--mantine-color-text);
-}
-
-.trackrecord-filter-dropdown .Select-placeholder,
-.trackrecord-filter-dropdown .Select--single > .Select-control .Select-value {
-    line-height: 34px;
-}
-
-.trackrecord-filter-dropdown .Select-input {
-    height: 34px;
-}
-
-.trackrecord-filter-dropdown .Select-multi-value-wrapper {
-    max-height: 34px;
-    overflow-y: auto;
-}
-
-.trackrecord-filter-dropdown .Select-menu-outer {
-    border-color: var(--mantine-color-default-border);
-    background-color: var(--mantine-color-body);
-    color: var(--mantine-color-text);
-}
-
 :root[data-mantine-color-scheme="dark"] .dmc {
     --Dash-Fill-Inverse-Strong: var(--mantine-color-dark-6);
     --Dash-Fill-Weak: rgba(255, 255, 255, 0.06);
