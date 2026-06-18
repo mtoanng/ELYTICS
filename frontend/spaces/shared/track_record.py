@@ -1,17 +1,18 @@
 from dash import (
     dcc,
     callback,
+    callback_context,
     Output,
     Input,
     State,
     no_update,
-    clientside_callback,
 )
 import dash_mantine_components as dmc
 from dash_iconify import DashIconify
 import plotly.graph_objects as go
 import pandas as pd
-from typing import List
+import numpy as np
+from typing import Callable, List
 
 from config.signals import (
     get_signal_label,
@@ -20,21 +21,24 @@ from config.signals import (
 )
 from services.backend_service import get_metadata, get_tabular
 
+FILTER_WRAPPER_STYLE = {"flex": "1 1 0", "minWidth": "220px"}
+FILTER_DROPDOWN_STYLE = {"width": "100%"}
+LIMIT_INPUT_STYLES = {"input": {"height": "34px", "minHeight": "34px"}}
+
 PLOT_COLS = ["sample_name", "run_hours"]
 DETAIL_COLS = [
+    "sample_name",
     "order_id",
-    "hours_run",
-    "runtime_hour",
-    "run_hours",
     "time",
-    "date",
     "u_cell_avg",
-    "c_o2inh2",
-    "c_h2ino2",
-]
-X_AXIS_OPTIONS = [
-    {"label": "Hours run", "value": "hours_run"},
-    {"label": "Date", "value": "time"},
+    "c_h2_ino2",
+    "c_o2_inh2",
+    "u",
+    "j",
+    "p_cat_out",
+    "t_an_in",
+    "time_test",
+    "time_run",
 ]
 
 PLOT_HOVER_COLS = [
@@ -52,8 +56,7 @@ USAGE_BLOCKQUOTE_TEXT = [
     "The top chart shows total runtime for GEN 1 Proto 1 stacks from column run_hours.",
     "Each bar corresponds to one sample_name.",
     "Hover on a bar to inspect runtime and stack metadata.",
-    "Select a sample name below to load detailed u_cell_avg, c_o2inh2, and c_h2ino2 data from track_record tabular data.",
-    "Use the x-axis toggle to switch the lower charts between runtime hours and date when a time column is available.",
+    "Select a sample name from the filter or by clicking on the plot bars to load detailed data shown below.",
     "NOTE: Current in-depth plots show the full timeseries (1hr) data. The conditioning events are not yet available in the data sources.",
 ]
 
@@ -66,6 +69,22 @@ def _ensure_columns(df: pd.DataFrame, required_cols: List[str]) -> pd.DataFrame:
         if col not in out.columns:
             out[col] = None
     return out
+
+
+def _coerce_axis_range(lower, upper) -> list[float] | None:
+    if lower in (None, "") or upper in (None, ""):
+        return None
+
+    try:
+        lower_value = float(lower)
+        upper_value = float(upper)
+    except (TypeError, ValueError):
+        return None
+
+    if lower_value >= upper_value:
+        return None
+
+    return [lower_value, upper_value]
 
 
 def _sample_from_bar_interaction(click_data, selected_data):
@@ -139,6 +158,16 @@ ORDER_ID_PALETTE = [
     "#17becf",
 ]
 
+# Target line functions based on hypothetical degradation trends. These can be adjusted based on real data insights.
+def _ucell_target_line(hours_run: pd.Series) -> np.ndarray:
+    return 1.835 + 4e-3 * np.log(hours_run) + 2.9e-6 * hours_run
+
+def _h2_in_o2_target_line(hours_run: pd.Series) -> np.ndarray:
+    return 0.5+hours_run*((0.8 - 0.5) / (80000 - 0))
+
+
+def _o2_in_h2_target_line(hours_run: pd.Series) -> np.ndarray:
+    return 30+hours_run*((200 - 30) / (80000 - 0))
 
 def get_order_id_color(order_id, order_ids_list):
     try:
@@ -148,125 +177,255 @@ def get_order_id_color(order_id, order_ids_list):
         return ORDER_ID_PALETTE[0]
 
 
-def build_detail_plot(
+def _build_analysis_time_run(
     df: pd.DataFrame,
-    signal_name: str,
-    x_axis_mode: str,
+    selected_order_ids: list[str] | None,
+) -> pd.DataFrame:
+    plot_df = df.copy()
+    plot_df["order_id"] = plot_df["order_id"].fillna("Unknown").astype(str).str.strip()
+    plot_df["time"] = pd.to_datetime(plot_df["time"], errors="coerce")
+    plot_df["time_run"] = pd.to_numeric(plot_df["time_run"], errors="coerce")
+
+    selected = [str(order_id) for order_id in (selected_order_ids or []) if str(order_id).strip()]
+    if selected:
+        plot_df = plot_df[plot_df["order_id"].isin(selected)]
+
+    plot_df = plot_df.dropna(subset=["time_run"])
+    if plot_df.empty:
+        plot_df["analysis_time_run"] = pd.Series(dtype=float)
+        return plot_df
+
+    if not selected:
+        selected = plot_df["order_id"].dropna().astype(str).unique().tolist()
+
+    if len(selected) <= 1:
+        plot_df["analysis_time_run"] = plot_df["time_run"]
+        return plot_df.sort_values(["time_run", "time", "order_id"], na_position="last")
+
+    order_stats = (
+        plot_df.groupby("order_id", dropna=False)
+        .agg(
+            min_time=("time", "min"),
+            max_time_run=("time_run", "max"),
+        )
+        .reset_index()
+    )
+    order_stats["sort_min_time"] = order_stats["min_time"].fillna(pd.Timestamp.max)
+    order_stats = order_stats.sort_values(["sort_min_time", "order_id"])
+
+    offsets: dict[str, float] = {}
+    cumulative_offset = 0.0
+    for row in order_stats.itertuples(index=False):
+        offsets[str(row.order_id)] = cumulative_offset
+        if pd.notna(row.max_time_run):
+            cumulative_offset += float(row.max_time_run)
+
+    plot_df["analysis_time_run"] = plot_df["order_id"].map(offsets).fillna(0.0) + plot_df["time_run"]
+    return plot_df.sort_values(["analysis_time_run", "time", "order_id"], na_position="last")
+
+
+def _build_no_data_figure(
+    title: str,
+    yaxis_title: str,
     theme: str,
     uirevision: str,
     margin_bottom: int = 0,
+    message: str = "No data available",
+    x_range: list | None = None,
+) -> go.Figure:
+    fig = go.Figure()
+    fig.update_layout(
+        title=title,
+        xaxis_title="Hours run [h]",
+        yaxis_title=yaxis_title,
+        margin=dict(l=40, r=20, t=32, b=margin_bottom),
+        showlegend=False,
+        uirevision=uirevision,
+        annotations=[
+            dict(
+                text=message,
+                x=0.5,
+                y=0.5,
+                xref="paper",
+                yref="paper",
+                showarrow=False,
+                font=dict(size=14),
+            )
+        ],
+    )
+    if x_range:
+        fig.update_xaxes(range=x_range)
+    return apply_theme(fig, theme)
+
+
+def build_detail_plot(
+    df: pd.DataFrame,
+    title: str,
+    value_col: str,
+    yaxis_title: str,
+    hover_label: str,
+    theme: str,
+    uirevision: str,
+    selected_order_ids: list[str] | None = None,
+    margin_bottom: int = 0,
     yaxis_range: list | None = None,
     y_multiplier: float = 1.0,
+    target_line_function: Callable[[pd.Series], np.ndarray] | None = None,
+    target_line_name: str | None = None,
+    x_range: list | None = None,
+    reset_autorange: bool = False,
 ) -> go.Figure:
-    plot_df = df.copy()
-    value_col = signal_name if signal_name in plot_df.columns else None
-
-    yaxis_title = get_signal_title(signal_name)
-    unit = get_signal_unit(signal_name)
-    hover_label = get_signal_label(signal_name)
-
-    if not value_col:
-        fig = go.Figure()
-        fig.add_annotation(
-            text=f"No data column available for {yaxis_title}",
-            x=0.5,
-            y=0.5,
-            xref="paper",
-            yref="paper",
-            showarrow=False,
-        )
-        fig.update_layout(
-            xaxis_title="Hours run [hr]",
-            yaxis_title=f"{yaxis_title}{f' [{unit}]' if unit and unit != '-' else ''}",
-            margin=dict(l=40, r=20, t=12, b=margin_bottom),
-            showlegend=False,
-            uirevision=uirevision,
-        )
-        return apply_theme(fig, theme)
-
-    plot_df[value_col] = pd.to_numeric(plot_df[value_col], errors="coerce")
+    full_plot_df = df.copy()
+    full_plot_df[value_col] = pd.to_numeric(full_plot_df[value_col], errors="coerce")
     if y_multiplier != 1.0:
-        plot_df[value_col] = plot_df[value_col] * y_multiplier
-    plot_df["order_id"] = plot_df["order_id"].fillna("Unknown").astype(str).str.strip()
+        full_plot_df[value_col] = full_plot_df[value_col] * y_multiplier
+    full_plot_df = _build_analysis_time_run(full_plot_df, selected_order_ids)
 
-    if x_axis_mode == "time":
-        x_col = "time" if "time" in plot_df.columns else "date"
-        x_title = "Date"
-        if x_col not in plot_df.columns:
-            plot_df = pd.DataFrame(columns=[value_col])
-        else:
-            plot_df[x_col] = pd.to_datetime(plot_df[x_col], errors="coerce")
-            plot_df = plot_df.dropna(subset=[x_col, value_col]).sort_values(x_col)
-    else:
-        if "runtime_hour" in plot_df.columns:
-            x_col = "runtime_hour"
-        elif "hours_run" in plot_df.columns:
-            x_col = "hours_run"
-        else:
-            x_col = "run_hours"
-        x_title = "Hours run [hr]"
-        plot_df[x_col] = pd.to_numeric(plot_df[x_col], errors="coerce")
-        plot_df = plot_df.dropna(subset=[x_col, value_col]).sort_values(x_col)
+    default_x_range = None
+    full_sorted_time_run = full_plot_df["analysis_time_run"].dropna().sort_values()
+    if not full_sorted_time_run.empty:
+        default_x_range = [full_sorted_time_run.iloc[0], full_sorted_time_run.iloc[-1]]
+
+    plot_df = full_plot_df.copy()
+    plot_df = plot_df.dropna(subset=[value_col])
+
+    if plot_df.empty:
+        return _build_no_data_figure(
+            title=title,
+            yaxis_title=yaxis_title,
+            theme=theme,
+            uirevision=uirevision,
+            margin_bottom=margin_bottom,
+            x_range=x_range or default_x_range,
+        )
+
+    # set limits on datapoints:
+    # j target
+    j_target = 3.0
+    tol = 0.05
+    j_low = j_target * (1 - tol)
+    j_high = j_target * (1 + tol)
+
+    j_l_target = 0.6
+    tol_l = 0.05
+    j_l_low = j_l_target * (1 - tol_l)
+    j_l_high = j_l_target * (1 + tol_l)
+
+    # p target (p_cat_out)
+    p_target = 40.0
+    tol = 0.05
+    p_low = p_target * (1 - tol)
+    p_high = p_target * (1 + tol)
+
+    # t target (t_an_in)
+    t_target = 70.0
+    tol = 0.05
+    t_low = t_target * (1 - tol)
+    t_high = t_target * (1 + tol)
+
+    x_col = "analysis_time_run"
+    x_title = "Hours run [h]"
+    scatter_mode = "markers"
 
     fig = go.Figure()
+    trace_count = 0
 
     if not plot_df.empty and "order_id" in plot_df.columns:
         unique_order_ids = sorted(plot_df["order_id"].dropna().unique())
 
-        x_hover = "%{x|%Y-%m-%d %H:%M}" if x_axis_mode == "time" else "%{x:.0f} h"
-        scatter_mode = "markers" if x_axis_mode == "time" else "lines+markers"
-
         for order_id in unique_order_ids:
             order_df = plot_df[plot_df["order_id"] == order_id].copy()
+            order_df_3 = order_df[
+                (order_df["j"] >= j_low)
+                & (order_df["j"] <= j_high)
+                & (order_df["p_cat_out"] >= p_low)
+                & (order_df["p_cat_out"] <= p_high)
+                & (order_df["t_an_in"] >= t_low)
+                & (order_df["t_an_in"] <= t_high)
+            ]
+            order_df_06 = order_df[
+                (order_df["j"] >= j_l_low)
+                & (order_df["j"] <= j_l_high)
+                & (order_df["p_cat_out"] >= p_low)
+                & (order_df["p_cat_out"] <= p_high)
+                & (order_df["t_an_in"] >= t_low)
+                & (order_df["t_an_in"] <= t_high)
+            ]
+
             if not order_df.empty:
                 color = get_order_id_color(order_id, unique_order_ids)
-                fig.add_trace(
-                    go.Scatter(
-                        x=order_df[x_col],
-                        y=order_df[value_col],
-                        mode=scatter_mode,
-                        name=order_id,
-                        marker=dict(size=8, color=color),
-                        line=dict(width=2, color=color),
-                        hovertemplate=(
-                            f"Order ID: {order_id}<br>{x_title}: {x_hover}<br>{hover_label}: %{{y:.3f}}<extra></extra>"
-                        ),
+                if order_df_3.empty:
+                    continue
+                # for h2 in o2 we want to show the 0.6 filtered data, for the rest the 3.0 filtered data
+                if value_col == "c_h2ino2":
+                    fig.add_trace(
+                        go.Scatter(
+                            x=order_df_06[x_col],
+                            y=order_df_06[value_col],
+                            mode=scatter_mode,
+                            name=order_id,
+                            marker=dict(size=8, color=color),
+                            line=dict(width=2, color=color),
+                            hovertemplate=(
+                                f"Order ID: {order_id}<br>{x_title}: %{{x:.2f}}<br>{hover_label}: %{{y:.3f}}<extra></extra>"
+                            ),
+                        )
                     )
-                )
-    elif x_axis_mode == "time" and plot_df.empty:
-        fig.add_annotation(
-            text="No time column available for this dataset",
-            x=0.5,
-            y=0.5,
-            xref="paper",
-            yref="paper",
-            showarrow=False,
+                else:
+                    fig.add_trace(
+                        go.Scatter(
+                            x=order_df_3[x_col],
+                            y=order_df_3[value_col],
+                            mode=scatter_mode,
+                            name=order_id,
+                            marker=dict(size=8, color=color),
+                            line=dict(width=2, color=color),
+                            hovertemplate=(
+                                f"Order ID: {order_id}<br>{x_title}: %{{x:.2f}}<br>{hover_label}: %{{y:.3f}}<extra></extra>"
+                            ),
+                        )
+                    )
+                trace_count += 1
+
+    if trace_count == 0:
+        return _build_no_data_figure(
+            title=title,
+            yaxis_title=yaxis_title,
+            theme=theme,
+            uirevision=uirevision,
+            margin_bottom=margin_bottom,
         )
+
+    if target_line_function is not None:
+        if not full_sorted_time_run.empty:
+            fig.add_trace(
+                go.Scattergl(
+                    x=full_sorted_time_run,
+                    y=target_line_function(full_sorted_time_run),
+                    mode="lines",
+                    line=dict(color="green", width=2, dash="dash"),
+                    name=target_line_name or "Target line",
+                ),
+            )
 
     is_dark = theme == "dark"
 
     layout_dict = dict(
         xaxis_title=x_title,
-        yaxis_title=f"{yaxis_title}{f' [{unit}]' if unit and unit != '-' else ''}",
-        margin=dict(l=40, r=20, t=12, b=margin_bottom),
+        yaxis_title=yaxis_title,
+        margin=dict(l=40, r=20, t=32, b=margin_bottom),
         showlegend=True,
         uirevision=uirevision,
-        legend=dict(
-            x=0.98,
-            y=0.98,
-            xanchor="right",
-            yanchor="top",
-            bgcolor="rgba(20, 24, 28, 0.85)" if is_dark else "rgba(255, 255, 255, 0.9)",
-            bordercolor=(
-                "rgba(255, 255, 255, 0.20)" if is_dark else "rgba(0, 0, 0, 0.15)"
-            ),
-            borderwidth=1,
-            font=dict(color="#f1f3f5" if is_dark else "#1f2937"),
-        ),
     )
     if yaxis_range is not None:
         layout_dict["yaxis"] = dict(range=yaxis_range)
     fig.update_layout(**layout_dict)
+    if x_range:
+        fig.update_xaxes(range=x_range)
+    elif reset_autorange:
+        fig.update_xaxes(autorange=True)
+    elif default_x_range:
+        fig.update_xaxes(range=default_x_range)
     return apply_theme(fig, theme)
 
 
@@ -282,23 +441,23 @@ def create_track_record_page(ns: str):
 
     fig_uCell = go.Figure()
     fig_uCell.update_layout(
-        title=get_signal_title("u_cell_avg"),
-        xaxis_title="Hours run [hr]",
-        yaxis_title=get_signal_title("u_cell_avg"),
+        title="uCell",
+        xaxis_title="Hours run [h]",
+        yaxis_title="uCell",
     )
 
-    fig_concO2H2 = go.Figure()
-    fig_concO2H2.update_layout(
-        title=get_signal_title("c_o2inh2"),
-        xaxis_title="Hours run [hr]",
-        yaxis_title=get_signal_title("c_o2inh2"),
+    fig_h2_in_o2 = go.Figure()
+    fig_h2_in_o2.update_layout(
+        title="c_h2_ino2",
+        xaxis_title="Hours run [h]",
+        yaxis_title="c_h2_ino2 [vol%]",
     )
 
-    fig_concH2O2 = go.Figure()
-    fig_concH2O2.update_layout(
-        title=get_signal_title("c_h2ino2"),
-        xaxis_title="Hours run [hr]",
-        yaxis_title=get_signal_title("c_h2ino2"),
+    fig_o2_in_h2 = go.Figure()
+    fig_o2_in_h2.update_layout(
+        title="c_o2_inh2",
+        xaxis_title="Hours run [h]",
+        yaxis_title="c_o2_inh2 [vol%]",
     )
 
     layout = dmc.Container(
@@ -387,30 +546,128 @@ def create_track_record_page(ns: str):
                                         dmc.Group(
                                             align="end",
                                             children=[
-                                                dmc.Select(
-                                                    id=f"{ns}-trackrecord-sample-filter",
+                                                dmc.InputWrapper(
+                                                    dcc.Dropdown(
+                                                        id=f"{ns}-trackrecord-sample-filter",
+                                                        placeholder="Select a sample name",
+                                                        clearable=True,
+                                                        searchable=True,
+                                                        className="trackrecord-filter-dropdown",
+                                                        style=FILTER_DROPDOWN_STYLE,
+                                                    ),
                                                     label="Sample name",
-                                                    placeholder="Select a sample name",
-                                                    searchable=True,
-                                                    clearable=True,
-                                                    data=[],
-                                                    nothingFoundMessage="No sample names",
-                                                    style={"flex": 1},
+                                                    htmlFor=f"{ns}-trackrecord-sample-filter",
+                                                    className="dmc",
+                                                    styles={"label": {"marginBottom": "6px"}},
+                                                    style=FILTER_WRAPPER_STYLE,
+                                                ),
+                                                dmc.InputWrapper(
+                                                    dcc.Dropdown(
+                                                        id=f"{ns}-trackrecord-order-filter",
+                                                        placeholder="Select one or more order IDs",
+                                                        multi=True,
+                                                        className="trackrecord-filter-dropdown",
+                                                        style=FILTER_DROPDOWN_STYLE,
+                                                    ),
+                                                    label="Order IDs",
+                                                    htmlFor=f"{ns}-trackrecord-order-filter",
+                                                    className="dmc",
+                                                    styles={"label": {"marginBottom": "6px"}},
+                                                    style=FILTER_WRAPPER_STYLE,
                                                 ),
                                                 dmc.Stack(
                                                     gap=4,
-                                                    style={"width": "220px"},
+                                                    style={"width": "140px", "minWidth": "140px"},
                                                     children=[
-                                                        dmc.Text(
-                                                            "X axis", size="sm", fw=500
-                                                        ),
-                                                        dmc.SegmentedControl(
-                                                            id=f"{ns}-trackrecord-x-axis-mode",
-                                                            data=X_AXIS_OPTIONS,
-                                                            value="hours_run",
-                                                            size="xs",
+                                                        dmc.Text("uCell y limit", fw=500, size="sm", ta="center"),
+                                                        dmc.Group(
+                                                            gap="xs",
+                                                            grow=True,
+                                                            children=[
+                                                                dmc.NumberInput(
+                                                                    id=f"{ns}-trackrecord-ucell-y-min",
+                                                                    placeholder="min",
+                                                                    size="sm",
+                                                                    hideControls=True,
+                                                                    styles=LIMIT_INPUT_STYLES,
+                                                                    style={"width": "100%"},
+                                                                ),
+                                                                dmc.NumberInput(
+                                                                    id=f"{ns}-trackrecord-ucell-y-max",
+                                                                    placeholder="max",
+                                                                    size="sm",
+                                                                    hideControls=True,
+                                                                    styles=LIMIT_INPUT_STYLES,
+                                                                    style={"width": "100%"},
+                                                                ),
+                                                            ],
                                                         ),
                                                     ],
+                                                ),
+                                                dmc.Stack(
+                                                    gap=4,
+                                                    style={"width": "140px", "minWidth": "140px"},
+                                                    children=[
+                                                        dmc.Text("H2 in O2 y limit", fw=500, size="sm", ta="center"),
+                                                        dmc.Group(
+                                                            gap="xs",
+                                                            grow=True,
+                                                            children=[
+                                                                dmc.NumberInput(
+                                                                    id=f"{ns}-trackrecord-h2ino2-y-min",
+                                                                    placeholder="min",
+                                                                    size="sm",
+                                                                    hideControls=True,
+                                                                    styles=LIMIT_INPUT_STYLES,
+                                                                    style={"width": "100%"},
+                                                                ),
+                                                                dmc.NumberInput(
+                                                                    id=f"{ns}-trackrecord-h2ino2-y-max",
+                                                                    placeholder="max",
+                                                                    size="sm",
+                                                                    hideControls=True,
+                                                                    styles=LIMIT_INPUT_STYLES,
+                                                                    style={"width": "100%"},
+                                                                ),
+                                                            ],
+                                                        ),
+                                                    ],
+                                                ),
+                                                dmc.Stack(
+                                                    gap=4,
+                                                    style={"width": "140px", "minWidth": "140px"},
+                                                    children=[
+                                                        dmc.Text("O2 in H2 y limit", fw=500, size="sm", ta="center"),
+                                                        dmc.Group(
+                                                            gap="xs",
+                                                            grow=True,
+                                                            children=[
+                                                                dmc.NumberInput(
+                                                                    id=f"{ns}-trackrecord-o2inh2-y-min",
+                                                                    placeholder="min",
+                                                                    size="sm",
+                                                                    hideControls=True,
+                                                                    styles=LIMIT_INPUT_STYLES,
+                                                                    style={"width": "100%"},
+                                                                ),
+                                                                dmc.NumberInput(
+                                                                    id=f"{ns}-trackrecord-o2inh2-y-max",
+                                                                    placeholder="max",
+                                                                    size="sm",
+                                                                    hideControls=True,
+                                                                    styles=LIMIT_INPUT_STYLES,
+                                                                    style={"width": "100%"},
+                                                                ),
+                                                            ],
+                                                        ),
+                                                    ],
+                                                ),
+                                                dmc.Button(
+                                                    "Reset limits",
+                                                    id=f"{ns}-trackrecord-reset-limits",
+                                                    variant="light",
+                                                    size="sm",
+                                                    style={"alignSelf": "end", "marginBottom": "1px"},
                                                 ),
                                             ],
                                         ),
@@ -430,8 +687,8 @@ def create_track_record_page(ns: str):
                                                         },
                                                     ),
                                                     dcc.Graph(
-                                                        id=f"{ns}-trackrecord-concO2H2-plot",
-                                                        figure=fig_concO2H2,
+                                                        id=f"{ns}-trackrecord-c-h2-ino2-plot",
+                                                        figure=fig_h2_in_o2,
                                                         config={"responsive": True},
                                                         style={
                                                             "width": "100%",
@@ -439,8 +696,8 @@ def create_track_record_page(ns: str):
                                                         },
                                                     ),
                                                     dcc.Graph(
-                                                        id=f"{ns}-trackrecord-concH2O2-plot",
-                                                        figure=fig_concH2O2,
+                                                        id=f"{ns}-trackrecord-c-o2-inh2-plot",
+                                                        figure=fig_o2_in_h2,
                                                         config={"responsive": True},
                                                         style={
                                                             "width": "100%",
@@ -490,7 +747,7 @@ def create_track_record_page(ns: str):
         return bool(is_open)
 
     @callback(
-        Output(f"{ns}-trackrecord-sample-filter", "data"),
+        Output(f"{ns}-trackrecord-sample-filter", "options"),
         Output(f"{ns}-trackrecord-sample-filter", "value"),
         Input(f"{ns}-track-meta-data", "data"),
         Input(f"{ns}-runtime-bar", "clickData"),
@@ -609,118 +866,159 @@ def create_track_record_page(ns: str):
         return df.to_dict("records")
 
     @callback(
+        Output(f"{ns}-trackrecord-order-filter", "options"),
+        Output(f"{ns}-trackrecord-order-filter", "value"),
+        Input(f"{ns}-trackrecord-detail-data", "data"),
+        State(f"{ns}-trackrecord-order-filter", "value"),
+    )
+    def populate_order_filter(detail_rows, current_order_ids):
+        df = _ensure_columns(pd.DataFrame(detail_rows or []), DETAIL_COLS)
+        if df.empty:
+            return [], []
+
+        df["order_id"] = df["order_id"].fillna("Unknown").astype(str).str.strip()
+        df["time"] = pd.to_datetime(df["time"], errors="coerce")
+        order_rank = (
+            df.groupby("order_id", dropna=False)["time"]
+            .min()
+            .reset_index()
+        )
+        order_rank["sort_time"] = order_rank["time"].fillna(pd.Timestamp.max)
+        order_rank = order_rank.sort_values(["sort_time", "order_id"])
+        order_ids = order_rank["order_id"].astype(str).tolist()
+        options = [{"label": order_id, "value": order_id} for order_id in order_ids]
+
+        if current_order_ids:
+            valid_values = set(order_ids)
+            selected = [str(order_id) for order_id in current_order_ids if str(order_id) in valid_values]
+            if selected:
+                return options, selected
+
+        return options, order_ids
+
+    @callback(
+        Output(f"{ns}-trackrecord-ucell-y-min", "value"),
+        Output(f"{ns}-trackrecord-ucell-y-max", "value"),
+        Output(f"{ns}-trackrecord-h2ino2-y-min", "value"),
+        Output(f"{ns}-trackrecord-h2ino2-y-max", "value"),
+        Output(f"{ns}-trackrecord-o2inh2-y-min", "value"),
+        Output(f"{ns}-trackrecord-o2inh2-y-max", "value"),
+        Input(f"{ns}-trackrecord-reset-limits", "n_clicks"),
+        prevent_initial_call=True,
+    )
+    def reset_y_limits(n_clicks):
+        if not n_clicks:
+            return no_update, no_update, no_update, no_update, no_update, no_update
+        return None, None, None, None, None, None
+
+    @callback(
         Output(f"{ns}-trackrecord-uCell-plot", "figure"),
-        Output(f"{ns}-trackrecord-concO2H2-plot", "figure"),
-        Output(f"{ns}-trackrecord-concH2O2-plot", "figure"),
+        Output(f"{ns}-trackrecord-c-h2-ino2-plot", "figure"),
+        Output(f"{ns}-trackrecord-c-o2-inh2-plot", "figure"),
         Input(f"{ns}-trackrecord-detail-data", "data"),
         Input(f"{ns}-trackrecord-sample-filter", "value"),
-        Input(f"{ns}-trackrecord-x-axis-mode", "value"),
+        Input(f"{ns}-trackrecord-order-filter", "value"),
         Input("theme-store", "data"),
+        Input(f"{ns}-trackrecord-ucell-y-min", "value"),
+        Input(f"{ns}-trackrecord-ucell-y-max", "value"),
+        Input(f"{ns}-trackrecord-h2ino2-y-min", "value"),
+        Input(f"{ns}-trackrecord-h2ino2-y-max", "value"),
+        Input(f"{ns}-trackrecord-o2inh2-y-min", "value"),
+        Input(f"{ns}-trackrecord-o2inh2-y-max", "value"),
+        Input(f"{ns}-trackrecord-uCell-plot", "relayoutData"),
+        Input(f"{ns}-trackrecord-c-h2-ino2-plot", "relayoutData"),
+        Input(f"{ns}-trackrecord-c-o2-inh2-plot", "relayoutData"),
     )
-    def update_detail_plots(detail_rows, sample_name, x_axis_mode, theme):
-        df = _ensure_columns(pd.DataFrame(detail_rows or []), DETAIL_COLS)
-        uirevision = f"{ns}-trackrecord-{sample_name or 'none'}-{x_axis_mode}"
+    def update_detail_plots(
+        detail_rows,
+        sample_name,
+        selected_order_ids,
+        theme,
+        ucell_y_min,
+        ucell_y_max,
+        h2ino2_y_min,
+        h2ino2_y_max,
+        o2inh2_y_min,
+        o2inh2_y_max,
+        relayout_u,
+        relayout_h2,
+        relayout_o2,
+    ):
+        df = pd.DataFrame(detail_rows or [])
+        df = _ensure_columns(df, DETAIL_COLS)
+        normalized_order_ids = [str(order_id) for order_id in (selected_order_ids or []) if str(order_id).strip()]
+        ucell_y_range = _coerce_axis_range(ucell_y_min, ucell_y_max)
+        h2ino2_y_range = _coerce_axis_range(h2ino2_y_min, h2ino2_y_max)
+        o2inh2_y_range = _coerce_axis_range(o2inh2_y_min, o2inh2_y_max)
+        y_limit_key = "|".join(
+            [
+                f"ucell:{ucell_y_range[0]}:{ucell_y_range[1]}" if ucell_y_range else "ucell:auto",
+                f"h2:{h2ino2_y_range[0]}:{h2ino2_y_range[1]}" if h2ino2_y_range else "h2:auto",
+                f"o2:{o2inh2_y_range[0]}:{o2inh2_y_range[1]}" if o2inh2_y_range else "o2:auto",
+            ]
+        )
+        uirevision = f"{ns}-trackrecord-{sample_name or 'none'}-{'|'.join(normalized_order_ids) or 'all'}-{y_limit_key}"
+
+        x_range = None
+        reset_autorange = False
+        ctx = callback_context
+        if ctx.triggered and "relayoutData" in ctx.triggered[0]["prop_id"]:
+            relayout = ctx.triggered[0]["value"] or {}
+            if "xaxis.range[0]" in relayout:
+                x_range = [relayout["xaxis.range[0]"], relayout["xaxis.range[1]"]]
+            elif relayout.get("xaxis.autorange") is True:
+                reset_autorange = True
 
         ucell_fig = build_detail_plot(
             df=df,
-            signal_name="u_cell_avg",
-            x_axis_mode=x_axis_mode,
+            title="uCell",
+            value_col="u_cell_avg",
+            yaxis_title="uCell [V]",
+            hover_label="uCell [V]",
+            yaxis_range=ucell_y_range,
             theme=theme,
             uirevision=uirevision,
+            selected_order_ids=normalized_order_ids,
             margin_bottom=0,
+            target_line_function=_ucell_target_line,
+            target_line_name="uCell target line 1.5%",
+            x_range=x_range,
+            reset_autorange=reset_autorange,
         )
-        conco2h2_fig = build_detail_plot(
+
+        h2_in_o2_fig = build_detail_plot(
             df=df,
-            signal_name="c_o2inh2",
-            x_axis_mode=x_axis_mode,
+            title="c_h2_ino2",
+            value_col="c_h2ino2",
+            yaxis_title="H2 in O2 [vol%]",
+            hover_label="H2 in O2 [vol%]",
+            yaxis_range=h2ino2_y_range,
             theme=theme,
-            uirevision=uirevision,
+            uirevision=f"{uirevision}-c_h2_ino2",
+            selected_order_ids=normalized_order_ids,
             margin_bottom=0,
+            target_line_function=_h2_in_o2_target_line,
+            target_line_name="H2 in O2 target line",
+            x_range=x_range,
+            reset_autorange=reset_autorange,
         )
-        conch2o2_fig = build_detail_plot(
+
+        o2_in_h2_fig = build_detail_plot(
             df=df,
-            signal_name="c_h2ino2",
-            x_axis_mode=x_axis_mode,
+            title="c_o2_inh2",
+            value_col="c_o2inh2",
+            yaxis_title="O2 in H2 [ppm]",
+            hover_label="O2 in H2 [ppm]",
+            yaxis_range=o2inh2_y_range,
             theme=theme,
-            uirevision=uirevision,
-            margin_bottom=20,
+            uirevision=f"{uirevision}-c_o2_inh2",
+            selected_order_ids=normalized_order_ids,
+            margin_bottom=0,
+            target_line_function=_o2_in_h2_target_line,
+            target_line_name="O2 in H2 target line",
+            x_range=x_range,
+            reset_autorange=reset_autorange,
         )
-        return ucell_fig, conco2h2_fig, conch2o2_fig
-
-    clientside_callback(
-        f"""
-        function(uRelayout, oRelayout, hRelayout, uFigure, oFigure, hFigure) {{
-            const triggered = window.dash_clientside.callback_context.triggered;
-            if (!triggered || !triggered.length) {{
-                return [
-                    window.dash_clientside.no_update,
-                    window.dash_clientside.no_update,
-                    window.dash_clientside.no_update
-                ];
-            }}
-
-            const propId = triggered[0].prop_id || "";
-            if (propId.indexOf("relayoutData") === -1) {{
-                return [
-                    window.dash_clientside.no_update,
-                    window.dash_clientside.no_update,
-                    window.dash_clientside.no_update
-                ];
-            }}
-
-            const relayout = triggered[0].value || {{}};
-            let xRange = null;
-            let resetAutorange = false;
-
-            if (Array.isArray(relayout["xaxis.range"]) && relayout["xaxis.range"].length === 2) {{
-                xRange = relayout["xaxis.range"];
-            }} else if (relayout["xaxis.range[0]"] !== undefined && relayout["xaxis.range[1]"] !== undefined) {{
-                xRange = [relayout["xaxis.range[0]"], relayout["xaxis.range[1]"]];
-            }} else if (relayout["xaxis.autorange"] === true) {{
-                resetAutorange = true;
-            }}
-
-            if (!xRange && !resetAutorange) {{
-                return [
-                    window.dash_clientside.no_update,
-                    window.dash_clientside.no_update,
-                    window.dash_clientside.no_update
-                ];
-            }}
-
-            function syncFigure(fig) {{
-                if (!fig) {{
-                    return window.dash_clientside.no_update;
-                }}
-
-                const nextFig = JSON.parse(JSON.stringify(fig));
-                nextFig.layout = nextFig.layout || {{}};
-                nextFig.layout.xaxis = nextFig.layout.xaxis || {{}};
-
-                if (xRange) {{
-                    nextFig.layout.xaxis.range = xRange;
-                    nextFig.layout.xaxis.autorange = false;
-                }} else {{
-                    delete nextFig.layout.xaxis.range;
-                    nextFig.layout.xaxis.autorange = true;
-                }}
-
-                return nextFig;
-            }}
-
-            return [syncFigure(uFigure), syncFigure(oFigure), syncFigure(hFigure)];
-        }}
-        """,
-        Output(f"{ns}-trackrecord-uCell-plot", "figure", allow_duplicate=True),
-        Output(f"{ns}-trackrecord-concO2H2-plot", "figure", allow_duplicate=True),
-        Output(f"{ns}-trackrecord-concH2O2-plot", "figure", allow_duplicate=True),
-        Input(f"{ns}-trackrecord-uCell-plot", "relayoutData"),
-        Input(f"{ns}-trackrecord-concO2H2-plot", "relayoutData"),
-        Input(f"{ns}-trackrecord-concH2O2-plot", "relayoutData"),
-        State(f"{ns}-trackrecord-uCell-plot", "figure"),
-        State(f"{ns}-trackrecord-concO2H2-plot", "figure"),
-        State(f"{ns}-trackrecord-concH2O2-plot", "figure"),
-        prevent_initial_call=True,
-    )
+        return ucell_fig, h2_in_o2_fig, o2_in_h2_fig
 
     return layout

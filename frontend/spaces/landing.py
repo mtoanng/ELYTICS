@@ -13,7 +13,7 @@ SPACE_INFO = {
     "sherlock": {
         "title": "Sherlock",
         "subtitle": "asTested",
-        "description": "Single platform for all internal external testing data.",
+        "description": "Single platform for all internal and external testing data.",
         "version": None,
         "color": "blue",
         "icon": "tabler:flask",
@@ -21,15 +21,15 @@ SPACE_INFO = {
     "watson": {
         "title": "Watson",
         "subtitle": "asOperated",
-        "description": "Single platform for all customer related data analysis.",
+        "description": "Single platform for all customer operated stack related data analysis.",
         "version": None,
         "color": "cyan",
-        "icon": "tabler:shopping-bag-check",
+        "icon": "tabler:world-cog",
     },
     "mycroft": {
         "title": "Mycroft",
         "subtitle": "asProduced",
-        "description": "Single platform for manufacturing data analysis.",
+        "description": "Single platform for manufacturing and production data analysis.",
         "version": None,
         "color": "grape",
         "icon": "tabler:building-factory-2",
