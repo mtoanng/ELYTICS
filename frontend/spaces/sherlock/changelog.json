@@ -9,6 +9,11 @@
       "pr": 935,
       "title": "feat(sherlock): Migrated to Data Model 4.0",
       "date": "2026-06-18"
+    },
+    {
+      "pr": 966,
+      "title": "fix(sherlock): updated track record page",
+      "date": "2026-06-18"
     }
   ],
   "releases": {
