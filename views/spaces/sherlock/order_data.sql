@@ -31,7 +31,7 @@ SELECT
   s.vf_an_in_max,
   t.mf_h2_max
 FROM
-  ps_xplatform_prod.pemely_ops.gold_order o
+  (SELECT * EXCEPT (testrig_id), EXPLODE(testrig_id) AS testrig_id FROM ps_xplatform_prod.pemely_ops.gold_order) o
     LEFT JOIN ps_xplatform_prod.pemely_ops.gold_sample samp
       ON o.sample_id = samp.sample_id
     INNER JOIN (
@@ -124,7 +124,7 @@ SELECT
         order_id,
         count(event_id) as polcurve_count
       FROM
-        ps_xplatform_dev.pemely_ops.vav1tb_gold_event
+        ps_xplatform_prod.pemely_ops.gold_event
       WHERE
         event_type = 'ivcurve'
       GROUP BY

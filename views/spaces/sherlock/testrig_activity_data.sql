@@ -50,7 +50,7 @@ joined AS (
     b.vf_an_in
   FROM
     base_ts b
-      INNER JOIN ps_xplatform_prod.pemely_ops.gold_order o
+      INNER JOIN (SELECT * EXCEPT (testrig_id), EXPLODE(testrig_id) AS testrig_id FROM ps_xplatform_prod.pemely_ops.gold_order) o
         ON b.order_id = o.order_id
       LEFT JOIN ps_xplatform_prod.pemely_dev.silver_dim_testrig tr
         ON o.testrig_id = tr.testrig_id

@@ -14,7 +14,7 @@ WITH base AS (
     tr.location AS raw_location
   FROM
     ps_xplatform_prod.pemely_ops.gold_timeseries_1h ts
-      INNER JOIN ps_xplatform_prod.pemely_ops.gold_order o
+      INNER JOIN (SELECT * EXCEPT (testrig_id), EXPLODE(testrig_id) AS testrig_id FROM ps_xplatform_prod.pemely_ops.gold_order) o
         ON ts.order_id = o.order_id
       LEFT JOIN ps_xplatform_prod.pemely_dev.silver_dim_testrig tr
         ON o.testrig_id = tr.testrig_id

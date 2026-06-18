@@ -41,10 +41,9 @@ BASE_ORDER_COLUMNS = [
     ("# cells", "number_of_cells", "numeric"),
     ("Testrig ID", "testrig_id", "numeric"),
     ("Short Description", "short_description", "text"),
-    ("Total [hr]", "time_total", "numeric"),
-    ("Test [hr]", "timeFacTest", "numeric"),
-    ("Run [hr]", "timeFacRun", "numeric"),
-    ("start count", "startCnt", "numeric"),
+    ("Test [hr]", "time_test", "numeric"),
+    ("Run [hr]", "time_run", "numeric"),
+    ("start count", "start_count", "numeric"),
     ("polcurve count", "polcurve_count", "numeric"),
 ]
 
@@ -63,7 +62,7 @@ SAMPLE_DETAIL_COLUMNS = [
 
 MAX_GROUP_COLUMNS = [
     (get_signal_title("j"), "j_max", "j"),
-    (get_signal_title("u_cell_avg"), "u_cell_avg_max", "u_cell_avg"),
+    (get_signal_title("u_cell_avg"), "u_cell_max", "u_cell_avg"),
     (get_signal_title("t_an_in"), "t_an_in_max", "t_an_in"),
     (get_signal_title("t_an_out"), "t_an_out_max", "t_an_out"),
     (get_signal_title("p_cat_out"), "p_cat_out_max", "p_cat_out"),
@@ -438,6 +437,7 @@ layout = order_overview_layout
 def load_order_data(_):
     # Order data now includes joined sample fields for cross-page consistency.
     df = get_tabular('sherlock', "order")
+    print(df.columns)
     if df.empty:
         return []
 

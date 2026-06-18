@@ -48,7 +48,7 @@ SELECT
   ) AS testrig_label
 FROM
   ps_xplatform_prod.pemely_ops.gold_timeseries_1h TS
-    LEFT JOIN ps_xplatform_prod.pemely_ops.gold_order ORDR
+    LEFT JOIN (SELECT * EXCEPT (testrig_id), EXPLODE(testrig_id) AS testrig_id FROM ps_xplatform_prod.pemely_ops.gold_order) ORDR
       ON TS.order_id = ORDR.order_id
     LEFT JOIN ps_xplatform_prod.pemely_ops.gold_sample SAMP
       ON ORDR.sample_id = SAMP.sample_id

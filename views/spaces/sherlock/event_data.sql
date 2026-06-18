@@ -3,4 +3,4 @@ SELECT
   event_type,
   start,
   end
-FROM ps_xplatform_dev.pemely_ops.vav1tb_gold_event
+FROM ps_xplatform_prod.pemely_ops.gold_event

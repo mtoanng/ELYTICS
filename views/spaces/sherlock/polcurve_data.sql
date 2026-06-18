@@ -25,13 +25,13 @@ event_selected AS (
     end,
     event_subtype
   FROM
-    ps_xplatform_dev.pemely_ops.vav1tb_gold_event
+    ps_xplatform_prod.pemely_ops.gold_event
   WHERE event_type = 'ivcurve'
 ),
 order_selected AS (
   SELECT
     order_id,
-    testrig_id,
+    EXPLODE(testrig_id) AS testrig_id,
     number_of_cells,
     active_area_per_cell,
     sample_name
