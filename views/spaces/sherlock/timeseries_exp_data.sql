@@ -1,5 +1,4 @@
 SELECT
-  o.testrig_id,
   o.sample_name,
   o.number_of_cells,
   ts.*
