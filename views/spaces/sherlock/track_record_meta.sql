@@ -4,7 +4,7 @@ WITH runtime_per_sample AS (
     MAX(o.sample_type) AS sample_type,
     MAX(o.sample_state) AS sample_state,
     CONCAT(MAX(o.sample_type), ' - ', MAX(o.sample_state)) AS sample_type_state,
-    ceil(hr.calc.time_run) AS run_hours,
+    ceil(MAX(hr.calc.time_run)) AS run_hours,
     MAX(o.number_of_cells) AS number_of_cells
   FROM
     ps_xplatform_prod.pemely_ops.gold_timeseries_1h hr
