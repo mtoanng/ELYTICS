@@ -1,5 +1,11 @@
 {
-  "unreleased": [],
+  "unreleased": [
+    {
+      "pr": 954,
+      "title": "fix(sherlock): update SoH to latest standard",
+      "date": "2026-06-16"
+    }
+  ],
   "releases": {
     "1.0.0": [
       {

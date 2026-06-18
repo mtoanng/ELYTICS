@@ -27,7 +27,8 @@ joined AS (
       WHEN lower(tr.location) LIKE '%bap%' THEN 'BaP'
       WHEN lower(tr.location) LIKE '%rng%' THEN 'RnG'
       WHEN lower(tr.location) LIKE '%tbp%' THEN 'TbP'
-      WHEN lower(tr.location) IN ('avl', 'liz', 'kst', 'hycenta', 'fz j') THEN 'External'
+      WHEN lower(tr.location) IN ('avl', 'liz', 'kst', 'hycenta') THEN 'External'
+      WHEN lower(tr.location) LIKE 'fz j%' THEN 'External'
       ELSE tr.location
     END AS testrig_location,
     CONCAT(
@@ -37,7 +38,8 @@ joined AS (
         WHEN lower(tr.location) LIKE '%bap%' THEN 'BaP'
         WHEN lower(tr.location) LIKE '%rng%' THEN 'RnG'
         WHEN lower(tr.location) LIKE '%tbp%' THEN 'TbP'
-        WHEN lower(tr.location) IN ('avl', 'liz', 'kst', 'hycenta', 'fz j') THEN 'External'
+        WHEN lower(tr.location) IN ('avl', 'liz', 'kst', 'hycenta') THEN 'External'
+        WHEN lower(tr.location) LIKE 'fz j%' THEN 'External'
         ELSE tr.location
       END
     ) AS testrig_label,

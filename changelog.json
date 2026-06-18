@@ -4,6 +4,11 @@
       "pr": 940,
       "title": "fix(sherlock): Polcurve explorer filters",
       "date": "2026-06-08"
+    },
+    {
+      "pr": 954,
+      "title": "fix(sherlock): update SoH to latest standard",
+      "date": "2026-06-16"
     }
   ],
   "releases": {
