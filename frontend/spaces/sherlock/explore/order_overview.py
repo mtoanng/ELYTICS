@@ -17,6 +17,7 @@ from dash.exceptions import PreventUpdate
 from typing import Any
 from dash_iconify import DashIconify
 
+from config.signals import get_signal_title
 from services.backend_service import get_tabular
 
 register_page(
@@ -40,10 +41,9 @@ BASE_ORDER_COLUMNS = [
     ("# cells", "number_of_cells", "numeric"),
     ("Testrig ID", "testrig_id", "numeric"),
     ("Short Description", "short_description", "text"),
-    ("Total [hr]", "time_total", "numeric"),
-    ("Test [hr]", "timeFacTest", "numeric"),
-    ("Run [hr]", "timeFacRun", "numeric"),
-    ("start count", "startCnt", "numeric"),
+    ("Test [hr]", "time_test", "numeric"),
+    ("Run [hr]", "time_run", "numeric"),
+    ("start count", "start_count", "numeric"),
     ("polcurve count", "polcurve_count", "numeric"),
 ]
 
@@ -61,14 +61,14 @@ SAMPLE_DETAIL_COLUMNS = [
 ]
 
 MAX_GROUP_COLUMNS = [
-    ("jStack", "jStack_max"),
-    ("uCell", "uCell_max"),
-    ("tAndeIn", "tAndeIn_max"),
-    ("tAndeOut", "tAndeOut_max"),
-    ("pCtdeOut", "pCtdeOut_max"),
-    ("pAndeIn", "pAndeIn_max"),
-    ("vfAndeIn", "vfAndeIn_max"),
-    ("mfH2Out", "maxh2out"),
+    (get_signal_title("j"), "j_max", "j"),
+    (get_signal_title("u_cell_avg"), "u_cell_max", "u_cell_avg"),
+    (get_signal_title("t_an_in"), "t_an_in_max", "t_an_in"),
+    (get_signal_title("t_an_out"), "t_an_out_max", "t_an_out"),
+    (get_signal_title("p_cat_out"), "p_cat_out_max", "p_cat_out"),
+    (get_signal_title("p_an_in"), "p_an_in_max", "p_an_in"),
+    (get_signal_title("vf_an_in"), "vf_an_in_max", "vf_an_in"),
+    (get_signal_title("mf_h2"), "mf_h2_max", "mf_h2"),
 ]
 
 
@@ -91,7 +91,7 @@ ORDER_COLUMN_SECTION_OPTIONS = [
         "group": "Maximum values",
         "items": [
             {"value": field, "label": header}
-            for header, field in MAX_GROUP_COLUMNS
+            for header, field, _ in MAX_GROUP_COLUMNS
         ],
     },
 ]
@@ -137,7 +137,7 @@ def build_order_column_defs(selected_fields: set[str] | None = None):
             "type": "numeric",
             "columnGroupShow": "open" if idx >= 2 else None,
         }
-        for idx, (header, field) in enumerate(MAX_GROUP_COLUMNS)
+        for idx, (header, field, _) in enumerate(MAX_GROUP_COLUMNS)
     ]
     # Drop None values so AG Grid receives a clean config.
     for child in max_children:
@@ -437,10 +437,12 @@ layout = order_overview_layout
 def load_order_data(_):
     # Order data now includes joined sample fields for cross-page consistency.
     df = get_tabular('sherlock', "order")
+    print(df.columns)
     if df.empty:
         return []
+
     # Round all _max columns and maxh2out to 2 decimals
-    max_cols = [col for col in df.columns if col.endswith('_max')] + (["maxh2out"] if "maxh2out" in df.columns else [])
+    max_cols = [col for col in df.columns if col.endswith('_max')]
     if max_cols:
         df[max_cols] = df[max_cols].round(2)
     return df.to_dict("records")

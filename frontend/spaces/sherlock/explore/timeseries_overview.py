@@ -17,6 +17,10 @@ import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
+from config.signals import (
+    get_signal_title,
+    get_signal_unit,
+)
 from services.backend_service import get_metadata, get_tabular, get_timeseries
 
 register_page(
@@ -56,113 +60,45 @@ _GRAPH_WRAPPER_STYLE_LOADING = {
     "overflow": "visible",
 }
 
-SIGNAL_META = {
-    "jStck": ("Current Density", "A/cm^2"),
-    "uStck": ("Stack Voltage", "V"),
-    "pAndeIn": ("Anode Pressure In", "bar"),
-    "pAndeOut": ("Anode Pressure Out", "bar"),
-    "mfH2Out": ("H2 Mass Flow Out", "kg/s"),
-    "tAndeIn": ("Anode Temp In", "degC"),
-    "tAndeOut": ("Anode Temp Out", "degC"),
-}
-
-EXTRA_SIGNALS = [
-    "cndAndeIn",
-    "cndAndeOut",
-    "cndCtdeIn",
-    "cndCtdeOut",
-    "concH2O2",
-    "concH2StckAmb",
-    "concO2H2",
-    "iStckSp",
-    "mfO2Out",
-    "pAndeOutSp",
-    "pCtdeIn",
-    "pCtdeOut",
-    "pCtdeOutSp",
-    "tAmb",
-    "tAndeInSp",
-    "tCtdeIn",
-    "tCtdeOut",
-    "vfAndeIn",
-    "vfAndeInSp",
-    "vfAndeOut",
-    "vfCtdeIn",
-    "vfCtdeInSp",
-    "iStck",
-    "uCell",
+DEFAULT_SIGNALS = [
+    "j",
+    "u",
+    "p_an_in",
+    "p_an_out",
+    "mf_h2",
+    "t_an_in",
+    "t_an_out",
 ]
 
-SENSOR_TITLES = {
-    "iStck": "Stack Current (iStck)",
-    "iStckSp": "Stack Current Setpoint (iStckSp)",
-    "jStck": "Current Density (jStck)",
-    "uStck": "Stack Voltage (uStck)",
-    "uCell": "Cell Voltage (uCell)",
-    "pAndeIn": "Anode Inlet Pressure (pAndeIn)",
-    "pAndeOut": "Anode Outlet Pressure (pAndeOut)",
-    "pAndeOutSp": "Anode Outlet Pressure Setpoint (pAndeOutSp)",
-    "pCtdeIn": "Cathode Inlet Pressure (pCtdeIn)",
-    "pCtdeOut": "Cathode Outlet Pressure (pCtdeOut)",
-    "pCtdeOutSp": "Cathode Outlet Pressure Setpoint (pCtdeOutSp)",
-    "tAmb": "Ambient Temperature (tAmb)",
-    "tAndeIn": "Anode Inlet Temperature (tAndeIn)",
-    "tAndeInSp": "Anode Inlet Temperature Setpoint (tAndeInSp)",
-    "tAndeOut": "Anode Outlet Temperature (tAndeOut)",
-    "tCtdeIn": "Cathode Inlet Temperature (tCtdeIn)",
-    "tCtdeOut": "Cathode Outlet Temperature (tCtdeOut)",
-    "vfAndeIn": "Anode Inlet Volume Flow (vfAndeIn)",
-    "vfAndeInSp": "Anode Inlet Volume Flow Setpoint (vfAndeInSp)",
-    "vfAndeOut": "Anode Outlet Volume Flow (vfAndeOut)",
-    "vfCtdeIn": "Cathode Inlet Volume Flow (vfCtdeIn)",
-    "vfCtdeInSp": "Cathode Inlet Volume Flow Setpoint (vfCtdeInSp)",
-    "mfH2Out": "Hydrogen Outlet Mass Flow (mfH2Out)",
-    "mfO2Out": "Oxygen Outlet Mass Flow (mfO2Out)",
-    "cndAndeIn": "Anode Inlet Conductivity (cndAndeIn)",
-    "cndAndeOut": "Anode Outlet Conductivity (cndAndeOut)",
-    "cndCtdeIn": "Cathode Inlet Conductivity (cndCtdeIn)",
-    "cndCtdeOut": "Cathode Outlet Conductivity (cndCtdeOut)",
-    "concH2O2": "Hydrogen concentration in Oxygen (concH2O2)",
-    "concH2StckAmb": "Hydrogen Stack Ambient Concentration (concH2StckAmb)",
-    "concO2H2": "Oxygen in Hydrogen Concentration (concO2H2)",
-}
-
-SENSOR_UNITS = {
-    "iStck": "A",
-    "iStckSp": "A",
-    "jStck": "A/cm^2",
-    "uStck": "V",
-    "uCell": "V",
-    "pAndeIn": "bar",
-    "pAndeOut": "bar",
-    "pAndeOutSp": "bar",
-    "pCtdeIn": "bar",
-    "pCtdeOut": "bar",
-    "pCtdeOutSp": "bar",
-    "tAmb": "degC",
-    "tAndeIn": "degC",
-    "tAndeInSp": "degC",
-    "tAndeOut": "degC",
-    "tCtdeIn": "degC",
-    "tCtdeOut": "degC",
-    "vfAndeIn": "L/min",
-    "vfAndeInSp": "L/min",
-    "vfAndeOut": "L/min",
-    "vfCtdeIn": "L/min",
-    "vfCtdeInSp": "L/min",
-    "mfH2Out": "kg/s",
-    "mfO2Out": "kg/s",
-    "cndAndeIn": "uS/cm",
-    "cndAndeOut": "uS/cm",
-    "cndCtdeIn": "uS/cm",
-    "cndCtdeOut": "uS/cm",
-    "concH2O2": "%",
-    "concH2StckAmb": "%",
-    "concO2H2": "%",
-}
+EXTRA_SIGNALS = [
+    "cond_an_in",
+    "cond_an_out",
+    "cond_cat_in",
+    "cond_cat_out",
+    "c_h2ino2",
+    "c_amb_h2",
+    "c_o2inh2",
+    "i_set",
+    "mf_o2",
+    "p_an_out_set",
+    "p_cat_in",
+    "p_cat_out",
+    "p_cat_out_set",
+    "t_amb",
+    "t_an_in_set",
+    "t_cat_in",
+    "t_cat_out",
+    "vf_an_in",
+    "vf_an_in_set",
+    "vf_an_out",
+    "vf_cat_in",
+    "vf_cat_in_set",
+    "i",
+    "u_cell_avg",
+]
 
 DEFAULT_SENSOR_NAMES = [
-    f"{label} ({key})" for key, (label, _unit) in SIGNAL_META.items()
+    get_signal_title(signal_name) for signal_name in DEFAULT_SIGNALS
 ]
 
 USAGE_BLOCKQUOTE_TEXT = [
@@ -204,6 +140,9 @@ def _empty_figure(
 
 def _to_options(values: list) -> list[dict]:
     return [{"label": str(v), "value": v} for v in values]
+
+def _to_signal_options(values: list[str]) -> list[dict]:
+    return [{"label": get_signal_title(v), "value": v} for v in values]
 
 
 def _normalize_cell_value(value) -> str | None:
@@ -561,13 +500,13 @@ def _build_plot_groups(
 ) -> list[tuple[str, str, list[str]]]:
     if plot_mode != "stacked":
         return [
-            (SENSOR_TITLES.get(signal, signal), SENSOR_UNITS.get(signal, ""), [signal])
+            (get_signal_title(signal), get_signal_unit(signal), [signal])
             for signal in signals
         ]
 
     grouped: dict[str, list[str]] = {}
     for signal in signals:
-        unit = SENSOR_UNITS.get(signal, "value")
+        unit = get_signal_unit(signal) or "value"
         grouped.setdefault(unit, []).append(signal)
 
     return [(f"{unit} signals", unit, grouped[unit]) for unit in grouped]
@@ -716,7 +655,7 @@ def _build_figure(
         for signal in group_signals:
             color = _PLOT_COLORS[color_index % len(_PLOT_COLORS)]
             color_index += 1
-            signal_title = SENSOR_TITLES.get(signal, signal)
+            signal_title = get_signal_title(signal)
             signal_added = False
 
             if metric == "all":
@@ -937,14 +876,13 @@ def _build_normalized_figure(
                 x=x_with_gaps,
                 y=norm_with_gaps,
                 mode="lines",
-                name=SENSOR_TITLES.get(signal, signal),
+                name=get_signal_title(signal),
                 line=dict(width=1.8, color=color),
                 showlegend=True,
                 customdata=event_labels_with_gaps,
                 hovertemplate=(
-                    "%{x}<br>%{y:.4f}<br>%{customdata}<extra>" + SENSOR_TITLES.get(signal, signal) + "</extra>"
-                    if include_events
-                    else "%{x}<br>%{y:.4f}<extra>" + SENSOR_TITLES.get(signal, signal) + "</extra>"
+                    "%{x}<br>%{y:.4f}<br>"
+                    "%{customdata}<extra>" + get_signal_title(signal) + "</extra>"
                 ),
             )
         )
@@ -1184,7 +1122,7 @@ def timeseries_overview_layout():
                                                     dmc.InputWrapper(
                                                         dcc.Dropdown(
                                                             id="timeseries-extra-signals",
-                                                            options=_to_options(EXTRA_SIGNALS),
+                                                            options=_to_signal_options(EXTRA_SIGNALS),
                                                             value=[],
                                                             multi=True,
                                                             clearable=True,
@@ -1753,7 +1691,8 @@ def load_timeseries_data(
             "viewport": viewport or {"start": None, "end": None},
         }
 
-    signals = list(SIGNAL_META.keys()) + (extra_signals or [])
+    requested_signals = DEFAULT_SIGNALS + (extra_signals or [])
+    signals = list(dict.fromkeys(requested_signals))
 
     viewport = viewport or {"start": None, "end": None}
     start_value = viewport.get("start")

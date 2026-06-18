@@ -63,4 +63,4 @@ SELECT
 FROM
   ranked r
     LEFT JOIN sample_metadata m
-      ON r.sample_name = m.sample_name
+      ON r.sample_name = m.sample_name;

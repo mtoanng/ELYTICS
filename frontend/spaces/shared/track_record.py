@@ -14,6 +14,11 @@ import pandas as pd
 import numpy as np
 from typing import Callable, List
 
+from config.signals import (
+    get_signal_label,
+    get_signal_title,
+    get_signal_unit,
+)
 from services.backend_service import get_metadata, get_tabular
 
 FILTER_WRAPPER_STYLE = {"flex": "1 1 0", "minWidth": "220px"}
@@ -48,8 +53,8 @@ PLOT_HOVER_COLS = [
 ]
 
 USAGE_BLOCKQUOTE_TEXT = [
-    "The top chart shows total runtime for GEN 1 Proto 1 stacks.",
-    "Each bar corresponds to one sample.",
+    "The top chart shows total runtime for GEN 1 Proto 1 stacks from column run_hours.",
+    "Each bar corresponds to one sample_name.",
     "Hover on a bar to inspect runtime and stack metadata.",
     "Select a sample name from the filter or by clicking on the plot bars to load detailed data shown below.",
     "NOTE: Current in-depth plots show the full timeseries (1hr) data. The conditioning events are not yet available in the data sources.",
@@ -484,7 +489,7 @@ def create_track_record_page(ns: str):
                                 ],
                             ),
                             dmc.Text(
-                                "Total runtime for GEN 1 Proto 1 stacks by sample name (based on cloud data).",
+                                "Total runtime for GEN 1 Proto 1 stacks by sample name (based on cloud data)",
                                 c="dimmed",
                             ),
                             dmc.Collapse(
@@ -853,6 +858,11 @@ def create_track_record_page(ns: str):
             return []
 
         df = _ensure_columns(df, DETAIL_COLS)
+        sort_candidates = ["runtime_hour", "hours_run", "run_hours"]
+        sort_col = next((col for col in sort_candidates if col in df.columns), None)
+        if sort_col:
+            df[sort_col] = pd.to_numeric(df[sort_col], errors="coerce")
+            df = df.sort_values(sort_col, ascending=True, na_position="last")
         return df.to_dict("records")
 
     @callback(

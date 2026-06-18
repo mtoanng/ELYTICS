@@ -4,15 +4,16 @@ WITH event_selected AS (
     order_id,
     start
   FROM
-    ps_xplatform_dev.pemely_ops.gold_polarization_event
+    ps_xplatform_prod.pemely_ops.gold_event
+  WHERE event_type = 'ivcurve'
 ),
 order_selected AS (
   SELECT
     order_id,
-    testrig_id,
+    EXPLODE(testrig_id) AS testrig_id,
     sample_name
   FROM
-    ps_xplatform_dev.pemely_ops.gold_genericstack_order
+    ps_xplatform_prod.pemely_ops.gold_order
 )
 SELECT
   o.order_id,
