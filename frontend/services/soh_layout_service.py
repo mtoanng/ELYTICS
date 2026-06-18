@@ -5,6 +5,7 @@ Layout helpers and UI constants for the Sherlock SOH page.
 from __future__ import annotations
 
 import pandas as pd
+from config.signals import get_signal_title
 
 
 IS_RISING_OPTIONS = [

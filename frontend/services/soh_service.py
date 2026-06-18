@@ -9,6 +9,11 @@ import plotly.graph_objs as go
 import plotly.express as px
 from plotly.subplots import make_subplots
 import dash
+from config.signals import (
+    get_signal_label,
+    get_signal_title,
+    get_signal_unit,
+)
 
 LIGHT_CELL_COLORS = [
     "#3498db", "#e74c3c", "#07b750", "#2807e3", "#b106cf",
@@ -1525,16 +1530,17 @@ def create_colored_soh_plot(df_soh, dff, xaxis_col, color_by, theme_data, sample
         add_binned_traces(fig_colored_soh, dff, "soh_lin_stack", color_bins, fit_colors, color_label_name, 2, "linear", xaxis_col, False, label_col="color_bin_label")
 
     else:
-        color_col = color_by if color_by else "tAndeIn"
-        is_pressure = (color_col == "pCtdeOut")
+        selected_color = color_by if color_by else "t_an_in"
+        color_col = selected_color if selected_color in dff.columns else None
+        is_pressure = selected_color == "p_cat_out"
         is_updown = (color_col == "is_rising")
-        
+
         color_label_map = {
-            "tAndeIn": "Anode Inlet Temperature (tAndeIn)",
-            "pCtdeOut": "Cathode Outlet Pressure (pCtdeOut)",
+            "t_an_in": get_signal_title("t_an_in"),
+            "p_cat_out": get_signal_title("p_cat_out"),
             "is_rising": "Up/Down Pol Curve (is_rising)",
         }
-        color_label_name = color_label_map.get(color_col, color_col)
+        color_label_name = color_label_map.get(selected_color, selected_color)
 
         if is_updown and "is_rising" in dff.columns:
             dff["color_bin"] = dff["is_rising"].map({True: "Up", False: "Down"})
@@ -1647,14 +1653,15 @@ def compute_ageing_rate_subtitle(dff, iv_0, iv_1, rt_0, rt_1):
 
 def create_load_cycle_plots(dff, theme_data, sample_name, slider_value, valid_ivs):
     plotly_template = get_plotly_template(theme_data)
+    subplot_signals = ["j", "u_cell_avg", "t_an_in", "p_cat_out", "vf_an_in", "p_an_out"]
     fig = make_subplots(
         rows=2, cols=3,
         row_heights=[0.5, 0.5],
         vertical_spacing=0.16,
         horizontal_spacing=0.08,
-        subplot_titles=(
-            "Current Density [A/cm²]", "Cell Voltage [V]", "Temperature [°C]",
-            "Cathode Pressure Out [bar]", "Water Inflow [l/min]", "Anode Pressure Out [bar]",
+        subplot_titles=tuple(
+            f"{get_signal_label(signal)} [{get_signal_unit(signal)}]"
+            for signal in subplot_signals
         ),
     )
 
@@ -1692,16 +1699,18 @@ def create_load_cycle_plots(dff, theme_data, sample_name, slider_value, valid_iv
 
     hist_color = "#3498db"
     hist_configs = [
-        ("jStck",    1, 1),
-        ("uCellAvg", 1, 2),
-        ("tAndeIn",  1, 3),
-        ("pCtdeOut", 2, 1),
-        ("vfAndeIn", 2, 2),
-        ("pAndeOut", 2, 3),
+        ("j", 1, 1),
+        ("u_cell_avg", 1, 2),
+        ("t_an_in", 1, 3),
+        ("p_cat_out", 2, 1),
+        ("vf_an_in", 2, 2),
+        ("p_an_out", 2, 3),
     ]
 
-    for col_name, row, col in hist_configs:
-        if col_name not in df_range.columns:
+    for signal_name, row, col in hist_configs:
+        col_name = signal_name if signal_name in df_range.columns else None
+        signal_title = get_signal_title(signal_name)
+        if not col_name:
             subplot_idx = (row - 1) * 3 + col
             fig.add_annotation(
                 text="No data", showarrow=False,
@@ -1728,7 +1737,7 @@ def create_load_cycle_plots(dff, theme_data, sample_name, slider_value, valid_iv
                     marker_color=hist_color,
                     opacity=0.8,
                     showlegend=False,
-                    hovertemplate=f"<b>{col_name}</b>: %{{x:.3f}}<br>Count: %{{y}}<extra></extra>",
+                    hovertemplate=f"<b>{signal_title}</b>: %{{x:.3f}}<br>Count: %{{y}}<extra></extra>",
                 ),
                 row=row, col=col,
             )
