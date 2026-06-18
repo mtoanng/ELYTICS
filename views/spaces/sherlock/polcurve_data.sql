@@ -77,7 +77,8 @@ SELECT
   esp.temp_set_avg AS tSp, -- constant per event_id
   esp.p_cat_out_avg_5 AS pCtSp, -- new column: avg p_cat_out rounded to nearest 5
   COALESCE(e.event_id, 'not part of a pol curve') AS event_id,
-  e.event_subtype
+  e.event_subtype,
+  CASE WHEN e.event_subtype = 'up' THEN true ELSE false END AS is_rising
 FROM
   static_selected s
     INNER JOIN event_selected e
