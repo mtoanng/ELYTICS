@@ -4,6 +4,11 @@
       "pr": 954,
       "title": "fix(sherlock): update SoH to latest standard",
       "date": "2026-06-16"
+    },
+    {
+      "pr": 935,
+      "title": "feat(sherlock): Migrated to Data Model 4.0",
+      "date": "2026-06-18"
     }
   ],
   "releases": {
