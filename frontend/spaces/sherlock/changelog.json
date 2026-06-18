@@ -19,6 +19,11 @@
       "pr": 977,
       "title": "fix(sherlock): Fixed bad timeseries query",
       "date": "2026-06-18"
+    },
+    {
+      "pr": 978,
+      "title": "fix(sherlock): Fixed DM4 query bugs",
+      "date": "2026-06-18"
     }
   ],
   "releases": {
