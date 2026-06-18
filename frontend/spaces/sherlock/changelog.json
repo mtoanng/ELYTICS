@@ -14,6 +14,11 @@
       "pr": 966,
       "title": "fix(sherlock): updated track record page",
       "date": "2026-06-18"
+    },
+    {
+      "pr": 977,
+      "title": "fix(sherlock): Fixed bad timeseries query",
+      "date": "2026-06-18"
     }
   ],
   "releases": {
