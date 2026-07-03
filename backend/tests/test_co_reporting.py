@@ -2,20 +2,14 @@ from fastapi.testclient import TestClient
 import pytest
 
 from backend.main import app
-from backend.services.auth import verify_oidc_token
 import backend.routers.co_reporting as co_reporting_router
 import backend.services.co_reporting as co_reporting_service
 
 
 @pytest.fixture
 def client():
-    app.dependency_overrides[verify_oidc_token] = lambda: {
-        "groups": ["IdM2BCD_holmes_pemely_development"],
-        "email": "test@example.com",
-    }
     with TestClient(app) as test_client:
         yield test_client
-    app.dependency_overrides.clear()
 
 
 def test_co_reporting_query_endpoint_returns_windowed_payload(client, monkeypatch):
@@ -80,7 +74,7 @@ def test_co_reporting_query_requires_channels(client):
     assert response.status_code == 422
 
 
-def test_co_reporting_channel_query_uses_full_gold_identity(monkeypatch):
+def test_co_reporting_channel_query_uses_experiment_identity(monkeypatch):
     captured = {}
 
     def fake_cache_get_or_query(key_prefix, query, source_name, **key_parts):
@@ -104,8 +98,8 @@ def test_co_reporting_channel_query_uses_full_gold_identity(monkeypatch):
     assert "FROM ps_xplatform_dev.co2elyd_dev.gold_channel_catalog_experiment" in query
     assert "series = 'PoC Stack VI'" in query
     assert "experiment_id = 42" in query
-    assert "uuid = 'run-uuid-001'" in query
-    assert "`group` = 'Conditioning'" in query
+    assert "uuid = 'run-uuid-001'" not in query
+    assert "`group` = 'Conditioning'" not in query
     assert "std_channel AS channel_name" in query
 
 
@@ -137,7 +131,8 @@ def test_co_reporting_window_query_can_use_uuid_group_identity(monkeypatch):
     assert captured["key_prefix"] == "co_reporting_query"
     assert "FROM ps_xplatform_dev.co2elyd_dev.gold_timeseries" in query
     assert "series = 'PoC Stack VI'" in query
-    assert "experiment_id =" not in query
+    assert "experiment_id IN" in query
+    assert "FROM ps_xplatform_dev.co2elyd_dev.gold_experiment_index" in query
     assert "uuid = 'run-uuid-001'" in query
     assert "`group` = 'Conditioning'" in query
     assert "std_channel IN ('Stack Voltage')" in query
@@ -156,3 +151,31 @@ def test_co_reporting_query_rejects_missing_identity():
             visible_start_s=0,
             visible_end_s=60,
         )
+
+
+def test_cache_get_or_query_falls_back_when_redis_unavailable(monkeypatch):
+    class BrokenRedis:
+        def get(self, key):
+            raise co_reporting_service.RedisError("redis unavailable")
+
+        def set(self, *args, **kwargs):
+            raise co_reporting_service.RedisError("redis unavailable")
+
+        def sadd(self, *args, **kwargs):
+            raise co_reporting_service.RedisError("redis unavailable")
+
+    monkeypatch.setattr(co_reporting_service, "get_redis_client", lambda: BrokenRedis())
+    monkeypatch.setattr(
+        co_reporting_service,
+        "execute_sql_query",
+        lambda query: [{"elapsed_time_s": 0, "std_channel": "Stack Voltage"}],
+    )
+
+    result = co_reporting_service._cache_get_or_query(
+        "co_reporting_query",
+        "SELECT 1",
+        "gold_timeseries",
+        series="PoC Stack VI",
+    )
+
+    assert result == [{"elapsed_time_s": 0, "std_channel": "Stack Voltage"}]

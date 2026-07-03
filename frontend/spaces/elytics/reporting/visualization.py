@@ -627,10 +627,21 @@ def save_and_open_report(fig, output_file, has_secondary_y=False):
 
 
 def rgb_to_rgba(color, alpha=0.2):
-    """Convert a Plotly RGB color string or common named color to RGBA."""
+    """Convert Plotly RGB, hex, or common named colors to RGBA."""
+    color = str(color).strip()
     if color.startswith('rgb'):
         nums = color[color.find('(')+1:color.find(')')].split(',')
         return f'rgba({nums[0].strip()},{nums[1].strip()},{nums[2].strip()},{alpha})'
+    if color.startswith('#'):
+        hex_value = color.lstrip('#')
+        if len(hex_value) == 3:
+            hex_value = ''.join(ch * 2 for ch in hex_value)
+        if len(hex_value) == 6:
+            try:
+                r, g, b = (int(hex_value[i:i + 2], 16) for i in (0, 2, 4))
+                return f'rgba({r},{g},{b},{alpha})'
+            except ValueError:
+                pass
 
     named_colors = {
         "blue": (0, 0, 255),
@@ -643,7 +654,7 @@ def rgb_to_rgba(color, alpha=0.2):
         "black": (0, 0, 0),
         "white": (255, 255, 255),
     }
-    r, g, b = named_colors.get(str(color).lower(), (31, 119, 180))
+    r, g, b = named_colors.get(color.lower(), (31, 119, 180))
     return f'rgba({r},{g},{b},{alpha})'
 
 def get_range_panel_html():

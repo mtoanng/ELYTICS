@@ -1,7 +1,6 @@
 uvicorn
 gunicorn
 fastapi
-pyjwt
 python-dotenv
 redis
 pandas

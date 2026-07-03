@@ -1,5 +1,14 @@
 ﻿[
   {
+    "name": "All",
+    "internal_key": "All",
+    "y1_cols": [],
+    "y2_cols": [],
+    "labels": {
+      "title": "All"
+    }
+  },
+  {
     "name": "Voltage",
     "internal_key": "Voltage",
     "y1_cols": ["Stack Voltage"],

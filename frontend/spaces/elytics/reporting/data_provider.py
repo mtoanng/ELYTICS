@@ -22,6 +22,12 @@ CONFIG_DIR = BASE_DIR / "config"
 SCHEMA_PATH = CONFIG_DIR / "schema.csv"
 
 DEFAULT_AGGREGATIONS = [1, 15, 60]
+CHANNEL_ALIASES = {
+    "ΔpGas inlet - Gas outlet": "Δp Gas inlet - Gas outlet",
+}
+DERIVED_CHANNEL_DEPENDENCIES = {
+    "Δp Anolyte": ("Anolyte inlet pressure", "Anolyte outlet pressure"),
+}
 
 
 @dataclass(frozen=True)
@@ -86,6 +92,22 @@ class ElyticsDataProvider:
     def _channel_display_name(channel_row: dict) -> str | None:
         return channel_row.get("std_channel") or channel_row.get("channel_name")
 
+    @staticmethod
+    def _canonical_channel_name(column: str) -> str:
+        return CHANNEL_ALIASES.get(column, column)
+
+    @staticmethod
+    def _expand_requested_columns(columns: list[str]) -> list[str]:
+        expanded: list[str] = []
+        for column in columns:
+            canonical_column = ElyticsDataProvider._canonical_channel_name(column)
+            dependencies = DERIVED_CHANNEL_DEPENDENCIES.get(canonical_column)
+            source_columns = dependencies if dependencies is not None else (canonical_column,)
+            for source_column in source_columns:
+                if source_column not in expanded:
+                    expanded.append(source_column)
+        return expanded
+
     def load_timeseries(
         self,
         series: ElyticsSeries,
@@ -95,7 +117,7 @@ class ElyticsDataProvider:
         df = get_co_reporting_timeseries(
             series.series,
             series.experiment_id,
-            channels=columns,
+            channels=self._expand_requested_columns(columns),
             resolution=resolution,
             uuid=series.uuid,
             group=series.group,
@@ -117,7 +139,7 @@ class ElyticsDataProvider:
         df = query_co_reporting_timeseries(
             series.series,
             series.experiment_id,
-            channels=columns,
+            channels=self._expand_requested_columns(columns),
             visible_start_s=visible_start_s,
             visible_end_s=visible_end_s,
             prefetch_margin_s=prefetch_margin_s,
@@ -135,16 +157,53 @@ class ElyticsDataProvider:
         return wide
 
     @staticmethod
+    def _add_derived_columns(df: pd.DataFrame) -> pd.DataFrame:
+        if df.empty:
+            return df
+        df = df.copy()
+        derived_pairs = {
+            "": ("", ""),
+            "_mean": ("_mean", "_mean"),
+            "_min": ("_min", "_max"),
+            "_max": ("_max", "_min"),
+        }
+        for derived, (left, right) in DERIVED_CHANNEL_DEPENDENCIES.items():
+            for target_suffix, (left_suffix, right_suffix) in derived_pairs.items():
+                target = f"{derived}{target_suffix}"
+                left_column = f"{left}{left_suffix}"
+                right_column = f"{right}{right_suffix}"
+                if target not in df.columns and left_column in df.columns and right_column in df.columns:
+                    left_values = pd.to_numeric(df[left_column], errors="coerce")
+                    right_values = pd.to_numeric(df[right_column], errors="coerce")
+                    df[target] = (left_values - right_values).replace([float("inf"), float("-inf")], pd.NA)
+        for alias, canonical in CHANNEL_ALIASES.items():
+            for suffix in ("", "_mean", "_min", "_max"):
+                alias_column = f"{alias}{suffix}"
+                canonical_column = f"{canonical}{suffix}"
+                if alias_column not in df.columns and canonical_column in df.columns:
+                    df[alias_column] = df[canonical_column]
+        return df
+
+    @staticmethod
     def _pivot_timeseries(df: pd.DataFrame, resolution: str) -> pd.DataFrame:
         if df.empty:
             return df
 
         df = df.copy()
-        if "std_channel" in df.columns:
-            df["metric"] = df["std_channel"]
-        else:
-            df["metric"] = df["channel_name"].fillna(df["channel"])
-        index_columns = ["timestamp", "elapsed_time_s"]
+        metric = None
+        for column in ("std_channel", "channel_name", "raw_channel", "channel_id", "channel", "signal_id"):
+            if column in df.columns:
+                values = df[column]
+                metric = values if metric is None else metric.fillna(values)
+        if metric is None:
+            return pd.DataFrame()
+        df["metric"] = metric.astype(str)
+
+        index_columns = ["elapsed_time_s"]
+        timestamps = None
+        if "timestamp" in df.columns:
+            timestamps = df.groupby("elapsed_time_s", dropna=False)["timestamp"].first()
+
         if resolution == "raw":
             wide = df.pivot_table(
                 index=index_columns,
@@ -173,10 +232,14 @@ class ElyticsDataProvider:
 
         if wide.empty:
             return wide
+        if timestamps is not None:
+            wide.insert(0, "timestamp", wide["elapsed_time_s"].map(timestamps))
+        else:
+            wide.insert(0, "timestamp", pd.NaT)
         wide = wide.rename(columns={"timestamp": "time", "elapsed_time_s": "Elapsed time"})
         wide["time"] = pd.to_datetime(wide["time"], errors="coerce", utc=True)
         wide = wide.sort_values("Elapsed time").reset_index(drop=True)
-        return wide
+        return ElyticsDataProvider._add_derived_columns(wide)
 
 
 def _load_units() -> dict[str, str]:

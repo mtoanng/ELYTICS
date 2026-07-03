@@ -2,6 +2,8 @@ import json
 import os
 from typing import Any
 
+from redis import RedisError
+
 from backend.services.cache import cache_key, cache_set, get_redis_client
 from backend.services.databricks import execute_sql_query
 from backend.services.sql import DATABRICKS_CATALOG, LOCAL_SQL, to_sql_literal
@@ -116,10 +118,17 @@ def _identity_condition(
     clauses = [f"series = {to_sql_literal(series)}"]
     if experiment_id is not None:
         clauses.append(f"experiment_id = {_experiment_literal(experiment_id)}")
-    if normalised_uuid is not None:
-        clauses.append(f"uuid = {to_sql_literal(normalised_uuid)}")
-    if normalised_group is not None:
-        clauses.append(f"`group` = {to_sql_literal(normalised_group)}")
+    else:
+        experiment_index_table = _qualified_table(CO_GOLD_EXPERIMENT_INDEX_TABLE)
+        clauses.append(
+            "experiment_id IN (\n"
+            "            SELECT experiment_id\n"
+            f"            FROM {experiment_index_table}\n"
+            f"            WHERE series = {to_sql_literal(series)}\n"
+            f"              AND uuid = {to_sql_literal(normalised_uuid)}\n"
+            f"              AND `group` = {to_sql_literal(normalised_group)}\n"
+            "          )"
+        )
     return "\n          AND ".join(clauses)
 
 
@@ -131,16 +140,62 @@ def _channel_match_condition(channels: list[str]) -> str:
 def _cache_get_or_query(key_prefix: str, query: str, source_name: str, **key_parts: Any) -> list[dict[str, Any]]:
     effective_ttl = 0 if LOCAL_SQL else CO_REPORTING_TTL_SECONDS
     key = cache_key(key_prefix, source=source_name, **key_parts)
-    redis_client = get_redis_client()
+    redis_client = None
     if effective_ttl > 0:
-        cached = redis_client.get(key)
-        if cached:
-            return json.loads(cached)
+        try:
+            redis_client = get_redis_client()
+            cached = redis_client.get(key)
+            if cached:
+                return json.loads(cached)
+        except RedisError:
+            redis_client = None
 
     data = execute_sql_query(query)
-    if effective_ttl > 0:
-        cache_set(redis_client, key, source_name, data, effective_ttl)
+    if effective_ttl > 0 and redis_client is not None:
+        try:
+            cache_set(redis_client, key, source_name, data, effective_ttl)
+        except RedisError:
+            pass
     return data
+
+
+def _is_table_not_found_error(exc: Exception) -> bool:
+    message = str(exc).lower()
+    return "table_or_view_not_found" in message or "cannot be found" in message
+
+
+def _list_series_groups_from_agg() -> list[dict[str, Any]]:
+    table = _qualified_table(CO_GOLD_AGG_1M_TABLE)
+    query = f"""
+        SELECT
+          experiment_id,
+          series,
+          CAST(NULL AS STRING) AS uuid,
+          CAST(NULL AS STRING) AS `group`,
+          MIN(elapsed_time_s) AS start_time_s,
+          MAX(elapsed_time_s) AS end_time_s,
+          MAX(elapsed_time_s) - MIN(elapsed_time_s) AS duration_s,
+          MIN(timestamp) AS start_timestamp,
+          MAX(timestamp) AS end_timestamp,
+          COUNT(DISTINCT std_channel) AS channel_count,
+          SUM(value_count) AS total_data_points,
+          CAST(NULL AS STRING) AS source_file_name,
+          CAST(NULL AS BIGINT) AS source_file_size,
+          CAST(NULL AS TIMESTAMP) AS source_last_modified,
+          CAST(NULL AS TIMESTAMP) AS ingested_at,
+          CAST(NULL AS DOUBLE) AS avg_stack_voltage_v,
+          CAST(NULL AS DOUBLE) AS peak_current_density_ma_cm2,
+          CAST(NULL AS DOUBLE) AS avg_energy_efficiency_pct,
+          CAST(NULL AS DOUBLE) AS avg_fe_co_pct,
+          CAST(NULL AS DOUBLE) AS avg_fe_h2_pct,
+          CAST(NULL AS DOUBLE) AS avg_spce_pct
+        FROM {table}
+        WHERE series IS NOT NULL
+          AND experiment_id IS NOT NULL
+        GROUP BY experiment_id, series
+        ORDER BY series, start_timestamp, experiment_id
+    """
+    return _cache_get_or_query("co_reporting_series_fallback", query, table)
 
 
 def list_series_groups() -> list[dict[str, Any]]:
@@ -173,7 +228,12 @@ def list_series_groups() -> list[dict[str, Any]]:
           AND experiment_id IS NOT NULL
         ORDER BY series, start_timestamp, experiment_id
     """
-    return _cache_get_or_query("co_reporting_series", query, table)
+    try:
+        return _cache_get_or_query("co_reporting_series", query, table)
+    except Exception as exc:
+        if not _is_table_not_found_error(exc):
+            raise
+        return _list_series_groups_from_agg()
 
 
 def list_channels(

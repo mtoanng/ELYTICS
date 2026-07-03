@@ -35,23 +35,23 @@ def cache_key(prefix: str, **kwargs: Any) -> str:
     digest = hashlib.sha256(
         json.dumps(kwargs, sort_keys=True, default=str).encode()
     ).hexdigest()
-    return f"holmes:{prefix}:{digest}"
+    return f"elytics:{prefix}:{digest}"
 
 
 def cache_set(
     redis_client: redis.Redis,
     key: str,
-    view_name: str,
+    source_name: str,
     payload: Any,
     ttl: int,
 ) -> None:
     redis_client.set(key, json.dumps(payload, default=str), ex=ttl)
-    redis_client.sadd(f"holmes:index:{view_name}", key)
+    redis_client.sadd(f"elytics:index:{source_name}", key)
 
 
-def invalidate_view_cache(view_name: str) -> None:
+def invalidate_source_cache(source_name: str) -> None:
     redis_client = get_redis_client()
-    index_key = f"holmes:index:{view_name}"
+    index_key = f"elytics:index:{source_name}"
     keys = redis_client.smembers(index_key)
     if keys:
         redis_client.delete(*keys)

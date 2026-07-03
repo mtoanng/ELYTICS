@@ -21,7 +21,7 @@ services:
       - frontend
       - redis
     networks:
-      - holmes
+      - elytics
     cpus: 2
     mem_limit: 4g
 
@@ -49,7 +49,7 @@ services:
     ports:
       - "8000:8000"
     networks:
-      - holmes
+      - elytics
     cpus: 0.50
     mem_limit: 2g
 
@@ -81,7 +81,7 @@ services:
     ports:
       - "8501:8501"
     networks:
-      - holmes
+      - elytics
     cpus: 0.30
     mem_limit: 1200m
 
@@ -91,10 +91,10 @@ services:
     ports:
       - "6379:6379"
     networks:
-      - holmes
+      - elytics
     cpus: 0.20
     mem_limit: 800m
 
 networks:
-  holmes:
+  elytics:
     driver: bridge

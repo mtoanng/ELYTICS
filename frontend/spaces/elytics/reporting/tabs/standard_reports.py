@@ -34,6 +34,7 @@ from dash.dependencies import Input, Output, State
 
 from pathlib import Path
 
+from ..data_provider import CHANNEL_ALIASES
 from ..model import SeriesDataManager
 from ..visualization import plot_report
 from .export_helpers import (
@@ -72,6 +73,28 @@ def _load_standard_reports():
 
 
 STANDARD_REPORTS = _load_standard_reports()
+
+
+def _query_columns_for_report(report, series, data_manager: SeriesDataManager) -> list[str]:
+    columns = [*report.get("y1_cols", []), *report.get("y2_cols", [])]
+    if columns:
+        return columns
+    return [
+        row.get("std_channel") or row.get("channel_name")
+        for row in data_manager.list_channels(series)
+        if row.get("std_channel") or row.get("channel_name")
+    ]
+
+
+def _drop_alias_duplicate_columns(df):
+    duplicate_columns = []
+    for alias, canonical in CHANNEL_ALIASES.items():
+        for suffix in ("", "_mean", "_min", "_max"):
+            alias_column = f"{alias}{suffix}"
+            canonical_column = f"{canonical}{suffix}"
+            if alias_column in df.columns and canonical_column in df.columns:
+                duplicate_columns.append(alias_column)
+    return df.drop(columns=duplicate_columns) if duplicate_columns else df
 
 
 # ---------------------------------------------------------------------------
@@ -380,7 +403,7 @@ def register_callbacks(app, data_manager: SeriesDataManager):
         if series is None:
             return empty_figure("Series metadata unavailable."), no_update, "Series metadata unavailable."
 
-        report_columns = [*report.get("y1_cols", []), *report.get("y2_cols", [])]
+        report_columns = _query_columns_for_report(report, series, data_manager)
         visible_start_h = float(time_min) if time_min is not None else 0.0
         visible_end_h = float(time_max) if time_max is not None else 24.0
         if visible_end_h <= visible_start_h:
@@ -520,7 +543,7 @@ def register_callbacks(app, data_manager: SeriesDataManager):
         if visible_end_h <= visible_start_h:
             visible_end_h = visible_start_h + 24.0
 
-        report_columns = [*report.get("y1_cols", []), *report.get("y2_cols", [])]
+        report_columns = _query_columns_for_report(report, series, data_manager)
         df = data_manager.query_timeseries_window(
             series,
             report_columns,
@@ -732,6 +755,8 @@ def _build_figure(df, report, data_manager):
     """
     y1_cols = report["y1_cols"] if report["y1_cols"] else None
     y2_cols = report["y2_cols"] if report["y2_cols"] else None
+    if y1_cols is None and y2_cols is None:
+        df = _drop_alias_duplicate_columns(df)
     labels = report.get("labels", {})
 
     fig = plot_report(

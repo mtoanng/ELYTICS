@@ -1,0 +1,50 @@
+services:
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "700mb", "--maxmemory-policy", "allkeys-lru"]
+    ports:
+      - "6379:6379"
+    networks:
+      - elytics
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - ./backend/.env
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_DB: "0"
+      PYTHONPATH: /app
+    depends_on:
+      - redis
+    ports:
+      - "8000:8000"
+    networks:
+      - elytics
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    env_file:
+      - ./frontend/.env
+    environment:
+      BACKEND_API_URL: http://backend:8000
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_DB: "0"
+      PYTHONPATH: /app
+    depends_on:
+      - backend
+      - redis
+    ports:
+      - "8501:8501"
+    networks:
+      - elytics
+
+networks:
+  elytics:
+    driver: bridge

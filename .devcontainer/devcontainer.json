@@ -1,5 +1,5 @@
 {
-  "name": "TBP-HOLMES Dev",
+  "name": "Elytics CO Reporting Dev",
   "dockerComposeFile": "docker-compose.yml",
   "service": "dev",
   "runServices": [
@@ -15,7 +15,6 @@
   "forwardPorts": [
     8000,
     8501,
-    8089,
     6379
   ],
   "portsAttributes": {
@@ -25,10 +24,6 @@
     },
     "8501": {
       "label": "Dash Frontend",
-      "onAutoForward": "openBrowser"
-    },
-    "8089": {
-      "label": "Locust Load Testing UI",
       "onAutoForward": "openBrowser"
     },
     "6379": {

@@ -138,19 +138,6 @@ def _create_space_selector():
     )
 
 
-def _create_link(icon, href):
-    return dmc.Anchor(
-        dmc.ActionIcon(
-            DashIconify(icon=icon, width=22),
-            variant="transparent",
-            size="lg",
-        ),
-        href=href,
-        target="_blank",
-        visibleFrom="xs",
-    )
-
-
 def header_layout():
     dev_banner = None
     if IS_DEVELOPMENT:
@@ -182,7 +169,6 @@ def header_layout():
                 gap="md",
                 children=[
                     _create_search(),
-                    _create_link("radix-icons:reader", "https://inside-docupedia.bosch.com/confluence/spaces/ELYSTACK/pages/6751345063/HOLMES+Application"),
                     dmc.Switch(
                         id="theme-switch",
                         checked=False,

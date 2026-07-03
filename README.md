@@ -1,25 +1,31 @@
-# TBP-HOLMES
+# Elytics CO Reporting Demo
 
-Welcome to the TBP-HOLMES project repository.
+This repository contains the Elytics CO reporting demo app: a Dash frontend backed by a thin FastAPI service that queries Databricks SQL gold serving tables.
 
-This repository contains all source code, configuration, and documentation for the TBP-HOLMES system.
+## Architecture
 
-## Overview
+- Frontend route: `/elytics/co-reporting`
+- Backend API prefix: `/api/elytics/co-reporting`
+- Serving model: `gold_experiment_index`, `gold_channel_catalog_experiment`, `gold_timeseries`, and 1/15/60 minute aggregate gold tables
+- Cache: Redis-backed response cache with TTL controls
+- Databricks access: SQLAlchemy connection pool using either `azure-sp-m2m` service principal auth or local PAT fallback
 
-TBP-HOLMES is a modular platform designed for data-driven applications, featuring a modern frontend, robust backend, and scalable infrastructure.  
-All major aspects of the system are documented in the [`docs/`](./docs/) directory.
+The local demo intentionally has no frontend OIDC gate. Access to data is controlled by the Databricks SQL Warehouse credentials configured in `backend/.env`.
 
-## Getting Started
+## Local Validation
 
-To get started with this repository:
-
-```bash
-git clone https://BoschTransmissionTechnology@dev.azure.com/BoschTransmissionTechnology/ELY%20Analytics%20Solution/_git/TBP-HOLMES
-cd TBP-HOLMES
+```powershell
+.\.testvenv\Scripts\python.exe -m pytest backend/tests frontend/tests
 ```
 
-For setup instructions, development workflow, and detailed guides, **please refer to the [`docs/`](./docs/) directory**.
+## Podman Demo
 
----
+Copy `backend/.env.demo.example` to `backend/.env` and `frontend/.env.demo.example` to `frontend/.env`, then fill in the Databricks SQL Warehouse settings and credentials.
 
-If you have questions or need further information, check the documentation or contact the maintainers.
+```powershell
+podman compose -f compose.demo.yml up --build
+```
+
+Open `http://localhost:8501/elytics/co-reporting`. The frontend calls the backend at `http://backend:8000`, and the backend queries Databricks SQL directly while using Redis for response caching.
+
+For live smoke testing outside containers, populate `backend/.env` from `backend/.env.demo.example`, then run focused CO reporting checks against the configured Databricks SQL Warehouse.
