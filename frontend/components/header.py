@@ -14,24 +14,9 @@ IS_DEVELOPMENT = os.getenv("ENVIRONMENT", "development").lower() == "development
 SPACE_SELECTOR_META = {
     "home": {"title": "Home", "subtitle": "", "icon": "tabler:home"},
     "sherlock": {
-        "title": "Sherlock",
-        "subtitle": "asTested",
-        "icon": "tabler:flask",
-    },
-    "watson": {
-        "title": "Watson",
-        "subtitle": "asManufactured",
-        "icon": "tabler:shopping-bag-check",
-    },
-    "mycroft": {
-        "title": "Mycroft",
-        "subtitle": "asProduced",
-        "icon": "tabler:building-factory-2",
-    },
-    "enola": {
-        "title": "Enola",
-        "subtitle": "asManaged",
-        "icon": "tabler:eye",
+        "title": "Elytics",
+        "subtitle": "CO2 analytics",
+        "icon": "tabler:chart-line",
     },
 }
 
@@ -64,7 +49,7 @@ def _build_search_options():
         if general_items:
             options.append(
                 {
-                    "group": f"{space.title()} - General",
+                    "group": f"{_space_option_label(space)} - General",
                     "items": general_items,
                 }
             )
@@ -91,7 +76,7 @@ def _build_search_options():
 
             options.append(
                 {
-                    "group": f"{space.title()} - {group}",
+                    "group": f"{_space_option_label(space)} - {group}",
                     "items": grouped_items,
                 }
             )
@@ -367,7 +352,10 @@ clientside_callback(
                     return window.dash_clientside.no_update;
                 }
                 if (space !== 'home' && space !== currentSpace) {
-                    window.location.href = '/' + space + '/home';
+                    const defaultRoutes = {
+                        sherlock: '/sherlock/data-exploration/co-reporting'
+                    };
+                    window.location.href = defaultRoutes[space] || ('/' + space + '/home');
                 }
             }
         }

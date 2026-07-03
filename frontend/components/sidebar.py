@@ -1,109 +1,22 @@
-import dash_mantine_components as dmc
-from pathlib import Path
 import json
+from pathlib import Path
+
+import dash_mantine_components as dmc
 
 SIDEBAR_STRUCTURE = {
-    "mycroft": {
-        None: [{"path": "home", "label": "Home"}],
-        "Management": {
-            "path": "management",
-            "pages": [
-                {
-                    "path": "production-overview",
-                    "label": "Production Overview",
-                },
-            ],
-        },
-        "Data Exploration": {
-            "path": "data-exploration",
-            "pages": [
-                {"path": "stack-overview", "label": "Stack Overview"},
-                {"path": "soaking-overview", "label": "Soaking Overview"},
-                {"path": "cvm-overview", "label": "CVM Overview"},
-                {"path": "eol-polcurve", "label": "EOL Polarization Curve"},
-            ],
-        },
-        "Data Analysis": {
-            "path": "data-analysis",
-            "pages": [
-                {"path": "eol-trend-analysis", "label": "EOL Trend Analysis"},
-            ],
-        },
-    },
     "sherlock": {
-        None: [{"path": "home", "label": "Home"}],
-        "Management": {
-            "path": "management",
-            "pages": [
-                {"path": "test-rig-statistics", "label": "Test Rig Statistics"},
-                {"path": "test-rig-activity", "label": "Test Rig Activity"},
-                {
-                    "path": "track-record",
-                    "label": "Track Record",
-                    "preview": True,
-                    "tooltip": "Data sources are work in progress. Full timeseries (1hr) is used for detail plots instead of data from conditioning phase.",
-                },
-            ],
-        },
-        "Data Exploration": {
+        "Analytics": {
             "path": "data-exploration",
             "pages": [
-                {"path": "order-overview", "label": "Order Overview"},
-                {"path": "runtime-overview", "label": "Runtime Overview"},
-                {"path": "polarization-curves", "label": "Polarization Curves"},
-                {"path": "timeseries-overview", "label": "Timeseries Overview"},
+                {"path": "co-reporting", "label": "Elytics Reporting"},
             ],
         },
-        "Data Analysis": {
-            "path": "data-analysis",
-            "pages": [
-                {
-                    "path": "vlite",
-                    "label": "Polarization Curves - V-lite",
-                    "preview": True,
-                    "tooltip": "Model validation in progress.",
-                },
-            ],
-        },
-        "AI/ML": {
-            "path": "ai-ml",
-            "pages": [
-                {
-                    "path": "soh",
-                    "label": "State of Health",
-                    "preview": True,
-                    "tooltip": "Model is currently in early stages of development, results should be considered preliminary.",
-                },
-            ],
-        },
-    },
-    "enola": {
-        None: [{"path": "home", "label": "Home"}],
-        "Internal": {
-            "path": "internal",
-            "pages": [
-                {"path": "test-rig-statistics", "label": "Test Rig Statistics"},
-                {"path": "test-rig-activity", "label": "Test Rig Activity"},
-                {"path": "production-overview", "label": "Production Overview"},
-                {
-                    "path": "track-record",
-                    "label": "Track Record",
-                    "preview": True,
-                    "tooltip": "Data sources are work in progress.",
-                },
-            ],
-        },
-        "Customer": {
-            "path": "customer",
-            "pages": [
-                {"path": "customer-overview", "label": "Customer Overview"},
-            ],
-        },
-    },
-    "watson": {
-        None: [{"path": "home", "label": "Home"}],
     },
 }
+
+
+def get_visible_sidebar_structure() -> dict:
+    return SIDEBAR_STRUCTURE
 
 
 def get_space_from_path(pathname: str | None) -> str | None:

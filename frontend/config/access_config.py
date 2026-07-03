@@ -5,7 +5,4 @@ ENV = os.getenv("ENVIRONMENT", "dev").lower()
 
 SPACE_ACCESS_MAP = {
     "/sherlock": ["IdM2BCD_holmes_pemely_sherlock"] if ENV == "prod" else ["IdM2BCD_holmes_pemely_development"],
-    "/watson": ["IdM2BCD_holmes_pemely_watson"] if ENV == "prod" else ["IdM2BCD_holmes_pemely_development"],
-    "/mycroft": ["IdM2BCD_holmes_pemely_mycroft"] if ENV == "prod" else ["IdM2BCD_holmes_pemely_development"],
-    "/enola": ["IdM2BCD_holmes_pemely_enola"] if ENV == "prod" else ["IdM2BCD_holmes_pemely_development"],
 }

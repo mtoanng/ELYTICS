@@ -93,6 +93,9 @@ def check_access(groups=None):
     - user: User dict or None
     - needs_login: True if token expired and needs re-authentication
     """
+    if os.getenv("DISABLE_AUTH", "false").strip().lower() in {"1", "true", "yes", "on"}:
+        return True, {"email": "demo@elytics.local", "groups": groups or []}, False
+
     if _is_access_token_expired():
         if not _refresh_access_token():
             session.clear()

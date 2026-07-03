@@ -10,18 +10,12 @@ from backend.services.databricks import execute_sql_query
 from backend.services.sql import LOCAL_SQL, resolve_query_source
 
 import backend.config.sherlock as sherlock
-import backend.config.watson as watson
-import backend.config.enola as enola
-import backend.config.mycroft as mycroft
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 SPACE_METADATA_MAP: dict[str, list[MetadataConfig]] = {
     "sherlock": sherlock.METADATA_CONFIG,
-    "watson":   watson.METADATA_CONFIG,
-    "enola":    enola.METADATA_CONFIG,
-    "mycroft":  mycroft.METADATA_CONFIG,
 }
 
 

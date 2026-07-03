@@ -1,0 +1,20 @@
+{
+  "name": {},
+  "mapping": {},
+  "files": [
+    {
+      "worksheets": [
+        {
+          "name": {},
+          "header_row": {},
+          "first_data_row": {}
+        }
+      ]
+    }
+  ],
+  "stack_type": {},
+  "options": {
+    "time_offset [h]": {}
+  },
+  "aggregations": []
+}

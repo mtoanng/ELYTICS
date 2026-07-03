@@ -1,0 +1,173 @@
+{
+  "PoCII": {
+    "files": [
+      {
+        "path": "data/bronze/PoC II Stack Measurement.xlsx",
+        "worksheets": [
+          {
+            "name": "PoC II Stack Measurement I",
+            "header_row": 1,
+            "first_data_row": 2
+          },
+          {
+            "name": "PoC II Stack Measurement II",
+            "header_row": 1,
+            "first_data_row": 2
+          }
+        ]
+      }
+    ],
+    "name": "PoCII",
+    "mapping": "data/bronze/PoCII_mapping.json",
+    "stack_type": "PoC",
+    "options": {
+      "time_offset [h]": ""
+    },
+    "aggregations": [
+      1,
+      15,
+      60
+    ]
+  },
+  "PoCIII": {
+    "name": "PoCIII",
+    "mapping": "data/bronze/PoCIII_mapping.json",
+    "stack_type": "PoC",
+    "files": [
+      {
+        "path": "data/bronze/PoC III Stack Measurement.xlsx",
+        "worksheets": [
+          {
+            "name": "PoC III Stack Measurement - I",
+            "header_row": 1,
+            "first_data_row": 3
+          },
+          {
+            "name": "PoC III Stack Measurement - II",
+            "header_row": 1,
+            "first_data_row": 2
+          }
+        ]
+      }
+    ],
+    "options": {
+      "time_offset [h]": ""
+    },
+    "aggregations": [
+      1,
+      15
+    ]
+  },
+  "PoCIV": {
+    "name": "PoCIV",
+    "mapping": "data/bronze/PoCIV_mapping.json",
+    "stack_type": "PoC",
+    "files": [
+      {
+        "path": "data/bronze/PoCStackIVMeasurementI 1.xlsx",
+        "worksheets": [
+          {
+            "name": "PoC IV - Measurement I.",
+            "header_row": 1,
+            "first_data_row": 3
+          }
+        ]
+      },
+      {
+        "path": "data/bronze/PoCStackIVMeasurementII 1.xlsx",
+        "worksheets": [
+          {
+            "name": "PoC IV - Measurement II.",
+            "header_row": 1,
+            "first_data_row": 3
+          }
+        ]
+      }
+    ],
+    "options": {
+      "time_offset [h]": ""
+    },
+    "aggregations": [
+      1,
+      15
+    ]
+  },
+  "test": {
+    "files": [
+      {
+        "path": "data/bronze/test.xlsx",
+        "worksheets": [
+          {
+            "name": "1",
+            "header_row": 1,
+            "first_data_row": 2
+          },
+          {
+            "name": "2",
+            "header_row": 1,
+            "first_data_row": 2
+          }
+        ]
+      },
+      {
+        "path": "data/bronze/testtest.xlsx",
+        "worksheets": [
+          {
+            "name": "1",
+            "header_row": 1,
+            "first_data_row": 2
+          },
+          {
+            "name": "2",
+            "header_row": 1,
+            "first_data_row": 2
+          }
+        ]
+      }
+    ],
+    "mapping": "data/bronze/test_mapping.json",
+    "name": "test",
+    "stack_type": "PoC",
+    "options": {
+      "time_offset [h]": ""
+    },
+    "aggregations": [
+      1,
+      15
+    ]
+  },
+  "PoCVI": {
+    "files": [
+      {
+        "path": "data/bronze/PoC VI Stack Measurement.xlsx",
+        "worksheets": [
+          {
+            "name": "PoC VI Stack Measurement - I",
+            "header_row": 1,
+            "first_data_row": 3
+          },
+          {
+            "name": "PoC VI Stack Measurement - II",
+            "header_row": 1,
+            "first_data_row": 2
+          },
+          {
+            "name": "PoC VI Stack Measurement - III",
+            "header_row": 1,
+            "first_data_row": 2
+          }
+        ]
+      }
+    ],
+    "mapping": "data/bronze/PoCVI_mapping.json",
+    "name": "PoCVI",
+    "stack_type": "PoC",
+    "options": {
+      "time_offset [h]": ""
+    },
+    "aggregations": [
+      1,
+      15
+    ]
+  }
+}

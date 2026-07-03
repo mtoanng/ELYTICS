@@ -19,11 +19,9 @@ from backend.services.databricks import close_all_databricks_connections
 from backend.routers.tabular import router as tabular_router
 from backend.routers.metadata import router as metadata_router
 from backend.routers.timeseries import router as timeseries_router
+from backend.routers.co_reporting import router as co_reporting_router
 
 import backend.config.sherlock as sherlock
-import backend.config.watson as watson
-import backend.config.enola as enola
-import backend.config.mycroft as mycroft
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -40,7 +38,7 @@ for _noisy in (
 for _noisy in ("uvicorn.access", "gunicorn.access"):
     logging.getLogger(_noisy).setLevel(logging.WARNING)
 
-_SPACE_MODULES = [("sherlock", sherlock), ("watson", watson), ("enola", enola), ("mycroft", mycroft)]
+_SPACE_MODULES = [("sherlock", sherlock)]
 
 
 @asynccontextmanager
@@ -91,6 +89,7 @@ async def log_request_timing(request: Request, call_next):
 app.include_router(tabular_router)
 app.include_router(metadata_router)
 app.include_router(timeseries_router)
+app.include_router(co_reporting_router)
 
 if os.getenv("ENVIRONMENT") == "development":
     app.add_middleware(

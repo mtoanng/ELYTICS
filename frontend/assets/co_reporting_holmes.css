@@ -1,0 +1,220 @@
+.co-reporting-shell {
+    background: linear-gradient(180deg, rgba(11, 42, 84, 0.03) 0%, rgba(11, 42, 84, 0) 18%), var(--mantine-color-body);
+}
+
+.co-reporting-hero {
+    padding: 1rem 1.25rem 0.85rem;
+    border-bottom: 1px solid var(--mantine-color-default-border);
+    background:
+        linear-gradient(120deg, rgba(11, 42, 84, 0.08), rgba(11, 42, 84, 0.02) 42%, rgba(0, 0, 0, 0) 80%),
+        var(--mantine-color-body);
+}
+
+.elytics-brand-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    min-width: 0;
+}
+
+.elytics-brand-logo {
+    width: clamp(210px, 24vw, 340px);
+    height: auto;
+    flex: 0 0 auto;
+    border-radius: 10px;
+    box-shadow: 0 1px 2px rgba(11, 42, 84, 0.18);
+}
+
+.elytics-hero-copy {
+    min-width: 0;
+    max-width: 74ch;
+}
+
+.co-reporting-kicker {
+    margin: 0 0 0.25rem;
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--mantine-color-dimmed);
+    font-weight: 700;
+}
+
+.co-reporting-title {
+    margin: 0;
+    font-size: 1.45rem;
+    line-height: 1.15;
+    font-weight: 700;
+    color: var(--mantine-color-text);
+}
+
+.co-reporting-subtitle {
+    margin-top: 0.3rem;
+    color: var(--mantine-color-text);
+    font-size: 0.92rem;
+    max-width: 72ch;
+}
+
+.co-reporting-supporting-copy {
+    margin-top: 0.25rem;
+    color: var(--mantine-color-dimmed);
+    font-size: 0.84rem;
+    max-width: 72ch;
+}
+
+@media (max-width: 760px) {
+    .elytics-brand-row {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .elytics-brand-logo {
+        width: min(100%, 300px);
+    }
+}
+
+.co-reporting-tabs .tab {
+    border: 0 !important;
+    border-bottom: 2px solid transparent !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    color: var(--mantine-color-dimmed) !important;
+    padding: 0.85rem 1rem !important;
+    font-weight: 600;
+}
+
+.co-reporting-tabs .tab--selected {
+    color: var(--mantine-primary-color-filled) !important;
+    border-bottom-color: var(--mantine-primary-color-filled) !important;
+    background: transparent !important;
+}
+
+.co-reporting-tabs .tab:hover {
+    color: var(--mantine-color-text) !important;
+    background: rgba(11, 42, 84, 0.04) !important;
+}
+
+.co-reporting-shell .card {
+    border-color: var(--mantine-color-default-border);
+    border-radius: 0.75rem;
+    box-shadow: none;
+    background: var(--mantine-color-body);
+}
+
+.co-reporting-toolbar-card {
+    margin: 0.5rem 0.75rem 0.35rem;
+    overflow: hidden;
+}
+
+.co-reporting-toolbar-body {
+    background: linear-gradient(180deg, rgba(11, 42, 84, 0.025), rgba(11, 42, 84, 0));
+}
+
+.co-reporting-shell .card .card-body .form-label {
+    color: var(--mantine-color-text);
+    font-size: 0.73rem;
+    letter-spacing: 0.02em;
+}
+
+.co-reporting-shell .form-control,
+.co-reporting-shell .form-select,
+.co-reporting-shell .Select-control,
+.co-reporting-shell .Select-menu-outer {
+    border-color: var(--mantine-color-default-border);
+    background: var(--mantine-color-body);
+    color: var(--mantine-color-text);
+}
+
+.co-reporting-shell .input-group-text {
+    border-color: var(--mantine-color-default-border);
+    background: var(--mantine-color-default);
+    color: var(--mantine-color-text);
+}
+
+.co-reporting-shell .Select-placeholder,
+.co-reporting-shell .Select-value-label,
+.co-reporting-shell .Select-input,
+.co-reporting-shell .Select-input > input,
+.co-reporting-shell .Select-menu-outer,
+.co-reporting-shell .Select-option,
+.co-reporting-shell .VirtualizedSelectOption {
+    color: var(--mantine-color-text) !important;
+}
+
+.co-reporting-shell .Select-placeholder {
+    color: var(--mantine-color-dimmed) !important;
+}
+
+.co-reporting-shell .Select-arrow {
+    border-top-color: var(--mantine-color-dimmed);
+}
+
+.co-reporting-shell .btn-dark {
+    background: var(--mantine-primary-color-filled);
+    border-color: var(--mantine-primary-color-filled);
+}
+
+.co-reporting-shell .btn-dark:hover,
+.co-reporting-shell .btn-dark:focus {
+    background: var(--mantine-primary-color-filled-hover);
+    border-color: var(--mantine-primary-color-filled-hover);
+}
+
+.co-reporting-shell .text-muted {
+    color: var(--mantine-color-dimmed) !important;
+}
+
+.co-reporting-shell .js-plotly-plot .plotly .main-svg {
+    border-radius: 0.75rem;
+}
+
+.co-reporting-modal .modal-content {
+    border-radius: 1rem;
+    border-color: var(--mantine-color-default-border);
+    background: var(--mantine-color-body);
+    box-shadow: var(--mantine-shadow-lg);
+}
+
+.co-reporting-modal-header,
+.co-reporting-modal-footer {
+    border-color: var(--mantine-color-default-border);
+}
+
+.co-reporting-modal-header {
+    background: linear-gradient(180deg, rgba(11, 42, 84, 0.05), rgba(11, 42, 84, 0));
+}
+
+:root[data-mantine-color-scheme="dark"] .co-reporting-hero {
+    background:
+        linear-gradient(120deg, rgba(78, 168, 255, 0.12), rgba(78, 168, 255, 0.03) 42%, rgba(0, 0, 0, 0) 80%),
+        var(--mantine-color-body);
+}
+
+:root[data-mantine-color-scheme="dark"] .co-reporting-shell .card,
+:root[data-mantine-color-scheme="dark"] .co-reporting-shell .modal-content,
+:root[data-mantine-color-scheme="dark"] .co-reporting-shell .Select-menu-outer,
+:root[data-mantine-color-scheme="dark"] .co-reporting-shell .Select-control,
+:root[data-mantine-color-scheme="dark"] .co-reporting-shell .form-control,
+:root[data-mantine-color-scheme="dark"] .co-reporting-shell .form-select {
+    background-color: var(--mantine-color-dark-7) !important;
+    color: var(--mantine-color-gray-1) !important;
+}
+
+:root[data-mantine-color-scheme="dark"] .co-reporting-shell .Select-option,
+:root[data-mantine-color-scheme="dark"] .co-reporting-shell .VirtualizedSelectOption {
+    background-color: var(--mantine-color-dark-7) !important;
+    color: var(--mantine-color-gray-1) !important;
+}
+
+:root[data-mantine-color-scheme="dark"] .co-reporting-shell .Select-option.is-focused,
+:root[data-mantine-color-scheme="dark"] .co-reporting-shell .VirtualizedSelectFocusedOption {
+    background-color: var(--mantine-color-dark-5) !important;
+}
+
+:root[data-mantine-color-scheme="dark"] .co-reporting-shell .input-group-text {
+    background-color: var(--mantine-color-dark-6) !important;
+    color: var(--mantine-color-gray-1) !important;
+}
+
+:root[data-mantine-color-scheme="dark"] .co-reporting-shell .tab:hover {
+    background: rgba(255, 255, 255, 0.04) !important;
+}

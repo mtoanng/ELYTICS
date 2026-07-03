@@ -13,18 +13,12 @@ from backend.services.timeseries import (
 )
 
 import backend.config.sherlock as sherlock
-import backend.config.watson as watson
-import backend.config.enola as enola
-import backend.config.mycroft as mycroft
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 SPACE_TIMESERIES_MAP: dict[str, list[TimeseriesConfig]] = {
     "sherlock": sherlock.TIMESERIES_CONFIG,
-    "watson": watson.TIMESERIES_CONFIG,
-    "enola": enola.TIMESERIES_CONFIG,
-    "mycroft": mycroft.TIMESERIES_CONFIG,
 }
 
 

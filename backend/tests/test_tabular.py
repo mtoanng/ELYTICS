@@ -9,7 +9,7 @@ import backend.routers.tabular as tabular_router
 @pytest.fixture
 def client():
     app.dependency_overrides[verify_oidc_token] = lambda: {
-        "groups": ["IdM2BCD_holmes_pemely_user"],
+        "groups": ["IdM2BCD_holmes_pemely_development"],
         "email": "test@example.com",
     }
     with TestClient(app) as test_client:
@@ -30,7 +30,7 @@ def test_tabular_route_ignores_limit_offset_params(client, monkeypatch):
 
 
 def test_tabular_route_missing_required_filter(client):
-    response = client.get("/api/sherlock/tabular/track_record")
+    response = client.get("/api/sherlock/tabular/event")
     assert response.status_code == 400
     assert "order_id" in response.json()["detail"]
 

@@ -9,7 +9,7 @@ import backend.routers.timeseries as timeseries_router
 @pytest.fixture
 def client():
     app.dependency_overrides[verify_oidc_token] = lambda: {
-        "groups": ["IdM2BCD_holmes_pemely_user"],
+        "groups": ["IdM2BCD_holmes_pemely_development"],
         "email": "test@example.com",
     }
     with TestClient(app) as test_client:

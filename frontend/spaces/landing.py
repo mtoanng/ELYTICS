@@ -18,30 +18,6 @@ SPACE_INFO = {
         "color": "blue",
         "icon": "tabler:flask",
     },
-    "watson": {
-        "title": "Watson",
-        "subtitle": "asOperated",
-        "description": "Single platform for all customer operated stack related data analysis.",
-        "version": None,
-        "color": "cyan",
-        "icon": "tabler:world-cog",
-    },
-    "mycroft": {
-        "title": "Mycroft",
-        "subtitle": "asProduced",
-        "description": "Single platform for manufacturing and production data analysis.",
-        "version": None,
-        "color": "grape",
-        "icon": "tabler:building-factory-2",
-    },
-    "enola": {
-        "title": "Enola",
-        "subtitle": "asManaged",
-        "description": "Management overview of test rig operations and customer data.",
-        "version": None,
-        "color": "red",
-        "icon": "tabler:eye",
-    },
 }
 
 ROOT_CHANGELOG_LABEL = "HOLMES"
@@ -485,7 +461,7 @@ def update_changelog_list(selected_spaces):
 # Navigation callback for space cards
 clientside_callback(
     """
-    function(n1, n2, n3, n4) {
+    function(n1) {
         const triggered = window.dash_clientside.callback_context.triggered;
         if (triggered && triggered.length > 0 && triggered[0].prop_id !== '.') {
             try {
@@ -503,8 +479,5 @@ clientside_callback(
     """,
     Output("landing-nav-trigger", "children"),
     Input({"type": "space-nav-btn", "index": "sherlock"}, "n_clicks"),
-    Input({"type": "space-nav-btn", "index": "watson"}, "n_clicks"),
-    Input({"type": "space-nav-btn", "index": "mycroft"}, "n_clicks"),
-    Input({"type": "space-nav-btn", "index": "enola"}, "n_clicks"),
     prevent_initial_call=True,
 )

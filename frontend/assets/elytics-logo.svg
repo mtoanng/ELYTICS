@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 360" role="img" aria-labelledby="title desc">
+  <title id="title">Elytics CO2 Energy Stack</title>
+  <desc id="desc">Elytics analytics and optimization platform logo for CO2 energy stack reporting.</desc>
+  <defs>
+    <linearGradient id="blueGreen" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#10b981"/>
+    </linearGradient>
+    <linearGradient id="electric" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00f2fe"/>
+      <stop offset="100%" stop-color="#4facfe"/>
+    </linearGradient>
+    <linearGradient id="greenTech" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#059669"/>
+      <stop offset="100%" stop-color="#34d399"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+  <rect x="0" y="0" width="900" height="360" rx="20" fill="#0f172a"/>
+  <g transform="translate(30 10)">
+    <circle cx="160" cy="160" r="125" fill="none" stroke="url(#blueGreen)" stroke-width="6" stroke-dasharray="12 18 40 18" stroke-linecap="round"/>
+    <polygon points="160,55 245,105 245,215 160,265 75,215 75,105" fill="#1e293b" stroke="#475569" stroke-width="3"/>
+    <circle cx="115" cy="130" r="16" fill="#64748b"/>
+    <text x="115" y="135" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle">C</text>
+    <circle cx="90" cy="115" r="11" fill="#ef4444"/>
+    <text x="90" y="119" font-family="Segoe UI, Arial, sans-serif" font-size="9" font-weight="700" fill="#ffffff" text-anchor="middle">O</text>
+    <circle cx="135" cy="150" r="11" fill="#ef4444"/>
+    <text x="135" y="154" font-family="Segoe UI, Arial, sans-serif" font-size="9" font-weight="700" fill="#ffffff" text-anchor="middle">O</text>
+    <line x1="98" y1="121" x2="105" y2="124" stroke="#e2e8f0" stroke-width="2"/>
+    <line x1="125" y1="139" x2="129" y2="142" stroke="#e2e8f0" stroke-width="2"/>
+    <path d="M175 80L135 155H170L145 225L200 145H160Z" fill="url(#electric)" filter="url(#glow)"/>
+    <path d="M205 135C205 150 220 160 220 145C220 125 205 110 205 110C205 110 190 125 190 145C190 160 205 150 205 135Z" fill="url(#greenTech)" transform="rotate(-15 205 135)"/>
+    <path d="M205 175C225 175 230 155 230 155C230 155 210 150 195 165C185 175 195 190 195 190C195 190 195 175 205 175Z" fill="url(#greenTech)"/>
+  </g>
+  <g transform="translate(360 160)">
+    <text x="0" y="0" font-family="Segoe UI, Arial, sans-serif" font-size="76" font-weight="900" fill="#ffffff" letter-spacing="2">Elytics</text>
+    <text x="5" y="45" font-family="Segoe UI, Arial, sans-serif" font-size="20" font-weight="700" fill="#10b981" letter-spacing="6">CO2 ENERGY STACK</text>
+    <text x="5" y="75" font-family="Segoe UI, Arial, sans-serif" font-size="14" fill="#94a3b8" letter-spacing="1.5">ANALYTICS &amp; OPTIMIZATION PLATFORM</text>
+  </g>
+</svg>

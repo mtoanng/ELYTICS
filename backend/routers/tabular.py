@@ -8,18 +8,12 @@ from backend.config.types import TabularConfig
 from backend.services.sql import get_query_result, resolve_query_source
 
 import backend.config.sherlock as sherlock
-import backend.config.watson as watson
-import backend.config.enola as enola
-import backend.config.mycroft as mycroft
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 SPACE_TABULAR_MAP: dict[str, list[TabularConfig]] = {
     "sherlock": sherlock.TABULAR_CONFIG,
-    "watson":   watson.TABULAR_CONFIG,
-    "enola":    enola.TABULAR_CONFIG,
-    "mycroft":  mycroft.TABULAR_CONFIG,
 }
 
 
