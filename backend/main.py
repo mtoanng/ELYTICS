@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import os
 from time import perf_counter
@@ -6,22 +5,15 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, Request
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 load_dotenv(Path(__file__).resolve().parent / ".env")
 
-from backend.services.auth import verify_oidc_token
-from backend.config.types import validate_space_configs
 from backend.services.cache import configure_redis_cache_policy
 from backend.services.databricks import close_all_databricks_connections
 
-from backend.routers.tabular import router as tabular_router
-from backend.routers.metadata import router as metadata_router
-from backend.routers.timeseries import router as timeseries_router
 from backend.routers.co_reporting import router as co_reporting_router
-
-import backend.config.sherlock as sherlock
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -38,14 +30,8 @@ for _noisy in (
 for _noisy in ("uvicorn.access", "gunicorn.access"):
     logging.getLogger(_noisy).setLevel(logging.WARNING)
 
-_SPACE_MODULES = [("sherlock", sherlock)]
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    for space, mod in _SPACE_MODULES:
-        validate_space_configs(space, mod.TABULAR_CONFIG, mod.TIMESERIES_CONFIG, mod.METADATA_CONFIG)
-    logger.info("config validation passed for all spaces")
     configure_redis_cache_policy()
     try:
         yield
@@ -86,9 +72,6 @@ async def log_request_timing(request: Request, call_next):
             response_bytes,
         )
 
-app.include_router(tabular_router)
-app.include_router(metadata_router)
-app.include_router(timeseries_router)
 app.include_router(co_reporting_router)
 
 if os.getenv("ENVIRONMENT") == "development":
@@ -99,17 +82,6 @@ if os.getenv("ENVIRONMENT") == "development":
         allow_methods=["*"],
         allow_headers=["*"],
     )
-
-
-@app.get("/api/groups")
-def get_user_groups(token: dict = Depends(verify_oidc_token)):
-    user_groups = token.get("groups", [])
-    holmes_groups = [g for g in user_groups if g.startswith("IdM2BCD_holmes_pemely_")]
-    return {
-        "user": token.get("email"),
-        "holmes_groups": holmes_groups,
-        "roles": token.get("roles", []),
-    }
 
 
 if __name__ == "__main__":

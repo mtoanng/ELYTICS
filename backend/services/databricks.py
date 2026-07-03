@@ -18,6 +18,10 @@ logger = logging.getLogger(__name__)
 DATABRICKS_SERVER_HOSTNAME = os.getenv("DATABRICKS_SERVER_HOSTNAME")
 DATABRICKS_HTTP_PATH = os.getenv("DATABRICKS_HTTP_PATH")
 DATABRICKS_TOKEN = os.getenv("DATABRICKS_TOKEN")
+DATABRICKS_AZURE_CLIENT_ID = os.getenv("DATABRICKS_AZURE_CLIENT_ID")
+DATABRICKS_AZURE_CLIENT_SECRET = os.getenv("DATABRICKS_AZURE_CLIENT_SECRET")
+DATABRICKS_AZURE_TENANT_ID = os.getenv("DATABRICKS_AZURE_TENANT_ID")
+DATABRICKS_AZURE_WORKSPACE_RESOURCE_ID = os.getenv("DATABRICKS_AZURE_WORKSPACE_RESOURCE_ID")
 
 _POOL_SIZE = int(os.getenv("DATABRICKS_POOL_SIZE", "4"))
 _MAX_OVERFLOW = int(os.getenv("DATABRICKS_MAX_OVERFLOW", "1"))
@@ -40,10 +44,34 @@ def _build_engine() -> Engine:
     }
     if _AUTH_TYPE == "databricks-oauth":
         connect_args["auth_type"] = "databricks-oauth"
+    elif _AUTH_TYPE == "azure-sp-m2m":
+        missing = [
+            name
+            for name, value in (
+                ("DATABRICKS_AZURE_CLIENT_ID", DATABRICKS_AZURE_CLIENT_ID),
+                ("DATABRICKS_AZURE_CLIENT_SECRET", DATABRICKS_AZURE_CLIENT_SECRET),
+            )
+            if not value
+        ]
+        if missing:
+            raise RuntimeError(
+                f"{', '.join(missing)} must be set when DATABRICKS_AUTH_TYPE=azure-sp-m2m"
+            )
+        connect_args.update(
+            {
+                "auth_type": "azure-sp-m2m",
+                "azure_client_id": DATABRICKS_AZURE_CLIENT_ID,
+                "azure_client_secret": DATABRICKS_AZURE_CLIENT_SECRET,
+            }
+        )
+        if DATABRICKS_AZURE_TENANT_ID:
+            connect_args["azure_tenant_id"] = DATABRICKS_AZURE_TENANT_ID
+        if DATABRICKS_AZURE_WORKSPACE_RESOURCE_ID:
+            connect_args["azure_workspace_resource_id"] = DATABRICKS_AZURE_WORKSPACE_RESOURCE_ID
     else:
         if not DATABRICKS_TOKEN:
             raise RuntimeError(
-                "DATABRICKS_TOKEN is not set (required unless DATABRICKS_AUTH_TYPE=databricks-oauth)"
+                "DATABRICKS_TOKEN is not set (required unless DATABRICKS_AUTH_TYPE=databricks-oauth or azure-sp-m2m)"
             )
         connect_args["access_token"] = DATABRICKS_TOKEN
 

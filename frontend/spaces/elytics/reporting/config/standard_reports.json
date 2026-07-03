@@ -1,0 +1,83 @@
+﻿[
+  {
+    "name": "Voltage",
+    "internal_key": "Voltage",
+    "y1_cols": ["Stack Voltage"],
+    "y2_cols": ["Cell Voltage - 1", "Cell Voltage - 2", "Cell Voltage - 3", "Cell Voltage - 4", "Cell Voltage - 5"],
+    "labels": {
+      "title": "Voltage"
+    }
+  },
+  {
+    "name": "Gas Pressure",
+    "internal_key": "Gas_pressure",
+    "y1_cols": ["Gas inlet pressure", "Gas outlet pressure", "Δp Gas inlet - Gas outlet"],
+    "y2_cols": [],
+    "labels": {
+      "title": "Gas Pressure"
+    }
+  },
+  {
+    "name": "CO2 Flow",
+    "internal_key": "CO2_flow",
+    "y1_cols": ["Cathode inlet CO2 gas flow"],
+    "y2_cols": [],
+    "labels": {
+      "title": "CO2 flow"
+    }
+  },
+  {
+    "name": "Anolyte Pressure",
+    "internal_key": "Anolyte_pressure",
+    "y1_cols": ["Anolyte inlet pressure", "Anolyte outlet pressure", "Δp Anolyte"],
+    "y2_cols": [],
+    "labels": {
+      "title": "Anolyte Pressure"
+    }
+  },
+  {
+    "name": "Anode Temperature",
+    "internal_key": "Anode_temperature",
+    "y1_cols": ["Anode inlet", "Anode outlet"],
+    "y2_cols": [],
+    "labels": {
+      "title": "Anode Temperature"
+    }
+  },
+  {
+    "name": "CO to H2 Ratio & Current Density",
+    "internal_key": "CO_to_H2_ratio_and_current_density",
+    "y1_cols": ["CO:H2 ratio in cathode product gas"],
+    "y2_cols": ["Current density"],
+    "labels": {
+      "title": "CO:H2 ratio & current density"
+    }
+  },
+  {
+    "name": "Faradaic Efficiency",
+    "internal_key": "Faradaic_efficiency",
+    "y1_cols": ["Faradaic Efficiency of CO", "Faradaic Efficiency of H2", "Faradaic Efficiency of O2"],
+    "y2_cols": [],
+    "labels": {
+      "title": "Faradaic Efficiency"
+    }
+  },
+  {
+    "name": "Energy Efficiency",
+    "internal_key": "Energy_efficiency",
+    "y1_cols": ["Energy Efficiency"],
+    "y2_cols": [],
+    "labels": {
+      "title": "Stack Efficiency"
+    }
+  },
+  {
+    "name": "Single Pass Conversion Efficiency",
+    "internal_key": "Single_pass_conversion_efficiency",
+    "y1_cols": ["Single Pass Conversion Efficiency"],
+    "y2_cols": [],
+    "labels": {
+      "title": "Single Pass Conversion Efficiency"
+    }
+  }
+]

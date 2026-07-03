@@ -4,11 +4,11 @@ from pathlib import Path
 import dash_mantine_components as dmc
 
 SIDEBAR_STRUCTURE = {
-    "sherlock": {
+    "elytics": {
         "Analytics": {
-            "path": "data-exploration",
+            "path": "",
             "pages": [
-                {"path": "co-reporting", "label": "Elytics Reporting"},
+                {"path": "co-reporting", "label": "Reporting"},
             ],
         },
     },
@@ -171,9 +171,8 @@ def create_content(space: str, groups: dict, latest_version: str):
         )
 
         for page in pages:
-            body.append(
-                _nav_link(page, f"/{space}/{group_path}/{page['path']}", h=32, pl=18)
-            )
+            href = f"/{space}/{page['path']}" if not group_path else f"/{space}/{group_path}/{page['path']}"
+            body.append(_nav_link(page, href, h=32, pl=18))
 
     return dmc.Stack(
         gap=0,

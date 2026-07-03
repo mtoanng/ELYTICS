@@ -7,8 +7,7 @@ import dash_bootstrap_components as dbc
 import plotly.io as pio
 
 from components.appshell import create_appshell
-from services.auth import OIDCAuthWithToken
-from spaces.sherlock.co_energystacck_migration.reporting_dashboard import register_callbacks as register_co_reporting_callbacks
+from spaces.elytics.reporting.dashboard import register_callbacks as register_co_reporting_callbacks
 
 import redis
 from flask_session import Session
@@ -18,7 +17,7 @@ from waitress import serve
 
 load_dotenv()
 
-PAGES_FOLDER = str(Path(__file__).resolve().parent / "spaces" / "sherlock")
+PAGES_FOLDER = str(Path(__file__).resolve().parent / "spaces" / "elytics")
 
 
 def configure_logging():
@@ -63,23 +62,11 @@ app.server.config["SESSION_PERMANENT"] = True
 app.server.config["PERMANENT_SESSION_LIFETIME"] = int(os.getenv("SESSION_LIFETIME_SECONDS", str(7 * 24 * 60 * 60)))  # 7 days
 app.server.config["PREFERRED_URL_SCHEME"] = "https"
 Session(app.server)
-
-if os.getenv("DISABLE_AUTH", "false").strip().lower() in {"1", "true", "yes", "on"}:
-    logging.getLogger(__name__).warning("Frontend auth disabled for local demo mode")
-else:
-    auth = OIDCAuthWithToken(app, secret_key=os.getenv("FRONTEND_OIDC_SECRET_KEY", "dev"))
-    auth.register_provider(
-        "azure",
-        token_endpoint_auth_method="client_secret_post",
-        client_id=os.getenv("FRONTEND_AZURE_CLIENT_ID"),
-        client_secret=os.getenv("FRONTEND_AZURE_CLIENT_SECRET"),
-        server_metadata_url=f'https://login.microsoftonline.com/{os.getenv("FRONTEND_AZURE_TENANT_ID")}/v2.0/.well-known/openid-configuration',
-        scope=f"openid profile email offline_access api://{os.getenv('BACKEND_AZURE_CLIENT_ID')}/user_impersonation"
-    )
+logging.getLogger(__name__).info("Frontend app auth disabled; using backend Databricks connection for local demo")
 
 app.layout = create_appshell()
-# Dash Pages only wires up the layout for spaces/sherlock/explore/co_reporting.py;
-# the CO Reporting tabs' interactive callbacks must be registered explicitly.
+# Dash Pages wires the Elytics page layout; the reporting tabs' interactive
+# callbacks must still be registered explicitly.
 register_co_reporting_callbacks(app)
 
 if __name__ == "__main__":

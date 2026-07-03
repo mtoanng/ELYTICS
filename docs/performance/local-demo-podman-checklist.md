@@ -2,30 +2,26 @@
 
 ## Goal
 
-Run the Sherlock CO reporting demo locally with:
+Run the Elytics CO reporting demo locally with:
 
 - frontend container
 - backend container
 - Redis container
 - Databricks SQL Warehouse as the data source
-- Gold tables in dev (`ps_xplatform_dev.co2elyd_dev.*`)
+- Gold serving tables in dev (`ps_xplatform_dev.co2elyd_dev.*`)
 
 ## Runtime Decision
 
-Two local demo modes are supported operationally:
+The current Elytics local demo intentionally runs without frontend OIDC/app auth. The backend uses one machine credential to query Databricks SQL serving tables.
 
-### Mode A: Fast local demo
+Recommended credential mode:
 
-- backend auth disabled with `DISABLE_AUTH=true`
-- frontend still runs, but live login flow may not be exercised end to end
-- best for validating reporting queries and charts quickly
+- `DATABRICKS_AUTH_TYPE=azure-sp-m2m`
+- Azure service principal client id/secret/tenant stored in a local `.env` for demo or in Key Vault/container secrets for deployment
 
-### Mode B: Real auth demo
+Local fallback only:
 
-- backend verifies Azure tokens
-- frontend uses Azure OIDC login flow
-- best for realistic demo behavior
-- requires complete Azure app registration values
+- Databricks PAT/access token via `DATABRICKS_TOKEN`
 
 ## Files To Prepare
 
@@ -41,7 +37,7 @@ Templates:
 
 ## Required Backend Values
 
-### Always required
+Always required:
 
 - `ENVIRONMENT=development`
 - `REDIS_HOST`
@@ -49,45 +45,38 @@ Templates:
 - `REDIS_DB`
 - `DATABRICKS_SERVER_HOSTNAME`
 - `DATABRICKS_HTTP_PATH`
-- `DATABRICKS_TOKEN`
+- `DATABRICKS_AUTH_TYPE=azure-sp-m2m`
+- `DATABRICKS_AZURE_CLIENT_ID`
+- `DATABRICKS_AZURE_CLIENT_SECRET`
+- `DATABRICKS_AZURE_TENANT_ID`
 
-### Required for real auth mode
+Recommended for Azure Databricks:
 
-- `BACKEND_AZURE_TENANT_ID`
-- `BACKEND_AZURE_CLIENT_ID`
+- `DATABRICKS_AZURE_WORKSPACE_RESOURCE_ID`
 
-### Required for local auth-bypass mode
+Local fallback only:
 
-- `DISABLE_AUTH=true`
+- `DATABRICKS_TOKEN` with `DATABRICKS_AUTH_TYPE=access-token`
 
 ## Required Frontend Values
 
-### Always required
+Always required:
 
 - `BACKEND_API_URL`
 - `REDIS_HOST`
 - `REDIS_PORT`
 - `REDIS_DB`
 
-### Required for real auth mode
-
-- `FRONTEND_OIDC_SECRET_KEY`
-- `FRONTEND_AZURE_CLIENT_ID`
-- `FRONTEND_AZURE_CLIENT_SECRET`
-- `FRONTEND_AZURE_TENANT_ID`
-- `BACKEND_AZURE_CLIENT_ID`
-
 ## Databricks Access Checklist
 
-The backend credential must be able to read:
+The backend credential must have SQL Warehouse access and read access to:
 
 - `ps_xplatform_dev.co2elyd_dev.gold_experiment_index`
-- `ps_xplatform_dev.co2elyd_dev.gold_channel_catalog`
+- `ps_xplatform_dev.co2elyd_dev.gold_channel_catalog_experiment`
 - `ps_xplatform_dev.co2elyd_dev.gold_timeseries`
-- `ps_xplatform_dev.co2elyd_dev.gold_timeseries_agg`
+- `ps_xplatform_dev.co2elyd_dev.gold_timeseries_agg_1min`
 - `ps_xplatform_dev.co2elyd_dev.gold_timeseries_agg_15min`
 - `ps_xplatform_dev.co2elyd_dev.gold_timeseries_agg_60min`
-- `ps_xplatform_dev.co2elyd_dev.gold_summary_statistics`
 
 ## Podman Runtime Layout
 

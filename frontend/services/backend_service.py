@@ -1,68 +1,37 @@
-import requests
 import os
 import json
-import pandas as pd
-from flask import session
-from typing import Any, Dict, List, Optional
 from datetime import datetime
-from services.auth import _refresh_access_token
+from typing import Any, Dict, List, Optional
+
+import pandas as pd
+import requests
 
 API_BASE = os.environ.get("BACKEND_API_URL", "http://localhost:8000")
 REQUEST_TIMEOUT_SECONDS = 125
-DISABLE_AUTH = os.environ.get("DISABLE_AUTH", "false").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def get_api_headers():
-    """Extract OIDC token from Flask session and return headers."""
-    if DISABLE_AUTH:
-        return {"Content-Type": "application/json"}
-
-    token = session.get("access_token")
-    if not token:
-        raise ValueError("No OIDC token available in session")
-
-    return {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json",
-    }
+    return {"Content-Type": "application/json"}
 
 
 def _get_with_token_refresh(url: str, params: dict | None = None) -> requests.Response:
-    """GET request that automatically refreshes an expired token once and retries."""
     response = requests.get(
         url,
         params=params,
         headers=get_api_headers(),
         timeout=REQUEST_TIMEOUT_SECONDS,
     )
-    if response.status_code == 401:
-        if _refresh_access_token():
-            response = requests.get(
-                url,
-                params=params,
-                headers=get_api_headers(),
-                timeout=REQUEST_TIMEOUT_SECONDS,
-            )
     response.raise_for_status()
     return response
 
 
 def _post_with_token_refresh(url: str, payload: dict | None = None) -> requests.Response:
-    """POST request that automatically refreshes an expired token once and retries."""
     response = requests.post(
         url,
         json=payload,
         headers=get_api_headers(),
         timeout=REQUEST_TIMEOUT_SECONDS,
     )
-    if response.status_code == 401:
-        if _refresh_access_token():
-            response = requests.post(
-                url,
-                json=payload,
-                headers=get_api_headers(),
-                timeout=REQUEST_TIMEOUT_SECONDS,
-            )
     response.raise_for_status()
     return response
 
@@ -176,43 +145,72 @@ def get_timeseries(
 
 
 def get_co_reporting_series() -> List[Dict[str, Any]]:
-    url = f"{API_BASE}/api/sherlock/co-reporting/series"
+    url = f"{API_BASE}/api/elytics/co-reporting/series"
     response = _get_with_token_refresh(url)
     return response.json().get("data", [])
 
 
-def get_co_reporting_channels(series: str, uuid: str, group: str) -> List[Dict[str, Any]]:
-    url = f"{API_BASE}/api/sherlock/co-reporting/channels"
+def _co_reporting_identity_params(
+    series: str,
+    experiment_id: int | None = None,
+    uuid: str | None = None,
+    group: str | None = None,
+) -> Dict[str, Any]:
+    params: Dict[str, Any] = {"series": series}
+    if experiment_id is not None:
+        params["experiment_id"] = experiment_id
+    if uuid:
+        params["uuid"] = uuid
+    if group:
+        params["group"] = group
+    return params
+
+
+def get_co_reporting_channels(
+    series: str,
+    experiment_id: int | None = None,
+    uuid: str | None = None,
+    group: str | None = None,
+) -> List[Dict[str, Any]]:
+    url = f"{API_BASE}/api/elytics/co-reporting/channels"
     response = _get_with_token_refresh(
         url,
-        params={"series": series, "uuid": uuid, "group": group},
+        params=_co_reporting_identity_params(
+            series=series,
+            experiment_id=experiment_id,
+            uuid=uuid,
+            group=group,
+        ),
     )
     return response.json().get("data", [])
 
 
 def get_co_reporting_timeseries(
     series: str,
-    uuid: str,
-    group: str,
+    experiment_id: int | None,
     channels: List[str],
     resolution: str = "agg",
+    uuid: str | None = None,
+    group: str | None = None,
 ) -> pd.DataFrame:
-    params = {
-        "series": series,
-        "uuid": uuid,
-        "group": group,
+    params = _co_reporting_identity_params(
+        series=series,
+        experiment_id=experiment_id,
+        uuid=uuid,
+        group=group,
+    )
+    params.update({
         "channels": channels,
         "resolution": resolution,
-    }
-    url = f"{API_BASE}/api/sherlock/co-reporting/timeseries"
+    })
+    url = f"{API_BASE}/api/elytics/co-reporting/timeseries"
     response = _get_with_token_refresh(url, params=params)
     return pd.DataFrame(response.json().get("data", []))
 
 
 def query_co_reporting_timeseries(
     series: str,
-    uuid: str,
-    group: str,
+    experiment_id: int | None,
     channels: List[str],
     visible_start_s: float,
     visible_end_s: float,
@@ -221,16 +219,21 @@ def query_co_reporting_timeseries(
     mode: str | None = None,
     report_id: str | None = None,
     include_band: bool | None = None,
+    uuid: str | None = None,
+    group: str | None = None,
 ) -> pd.DataFrame:
-    payload = {
-        "series": series,
-        "uuid": uuid,
-        "group": group,
+    payload = _co_reporting_identity_params(
+        series=series,
+        experiment_id=experiment_id,
+        uuid=uuid,
+        group=group,
+    )
+    payload.update({
         "channels": channels,
         "visible_start_s": visible_start_s,
         "visible_end_s": visible_end_s,
         "resolution": resolution,
-    }
+    })
     if prefetch_margin_s is not None:
         payload["prefetch_margin_s"] = prefetch_margin_s
     if mode is not None:
@@ -240,7 +243,7 @@ def query_co_reporting_timeseries(
     if include_band is not None:
         payload["include_band"] = include_band
 
-    url = f"{API_BASE}/api/sherlock/co-reporting/query"
+    url = f"{API_BASE}/api/elytics/co-reporting/query"
     response = _post_with_token_refresh(url, payload=payload)
     payload = response.json()
     df = pd.DataFrame(payload.get("data", []))

@@ -6,14 +6,13 @@ import dash_mantine_components as dmc
 from dash_iconify import DashIconify
 
 from components.sidebar import SIDEBAR_STRUCTURE
-from dash_auth import list_groups
 from config.access_config import SPACE_ACCESS_MAP
 
 IS_DEVELOPMENT = os.getenv("ENVIRONMENT", "development").lower() == "development"
 
 SPACE_SELECTOR_META = {
     "home": {"title": "Home", "subtitle": "", "icon": "tabler:home"},
-    "sherlock": {
+    "elytics": {
         "title": "Elytics",
         "subtitle": "CO2 analytics",
         "icon": "tabler:chart-line",
@@ -67,10 +66,11 @@ def _build_search_options():
 
             grouped_items = []
             for page in pages:
+                value = f"/{space}/{page['path']}" if not group_path else f"/{space}/{group_path}/{page['path']}"
                 grouped_items.append(
                     {
                         "label": page["label"],
-                        "value": f"/{space}/{group_path}/{page['path']}",
+                        "value": value,
                     }
                 )
 
@@ -212,51 +212,6 @@ layout = header_layout
     prevent_initial_call=False
 )
 def update_space_selector(pathname, current_value):
-    # If at root path, don't show any space selected
-    if pathname == "/" or pathname == "":
-        # Get current user's groups
-        user_groups = list_groups()
-        
-        # Determine which spaces the user has access to based on SPACE_ACCESS_MAP
-        allowed_spaces = set()
-        for space_path, required_groups in SPACE_ACCESS_MAP.items():
-            space_name = space_path.strip("/")
-            if user_groups and any(group in user_groups for group in required_groups):
-                allowed_spaces.add(space_name)
-        
-        options = [
-            {
-                "label": _space_option_label("home"),
-                "value": "home",
-                "disabled": False,
-            },
-            {
-                "group": "Spaces",
-                "items": [],
-            },
-        ]
-        options[1]["items"].extend(
-            {
-                "label": _space_option_label(space_path.strip("/")),
-                "value": space_path.strip("/"),
-                "disabled": False,
-            }
-            for space_path in SPACE_ACCESS_MAP.keys()
-        )
-
-        return options, "home"
-    
-    # Get current user's groups
-    user_groups = list_groups()
-    
-    # Determine which spaces the user has access to based on SPACE_ACCESS_MAP
-    allowed_spaces = set()
-    for space_path, required_groups in SPACE_ACCESS_MAP.items():
-        space_name = space_path.strip("/")
-        if user_groups and any(group in user_groups for group in required_groups):
-            allowed_spaces.add(space_name)
-    
-    # Build options from SPACE_ACCESS_MAP, grouped under "Spaces"
     options = [
         {
             "label": _space_option_label("home"),
@@ -265,26 +220,24 @@ def update_space_selector(pathname, current_value):
         },
         {
             "group": "Spaces",
-            "items": [],
+            "items": [
+                {
+                    "label": _space_option_label(space_path.strip("/")),
+                    "value": space_path.strip("/"),
+                    "disabled": False,
+                }
+                for space_path in SPACE_ACCESS_MAP.keys()
+            ],
         },
     ]
-    options[1]["items"].extend(
-        {
-            "label": _space_option_label(space_path.strip("/")),
-            "value": space_path.strip("/"),
-            "disabled": False,
-        }
-        for space_path in SPACE_ACCESS_MAP.keys()
-    )
-    
-    # Get current space from URL
+
+    if pathname == "/" or pathname == "":
+        return options, "home"
+
     current_space = pathname.split("/")[1] if pathname and len(pathname.split("/")) > 1 else None
-    
-    # Always return current space from URL - don't override it
     if current_space:
         return options, current_space
-    
-    # Default to first space if no valid space in URL
+
     return options, "home"
 
 
@@ -353,7 +306,7 @@ clientside_callback(
                 }
                 if (space !== 'home' && space !== currentSpace) {
                     const defaultRoutes = {
-                        sherlock: '/sherlock/data-exploration/co-reporting'
+                        elytics: '/elytics/co-reporting'
                     };
                     window.location.href = defaultRoutes[space] || ('/' + space + '/home');
                 }

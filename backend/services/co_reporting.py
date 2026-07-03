@@ -10,19 +10,21 @@ CO_REPORTING_TTL_SECONDS = int(os.getenv("CO_REPORTING_TTL_SECONDS", "43200"))
 CO_GOLD_CATALOG = os.getenv("CO_GOLD_CATALOG", DATABRICKS_CATALOG)
 CO_GOLD_SCHEMA = os.getenv("CO_GOLD_SCHEMA", "co2elyd_dev")
 CO_GOLD_RAW_TABLE = os.getenv("CO_GOLD_RAW_TABLE", "gold_timeseries")
-CO_GOLD_AGG_TABLE = os.getenv("CO_GOLD_AGG_TABLE", "gold_timeseries_agg")
+CO_GOLD_AGG_1M_TABLE = os.getenv("CO_GOLD_AGG_1M_TABLE", "gold_timeseries_agg_1min")
 CO_GOLD_AGG_15M_TABLE = os.getenv("CO_GOLD_AGG_15M_TABLE", "gold_timeseries_agg_15min")
 CO_GOLD_AGG_60M_TABLE = os.getenv("CO_GOLD_AGG_60M_TABLE", "gold_timeseries_agg_60min")
 CO_GOLD_EXPERIMENT_INDEX_TABLE = os.getenv("CO_GOLD_EXPERIMENT_INDEX_TABLE", "gold_experiment_index")
-CO_GOLD_CHANNEL_CATALOG_TABLE = os.getenv("CO_GOLD_CHANNEL_CATALOG_TABLE", "gold_channel_catalog")
-CO_GOLD_SUMMARY_TABLE = os.getenv("CO_GOLD_SUMMARY_TABLE", "gold_summary_statistics")
+CO_GOLD_CHANNEL_CATALOG_EXPERIMENT_TABLE = os.getenv(
+    "CO_GOLD_CHANNEL_CATALOG_EXPERIMENT_TABLE",
+    os.getenv("CO_GOLD_CHANNEL_CATALOG_TABLE", "gold_channel_catalog_experiment"),
+)
 CO_REPORTING_DEFAULT_PREFETCH_SECONDS = int(os.getenv("CO_REPORTING_DEFAULT_PREFETCH_SECONDS", "1800"))
 CO_REPORTING_RAW_MAX_SPAN_SECONDS = int(os.getenv("CO_REPORTING_RAW_MAX_SPAN_SECONDS", str(2 * 3600)))
 CO_REPORTING_AGG_1M_MAX_SPAN_SECONDS = int(os.getenv("CO_REPORTING_AGG_1M_MAX_SPAN_SECONDS", str(24 * 3600)))
 CO_REPORTING_AGG_15M_MAX_SPAN_SECONDS = int(os.getenv("CO_REPORTING_AGG_15M_MAX_SPAN_SECONDS", str(7 * 24 * 3600)))
 CO_REPORTING_ENABLED_RESOLUTIONS = {
     item.strip()
-    for item in os.getenv("CO_REPORTING_ENABLED_RESOLUTIONS", "raw,agg_1m").split(",")
+    for item in os.getenv("CO_REPORTING_ENABLED_RESOLUTIONS", "raw,agg_1m,agg_15m,agg_60m").split(",")
     if item.strip()
 }
 
@@ -68,6 +70,16 @@ def _choose_resolution(requested_resolution: str, span_seconds: float) -> str:
     return "raw"
 
 
+def _table_for_resolution(resolution: str) -> str:
+    if resolution == "raw":
+        return _qualified_table(CO_GOLD_RAW_TABLE)
+    if resolution == "agg_15m":
+        return _qualified_table(CO_GOLD_AGG_15M_TABLE)
+    if resolution == "agg_60m":
+        return _qualified_table(CO_GOLD_AGG_60M_TABLE)
+    return _qualified_table(CO_GOLD_AGG_1M_TABLE)
+
+
 def _clamp_window(visible_start_s: float, visible_end_s: float, prefetch_margin_s: float) -> tuple[float, float]:
     start = min(visible_start_s, visible_end_s)
     end = max(visible_start_s, visible_end_s)
@@ -79,13 +91,41 @@ def _to_elapsed_literal(value: float) -> str:
     return str(round(float(value), 6))
 
 
+def _experiment_literal(experiment_id: int | str) -> str:
+    return str(int(experiment_id))
+
+
+def _optional_text(value: str | None) -> str | None:
+    if value is None:
+        return None
+    cleaned = str(value).strip()
+    return cleaned or None
+
+
+def _identity_condition(
+    series: str,
+    experiment_id: int | str | None = None,
+    uuid: str | None = None,
+    group: str | None = None,
+) -> str:
+    normalised_uuid = _optional_text(uuid)
+    normalised_group = _optional_text(group)
+    if experiment_id is None and (normalised_uuid is None or normalised_group is None):
+        raise ValueError("CO reporting queries require experiment_id or both uuid and group")
+
+    clauses = [f"series = {to_sql_literal(series)}"]
+    if experiment_id is not None:
+        clauses.append(f"experiment_id = {_experiment_literal(experiment_id)}")
+    if normalised_uuid is not None:
+        clauses.append(f"uuid = {to_sql_literal(normalised_uuid)}")
+    if normalised_group is not None:
+        clauses.append(f"`group` = {to_sql_literal(normalised_group)}")
+    return "\n          AND ".join(clauses)
+
+
 def _channel_match_condition(channels: list[str]) -> str:
     channel_filter = ", ".join(to_sql_literal(channel) for channel in channels)
-    return (
-        f"(channel_id IN ({channel_filter}) "
-        f"OR std_channel IN ({channel_filter}) "
-        f"OR raw_channel IN ({channel_filter}))"
-    )
+    return f"std_channel IN ({channel_filter})"
 
 
 def _cache_get_or_query(key_prefix: str, query: str, source_name: str, **key_parts: Any) -> list[dict[str, Any]]:
@@ -107,6 +147,7 @@ def list_series_groups() -> list[dict[str, Any]]:
     table = _qualified_table(CO_GOLD_EXPERIMENT_INDEX_TABLE)
     query = f"""
         SELECT
+          experiment_id,
           series,
           uuid,
           `group`,
@@ -116,45 +157,57 @@ def list_series_groups() -> list[dict[str, Any]]:
           start_timestamp,
           end_timestamp,
           channel_count,
-          max_sample_offset,
           total_data_points,
-          source_file_path,
           source_file_name,
           source_file_size,
           source_last_modified,
-          ingested_at
+          ingested_at,
+          avg_stack_voltage_v,
+          peak_current_density_ma_cm2,
+          avg_energy_efficiency_pct,
+          avg_fe_co_pct,
+          avg_fe_h2_pct,
+          avg_spce_pct
         FROM {table}
         WHERE series IS NOT NULL
-          AND uuid IS NOT NULL
-          AND `group` IS NOT NULL
-        ORDER BY series, uuid, `group`
+          AND experiment_id IS NOT NULL
+        ORDER BY series, start_timestamp, experiment_id
     """
     return _cache_get_or_query("co_reporting_series", query, table)
 
 
-def list_channels(series: str, uuid: str, group: str) -> list[dict[str, Any]]:
-    table = _qualified_table(CO_GOLD_CHANNEL_CATALOG_TABLE)
+def list_channels(
+    series: str,
+    experiment_id: int | str | None = None,
+    uuid: str | None = None,
+    group: str | None = None,
+) -> list[dict[str, Any]]:
+    table = _qualified_table(CO_GOLD_CHANNEL_CATALOG_EXPERIMENT_TABLE)
+    identity_condition = _identity_condition(
+        series=series,
+        experiment_id=experiment_id,
+        uuid=uuid,
+        group=group,
+    )
     query = f"""
         SELECT
-          channel_id,
-          raw_channel,
+          signal_id,
           std_channel,
+          std_channel AS channel_name,
           unit,
-          column_index,
           has_data
         FROM {table}
-        WHERE series = {to_sql_literal(series)}
-          AND uuid = {to_sql_literal(uuid)}
-          AND `group` = {to_sql_literal(group)}
-          AND channel_id IS NOT NULL
+        WHERE {identity_condition}
+          AND std_channel IS NOT NULL
           AND COALESCE(has_data, true) = true
-        ORDER BY COALESCE(column_index, 2147483647), COALESCE(std_channel, raw_channel, channel_id), channel_id
+        ORDER BY std_channel
     """
     return _cache_get_or_query(
         "co_reporting_channels",
         query,
         table,
         series=series,
+        experiment_id=experiment_id,
         uuid=uuid,
         group=group,
     )
@@ -162,10 +215,11 @@ def list_channels(series: str, uuid: str, group: str) -> list[dict[str, Any]]:
 
 def get_timeseries(
     series: str,
-    uuid: str,
-    group: str,
+    experiment_id: int | str | None,
     channels: list[str],
     resolution: str,
+    uuid: str | None = None,
+    group: str | None = None,
 ) -> list[dict[str, Any]]:
     if not channels:
         return []
@@ -173,54 +227,58 @@ def get_timeseries(
     normalised_channels = _normalise_channels(channels)
     channel_condition = _channel_match_condition(normalised_channels)
     effective_resolution = _normalise_resolution(resolution)
+    table = _table_for_resolution(effective_resolution)
+    identity_condition = _identity_condition(
+        series=series,
+        experiment_id=experiment_id,
+        uuid=uuid,
+        group=group,
+    )
+
     if effective_resolution == "raw":
-        table = _qualified_table(CO_GOLD_RAW_TABLE)
         query = f"""
             SELECT
               timestamp,
               elapsed_time_s,
               sample_offset,
-              channel_id,
-              raw_channel,
               std_channel,
-              unit,
+              std_channel AS channel_name,
+              signal_id,
+              signal_id AS channel,
               value,
               value_str
             FROM {table}
-            WHERE series = {to_sql_literal(series)}
-              AND uuid = {to_sql_literal(uuid)}
-              AND `group` = {to_sql_literal(group)}
+            WHERE {identity_condition}
               AND {channel_condition}
-            ORDER BY elapsed_time_s, sample_offset, channel_id
+            ORDER BY elapsed_time_s, sample_offset, signal_id
         """
     else:
-        table = _qualified_table(CO_GOLD_AGG_TABLE)
         query = f"""
             SELECT
               timestamp,
               elapsed_time_s,
               elapsed_bin_s,
-              channel_id,
-              raw_channel,
               std_channel,
-              unit,
+              std_channel AS channel_name,
+              signal_id,
+              signal_id AS channel,
               value_mean,
               value_min,
               value_max,
               value_count
             FROM {table}
-            WHERE series = {to_sql_literal(series)}
-              AND uuid = {to_sql_literal(uuid)}
-              AND `group` = {to_sql_literal(group)}
+            WHERE {identity_condition}
               AND {channel_condition}
-            ORDER BY elapsed_bin_s, channel_id
+            ORDER BY elapsed_bin_s, signal_id
         """
+        effective_resolution = "agg_1m" if effective_resolution == "agg" else effective_resolution
 
     return _cache_get_or_query(
         "co_reporting_timeseries",
         query,
         table,
         series=series,
+        experiment_id=experiment_id,
         uuid=uuid,
         group=group,
         channels=normalised_channels,
@@ -230,8 +288,7 @@ def get_timeseries(
 
 def query_timeseries_window(
     series: str,
-    uuid: str,
-    group: str,
+    experiment_id: int | str | None,
     channels: list[str],
     visible_start_s: float,
     visible_end_s: float,
@@ -240,6 +297,8 @@ def query_timeseries_window(
     mode: str | None = None,
     report_id: str | None = None,
     include_band: bool | None = None,
+    uuid: str | None = None,
+    group: str | None = None,
 ) -> dict[str, Any]:
     normalised_channels = _normalise_channels(channels)
     if not normalised_channels:
@@ -260,112 +319,64 @@ def query_timeseries_window(
     span_seconds = max(0.0, visible_max - visible_min)
     served_resolution = _choose_resolution(resolution, span_seconds)
     channel_condition = _channel_match_condition(normalised_channels)
+    table = _table_for_resolution(served_resolution)
+    identity_condition = _identity_condition(
+        series=series,
+        experiment_id=experiment_id,
+        uuid=uuid,
+        group=group,
+    )
 
     if served_resolution == "raw":
-        table = _qualified_table(CO_GOLD_RAW_TABLE)
         query = f"""
             SELECT
               timestamp,
               elapsed_time_s,
               sample_offset,
-              channel_id,
-              raw_channel,
               std_channel,
-              unit,
+              std_channel AS channel_name,
+              signal_id,
+              signal_id AS channel,
               value,
               value_str
             FROM {table}
-            WHERE series = {to_sql_literal(series)}
-              AND uuid = {to_sql_literal(uuid)}
-              AND `group` = {to_sql_literal(group)}
+            WHERE {identity_condition}
               AND elapsed_time_s IS NOT NULL
               AND elapsed_time_s >= {_to_elapsed_literal(query_start_s)}
               AND elapsed_time_s <= {_to_elapsed_literal(query_end_s)}
               AND {channel_condition}
-            ORDER BY elapsed_time_s, sample_offset, channel_id
-        """
-    elif served_resolution == "agg_60m":
-        table = _qualified_table(CO_GOLD_AGG_60M_TABLE)
-        query = f"""
-            SELECT
-              timestamp,
-              elapsed_time_s,
-              elapsed_bin_s,
-              channel_id,
-              raw_channel,
-              std_channel,
-              unit,
-              value_mean,
-              value_min,
-              value_max,
-              value_count
-            FROM {table}
-            WHERE series = {to_sql_literal(series)}
-              AND uuid = {to_sql_literal(uuid)}
-              AND `group` = {to_sql_literal(group)}
-              AND elapsed_time_s IS NOT NULL
-              AND elapsed_time_s >= {_to_elapsed_literal(query_start_s)}
-              AND elapsed_time_s <= {_to_elapsed_literal(query_end_s)}
-              AND {channel_condition}
-            ORDER BY elapsed_bin_s, channel_id
-        """
-    elif served_resolution == "agg_15m":
-        table = _qualified_table(CO_GOLD_AGG_15M_TABLE)
-        query = f"""
-            SELECT
-              timestamp,
-              elapsed_time_s,
-              elapsed_bin_s,
-              channel_id,
-              raw_channel,
-              std_channel,
-              unit,
-              value_mean,
-              value_min,
-              value_max,
-              value_count
-            FROM {table}
-            WHERE series = {to_sql_literal(series)}
-              AND uuid = {to_sql_literal(uuid)}
-              AND `group` = {to_sql_literal(group)}
-              AND elapsed_time_s IS NOT NULL
-              AND elapsed_time_s >= {_to_elapsed_literal(query_start_s)}
-              AND elapsed_time_s <= {_to_elapsed_literal(query_end_s)}
-              AND {channel_condition}
-            ORDER BY elapsed_bin_s, channel_id
+            ORDER BY elapsed_time_s, sample_offset, signal_id
         """
     else:
-        table = _qualified_table(CO_GOLD_AGG_TABLE)
         query = f"""
             SELECT
               timestamp,
               elapsed_time_s,
               elapsed_bin_s,
-              channel_id,
-              raw_channel,
               std_channel,
-              unit,
+              std_channel AS channel_name,
+              signal_id,
+              signal_id AS channel,
               value_mean,
               value_min,
               value_max,
               value_count
             FROM {table}
-            WHERE series = {to_sql_literal(series)}
-              AND uuid = {to_sql_literal(uuid)}
-              AND `group` = {to_sql_literal(group)}
+            WHERE {identity_condition}
               AND elapsed_time_s IS NOT NULL
               AND elapsed_time_s >= {_to_elapsed_literal(query_start_s)}
               AND elapsed_time_s <= {_to_elapsed_literal(query_end_s)}
               AND {channel_condition}
-            ORDER BY elapsed_bin_s, channel_id
+            ORDER BY elapsed_bin_s, signal_id
         """
-        served_resolution = "agg_1m"
+        served_resolution = "agg_1m" if served_resolution == "agg" else served_resolution
 
     data = _cache_get_or_query(
         "co_reporting_query",
         query,
         table,
         series=series,
+        experiment_id=experiment_id,
         uuid=uuid,
         group=group,
         channels=normalised_channels,
@@ -380,6 +391,7 @@ def query_timeseries_window(
         "data": data,
         "meta": {
             "series": series,
+            "experiment_id": int(experiment_id) if experiment_id is not None else None,
             "uuid": uuid,
             "group": group,
             "requested_resolution": resolution,

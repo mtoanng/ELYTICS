@@ -3,9 +3,6 @@ from dash import dcc, page_container, callback, Output, Input, State
 from dash_iconify import DashIconify
 
 from components import header, sidebar
-from services.auth import check_access
-from components.access_warning import create_access_warning
-from config.access_config import SPACE_ACCESS_MAP
 
 
 HEADER_HEIGHT = 70
@@ -132,70 +129,6 @@ def update_appshell_content(pathname, chrome_hidden):
                         constrained=True,
                     ),
                     id="page-content",
-                ),
-            ],
-            header={"height": HEADER_HEIGHT},
-            padding=0,
-        )
-
-    # Extract space from pathname (e.g., "/sherlock/..." -> "sherlock")
-    path_parts = pathname.split("/")
-    space = path_parts[1] if len(path_parts) > 1 else None
-    required_groups = SPACE_ACCESS_MAP.get(f"/{space}")
-
-    # Check access
-    has_access, user, needs_login = (
-        check_access(groups=required_groups) if required_groups else (True, None, False)
-    )
-
-    # If needs login, Dash auth will handle the redirect automatically
-    # Just return empty content for now
-    if needs_login:
-        return dmc.AppShell(
-            id="main-appshell",
-            className=shell_class,
-            children=[
-                dmc.AppShellHeader(header.layout(), h=HEADER_HEIGHT),
-                dmc.AppShellMain(
-                    children=_page_content(
-                        dmc.Center(
-                            dmc.Loader(size="lg"),
-                            style={"minHeight": f"calc(100vh - {HEADER_HEIGHT}px)"},
-                        ),
-                        hidden,
-                        show_toggle=show_toggle,
-                        constrained=is_home,
-                    ),
-                    id="page-content",
-                    p=0,
-                    pt="lg",
-                ),
-            ],
-            header={"height": HEADER_HEIGHT},
-            padding=0,
-        )
-
-    # If no access, show access warning without sidebar
-    if not has_access and space is not None:
-        access_content = create_access_warning(space)
-        return dmc.AppShell(
-            id="main-appshell",
-            className=shell_class,
-            children=[
-                dmc.AppShellHeader(header.layout(), h=HEADER_HEIGHT),
-                dmc.AppShellMain(
-                    children=_page_content(
-                        dmc.Center(
-                            access_content,
-                            style={"minHeight": f"calc(100vh - {HEADER_HEIGHT}px)"},
-                        ),
-                        hidden,
-                        show_toggle=show_toggle,
-                        constrained=is_home,
-                    ),
-                    id="page-content",
-                    p=0,
-                    pt="lg",
                 ),
             ],
             header={"height": HEADER_HEIGHT},
