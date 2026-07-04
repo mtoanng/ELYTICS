@@ -163,6 +163,18 @@
     color: var(--mantine-color-dimmed) !important;
 }
 
+.co-reporting-graph-frame {
+    flex: 1 1 auto;
+    margin: 0 0.75rem 0.75rem;
+    min-height: 560px;
+    overflow: visible;
+}
+
+.co-reporting-graph {
+    display: block;
+    min-height: 560px;
+}
+
 .co-reporting-shell .js-plotly-plot .plotly .main-svg {
     border-radius: 0.75rem;
 }

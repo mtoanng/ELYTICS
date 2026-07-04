@@ -31,10 +31,10 @@ def build_layout():
         fluid=True,
         className="px-0 co-reporting-shell",
         style={
-            "height": "calc(100vh - 110px)",
+            "minHeight": "calc(100vh - 80px)",
             "display": "flex",
             "flexDirection": "column",
-            "overflow": "hidden",
+            "overflow": "auto",
         },
         children=[
             dcc.Store(id="store-series-refresh", storage_type="memory", data=0),

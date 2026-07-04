@@ -97,6 +97,19 @@ def _drop_alias_duplicate_columns(df):
     return df.drop(columns=duplicate_columns) if duplicate_columns else df
 
 
+def _series_default_window_h(series, fallback_hours: float = 24.0) -> tuple[float, float]:
+    try:
+        start_h = max(0.0, float(series.start_time or 0.0) / 3600.0)
+    except (TypeError, ValueError):
+        start_h = 0.0
+    try:
+        end_h = max(start_h, float(series.end_time or 0.0) / 3600.0)
+    except (TypeError, ValueError):
+        end_h = start_h
+    visible_end_h = min(end_h, start_h + fallback_hours) if end_h > start_h else start_h + fallback_hours
+    return start_h, visible_end_h
+
+
 # ---------------------------------------------------------------------------
 # Layout
 # ---------------------------------------------------------------------------
@@ -252,14 +265,22 @@ def layout(data_manager: SeriesDataManager):
             ),
 
             # ---- main graph ----
-            dcc.Graph(
-                id="graph-report",
-                style={"flex": "1 1 auto", "minHeight": "0"},
-                config={
-                    "displayModeBar": True,
-                    "scrollZoom": True,
-                    "displaylogo": False,
-                },
+            html.Div(
+                className="co-reporting-graph-frame",
+                children=dcc.Graph(
+                    id="graph-report",
+                    className="co-reporting-graph",
+                    style={
+                        "height": "max(560px, calc(100vh - 17rem))",
+                        "width": "100%",
+                    },
+                    config={
+                        "displayModeBar": True,
+                        "scrollZoom": True,
+                        "displaylogo": False,
+                        "responsive": True,
+                    },
+                ),
             ),
         ],
     )
@@ -404,8 +425,9 @@ def register_callbacks(app, data_manager: SeriesDataManager):
             return empty_figure("Series metadata unavailable."), no_update, "Series metadata unavailable."
 
         report_columns = _query_columns_for_report(report, series, data_manager)
-        visible_start_h = float(time_min) if time_min is not None else 0.0
-        visible_end_h = float(time_max) if time_max is not None else 24.0
+        default_start_h, default_end_h = _series_default_window_h(series)
+        visible_start_h = float(time_min) if time_min is not None else default_start_h
+        visible_end_h = float(time_max) if time_max is not None else default_end_h
         if visible_end_h <= visible_start_h:
             visible_end_h = visible_start_h + 24.0
 
@@ -538,8 +560,9 @@ def register_callbacks(app, data_manager: SeriesDataManager):
 
         eff_tmin = new_tmin if new_tmin is not no_update else time_min
         eff_tmax = new_tmax if new_tmax is not no_update else time_max
-        visible_start_h = float(eff_tmin) if eff_tmin is not None else 0.0
-        visible_end_h = float(eff_tmax) if eff_tmax is not None else max(visible_start_h + 24.0, 24.0)
+        default_start_h, default_end_h = _series_default_window_h(series)
+        visible_start_h = float(eff_tmin) if eff_tmin is not None else default_start_h
+        visible_end_h = float(eff_tmax) if eff_tmax is not None else default_end_h
         if visible_end_h <= visible_start_h:
             visible_end_h = visible_start_h + 24.0
 

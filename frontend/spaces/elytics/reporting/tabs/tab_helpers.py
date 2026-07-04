@@ -308,13 +308,18 @@ def apply_axis_overrides(fig, y1_min, y1_max, y2_min, y2_max):
             float(y1_min) if y1_min is not None else None,
             float(y1_max) if y1_max is not None else None,
         ]
-        fig.update_layout(yaxis=dict(range=y1_range, autorange=False))
+        fig.update_layout(yaxis=dict(range=y1_range, autorange=False, fixedrange=False))
+    else:
+        fig.update_layout(yaxis=dict(autorange=True, fixedrange=False))
+
     if y2_min is not None or y2_max is not None:
         y2_range = [
             float(y2_min) if y2_min is not None else None,
             float(y2_max) if y2_max is not None else None,
         ]
-        fig.update_layout(yaxis2=dict(range=y2_range, autorange=False))
+        fig.update_layout(yaxis2=dict(range=y2_range, autorange=False, fixedrange=False))
+    else:
+        fig.update_layout(yaxis2=dict(autorange=True, fixedrange=False))
 
 
 def finalise_figure(fig, keep_webgl=False):
@@ -342,6 +347,8 @@ def finalise_figure(fig, keep_webgl=False):
             xanchor="left", x=1.02,
             font=dict(size=10),
         ),
+        yaxis=dict(autorange=True, fixedrange=False),
+        yaxis2=dict(autorange=True, fixedrange=False),
     )
     return fig
 

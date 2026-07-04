@@ -63,8 +63,8 @@ class ElyticsDataProvider:
             experiment_id = row.get("experiment_id")
             if not series_name or experiment_id in (None, ""):
                 continue
-            start_time = row.get("start_time") or row.get("start_timestamp")
-            end_time = row.get("end_time") or row.get("end_timestamp")
+            start_time = row.get("start_time") or row.get("start_time_s") or row.get("start_timestamp")
+            end_time = row.get("end_time") or row.get("end_time_s") or row.get("end_timestamp")
             uuid_value = None if row.get("uuid") in (None, "") else str(row.get("uuid"))
             source_file_name = None if row.get("source_file_name") in (None, "") else str(row.get("source_file_name"))
             series = ElyticsSeries(
