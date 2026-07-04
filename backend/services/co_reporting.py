@@ -112,21 +112,26 @@ def _identity_condition(
 ) -> str:
     normalised_uuid = _optional_text(uuid)
     normalised_group = _optional_text(group)
-    if experiment_id is None and (normalised_uuid is None or normalised_group is None):
-        raise ValueError("CO reporting queries require experiment_id or both uuid and group")
+    if experiment_id is None and normalised_uuid is None:
+        raise ValueError("CO reporting queries require experiment_id or uuid")
 
     clauses = [f"series = {to_sql_literal(series)}"]
     if experiment_id is not None:
         clauses.append(f"experiment_id = {_experiment_literal(experiment_id)}")
     else:
         experiment_index_table = _qualified_table(CO_GOLD_EXPERIMENT_INDEX_TABLE)
+        group_filter = (
+            f"\n              AND `group` = {to_sql_literal(normalised_group)}"
+            if normalised_group is not None
+            else ""
+        )
         clauses.append(
             "experiment_id IN (\n"
-            "            SELECT experiment_id\n"
+            "            SELECT DISTINCT experiment_id\n"
             f"            FROM {experiment_index_table}\n"
             f"            WHERE series = {to_sql_literal(series)}\n"
-            f"              AND uuid = {to_sql_literal(normalised_uuid)}\n"
-            f"              AND `group` = {to_sql_literal(normalised_group)}\n"
+            f"              AND uuid = {to_sql_literal(normalised_uuid)}"
+            f"{group_filter}\n"
             "          )"
         )
     return "\n          AND ".join(clauses)
@@ -201,6 +206,37 @@ def _list_series_groups_from_agg() -> list[dict[str, Any]]:
 def list_series_groups() -> list[dict[str, Any]]:
     table = _qualified_table(CO_GOLD_EXPERIMENT_INDEX_TABLE)
     query = f"""
+        WITH ranked AS (
+          SELECT
+            experiment_id,
+            series,
+            uuid,
+            `group`,
+            start_time_s,
+            end_time_s,
+            duration_s,
+            start_timestamp,
+            end_timestamp,
+            channel_count,
+            total_data_points,
+            source_file_name,
+            source_file_size,
+            source_last_modified,
+            ingested_at,
+            avg_stack_voltage_v,
+            peak_current_density_ma_cm2,
+            avg_energy_efficiency_pct,
+            avg_fe_co_pct,
+            avg_fe_h2_pct,
+            avg_spce_pct,
+            ROW_NUMBER() OVER (
+              PARTITION BY experiment_id, uuid, `group`
+              ORDER BY ingested_at DESC NULLS LAST
+            ) AS row_num
+          FROM {table}
+          WHERE series IS NOT NULL
+            AND experiment_id IS NOT NULL
+        )
         SELECT
           experiment_id,
           series,
@@ -223,9 +259,8 @@ def list_series_groups() -> list[dict[str, Any]]:
           avg_fe_co_pct,
           avg_fe_h2_pct,
           avg_spce_pct
-        FROM {table}
-        WHERE series IS NOT NULL
-          AND experiment_id IS NOT NULL
+        FROM ranked
+        WHERE row_num = 1
         ORDER BY series, start_timestamp, experiment_id
     """
     try:
@@ -250,7 +285,7 @@ def list_channels(
         group=group,
     )
     query = f"""
-        SELECT
+        SELECT DISTINCT
           signal_id,
           std_channel,
           std_channel AS channel_name,

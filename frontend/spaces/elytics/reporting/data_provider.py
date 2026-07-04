@@ -33,7 +33,7 @@ DERIVED_CHANNEL_DEPENDENCIES = {
 @dataclass(frozen=True)
 class ElyticsSeries:
     series: str
-    experiment_id: int
+    experiment_id: int | None
     uuid: str | None = None
     group: str | None = None
     start_time: str | None = None
@@ -57,6 +57,7 @@ class ElyticsDataProvider:
     def list_series(self) -> list[ElyticsSeries]:
         rows = get_co_reporting_series()
         items: dict[str, ElyticsSeries] = {}
+        combined_groups: dict[tuple[str, str, str], list[ElyticsSeries]] = {}
         for row in rows:
             series_name = str(row.get("series") or "").strip()
             experiment_id = row.get("experiment_id")
@@ -64,17 +65,37 @@ class ElyticsDataProvider:
                 continue
             start_time = row.get("start_time") or row.get("start_timestamp")
             end_time = row.get("end_time") or row.get("end_timestamp")
+            uuid_value = None if row.get("uuid") in (None, "") else str(row.get("uuid"))
+            source_file_name = None if row.get("source_file_name") in (None, "") else str(row.get("source_file_name"))
             series = ElyticsSeries(
                 series=series_name,
                 experiment_id=int(experiment_id),
-                uuid=None if row.get("uuid") in (None, "") else str(row.get("uuid")),
+                uuid=uuid_value,
                 group=None if row.get("group") in (None, "") else str(row.get("group")),
                 start_time=None if start_time in (None, "") else str(start_time),
                 end_time=None if end_time in (None, "") else str(end_time),
                 sample_count=row.get("sample_count") or row.get("total_data_points"),
-                source_file_name=None if row.get("source_file_name") in (None, "") else str(row.get("source_file_name")),
+                source_file_name=source_file_name,
             )
             items[series.key] = series
+            if uuid_value and source_file_name:
+                combined_groups.setdefault((series_name, uuid_value, source_file_name), []).append(series)
+
+        for (series_name, uuid_value, source_file_name), group_items in combined_groups.items():
+            unique_groups = {item.group for item in group_items if item.group}
+            if len(unique_groups) < 2:
+                continue
+            combined = ElyticsSeries(
+                series=series_name,
+                experiment_id=None,
+                uuid=uuid_value,
+                group=None,
+                start_time=min((item.start_time for item in group_items if item.start_time), default=None),
+                end_time=max((item.end_time for item in group_items if item.end_time), default=None),
+                sample_count=sum(int(item.sample_count or 0) for item in {item.experiment_id: item for item in group_items}.values()),
+                source_file_name=f"{source_file_name} (all measurements)",
+            )
+            items[combined.key] = combined
         return sorted(items.values(), key=lambda item: item.key)
 
     def get_series_map(self) -> dict[str, ElyticsSeries]:
@@ -157,6 +178,26 @@ class ElyticsDataProvider:
         return wide
 
     @staticmethod
+    def _strip_aggregation_suffix(column: str) -> str:
+        for suffix in ("_mean", "_min", "_max"):
+            if column.endswith(suffix):
+                return column[: -len(suffix)]
+        return column
+
+    @staticmethod
+    def _apply_plausibility_limits(df: pd.DataFrame) -> pd.DataFrame:
+        units = _load_units()
+        if not units:
+            return df
+        df = df.copy()
+        for column in df.columns:
+            base = ElyticsDataProvider._strip_aggregation_suffix(column)
+            if units.get(base) == "%":
+                values = pd.to_numeric(df[column], errors="coerce")
+                df[column] = values.clip(lower=0, upper=100)
+        return df
+
+    @staticmethod
     def _add_derived_columns(df: pd.DataFrame) -> pd.DataFrame:
         if df.empty:
             return df
@@ -182,7 +223,7 @@ class ElyticsDataProvider:
                 canonical_column = f"{canonical}{suffix}"
                 if alias_column not in df.columns and canonical_column in df.columns:
                     df[alias_column] = df[canonical_column]
-        return df
+        return ElyticsDataProvider._apply_plausibility_limits(df)
 
     @staticmethod
     def _pivot_timeseries(df: pd.DataFrame, resolution: str) -> pd.DataFrame:
@@ -199,10 +240,13 @@ class ElyticsDataProvider:
             return pd.DataFrame()
         df["metric"] = metric.astype(str)
 
-        index_columns = ["elapsed_time_s"]
+        elapsed_column = "elapsed_time_s"
+        if resolution != "raw" and "elapsed_bin_s" in df.columns:
+            elapsed_column = "elapsed_bin_s"
+        index_columns = [elapsed_column]
         timestamps = None
         if "timestamp" in df.columns:
-            timestamps = df.groupby("elapsed_time_s", dropna=False)["timestamp"].first()
+            timestamps = df.groupby(elapsed_column, dropna=False)["timestamp"].first()
 
         if resolution == "raw":
             wide = df.pivot_table(
@@ -233,10 +277,10 @@ class ElyticsDataProvider:
         if wide.empty:
             return wide
         if timestamps is not None:
-            wide.insert(0, "timestamp", wide["elapsed_time_s"].map(timestamps))
+            wide.insert(0, "timestamp", wide[elapsed_column].map(timestamps))
         else:
             wide.insert(0, "timestamp", pd.NaT)
-        wide = wide.rename(columns={"timestamp": "time", "elapsed_time_s": "Elapsed time"})
+        wide = wide.rename(columns={"timestamp": "time", elapsed_column: "Elapsed time"})
         wide["time"] = pd.to_datetime(wide["time"], errors="coerce", utc=True)
         wide = wide.sort_values("Elapsed time").reset_index(drop=True)
         return ElyticsDataProvider._add_derived_columns(wide)
@@ -304,9 +348,10 @@ class ElyticsDataManager(ElyticsDataProvider):
             series_def = self.series_defs.get(series_name)
         if not series_def:
             return None
+        experiment_id = series_def.get("experiment_id")
         return ElyticsSeries(
             series=series_def["series"],
-            experiment_id=int(series_def["experiment_id"]),
+            experiment_id=None if experiment_id in (None, "") else int(experiment_id),
             uuid=series_def.get("uuid"),
             group=series_def.get("group"),
             start_time=series_def.get("start_time"),

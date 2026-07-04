@@ -170,3 +170,54 @@ def test_all_report_drops_alias_duplicates_before_auto_plotting():
 
 def test_rgb_to_rgba_converts_plotly_hex_colors():
     assert rgb_to_rgba("#636EFA", 0.5) == "rgba(99,110,250,0.5)"
+
+
+def test_pivot_timeseries_uses_elapsed_bin_for_aggregate_rows():
+    df = pd.DataFrame(
+        [
+            {
+                "timestamp": None,
+                "elapsed_time_s": 43.0,
+                "elapsed_bin_s": 0.0,
+                "std_channel": "Stack Voltage",
+                "value_mean": 14.2,
+                "value_min": 14.0,
+                "value_max": 14.4,
+            },
+            {
+                "timestamp": None,
+                "elapsed_time_s": 102.0,
+                "elapsed_bin_s": 60.0,
+                "std_channel": "Stack Voltage",
+                "value_mean": 14.3,
+                "value_min": 14.1,
+                "value_max": 14.5,
+            },
+        ]
+    )
+
+    wide = ElyticsDataProvider._pivot_timeseries(df, resolution="agg")
+
+    assert wide["Elapsed time"].tolist() == [0.0, 60.0]
+
+
+def test_pivot_timeseries_applies_percent_plausibility_limits():
+    df = pd.DataFrame(
+        [
+            {
+                "timestamp": None,
+                "elapsed_time_s": 60.0,
+                "elapsed_bin_s": 60.0,
+                "std_channel": "Energy Efficiency",
+                "value_mean": 250.0,
+                "value_min": -20.0,
+                "value_max": 500.0,
+            },
+        ]
+    )
+
+    wide = ElyticsDataProvider._pivot_timeseries(df, resolution="agg")
+
+    assert wide.loc[0, "Energy Efficiency_mean"] == 100.0
+    assert wide.loc[0, "Energy Efficiency_min"] == 0.0
+    assert wide.loc[0, "Energy Efficiency_max"] == 100.0

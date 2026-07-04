@@ -96,6 +96,7 @@ def test_co_reporting_channel_query_uses_experiment_identity(monkeypatch):
     query = captured["query"]
     assert captured["key_prefix"] == "co_reporting_channels"
     assert "FROM ps_xplatform_dev.co2elyd_dev.gold_channel_catalog_experiment" in query
+    assert "SELECT DISTINCT" in query
     assert "series = 'PoC Stack VI'" in query
     assert "experiment_id = 42" in query
     assert "uuid = 'run-uuid-001'" not in query
@@ -132,6 +133,7 @@ def test_co_reporting_window_query_can_use_uuid_group_identity(monkeypatch):
     assert "FROM ps_xplatform_dev.co2elyd_dev.gold_timeseries" in query
     assert "series = 'PoC Stack VI'" in query
     assert "experiment_id IN" in query
+    assert "SELECT DISTINCT experiment_id" in query
     assert "FROM ps_xplatform_dev.co2elyd_dev.gold_experiment_index" in query
     assert "uuid = 'run-uuid-001'" in query
     assert "`group` = 'Conditioning'" in query
@@ -142,8 +144,39 @@ def test_co_reporting_window_query_can_use_uuid_group_identity(monkeypatch):
     assert payload["meta"]["returned_points"] == 1
 
 
+def test_co_reporting_window_query_can_use_uuid_identity_for_all_groups(monkeypatch):
+    captured = {}
+
+    def fake_cache_get_or_query(key_prefix, query, source_name, **key_parts):
+        captured["query"] = query
+        return [{"elapsed_time_s": 60, "std_channel": "Stack Voltage", "value_mean": 14.2}]
+
+    monkeypatch.setattr(co_reporting_service, "_cache_get_or_query", fake_cache_get_or_query)
+
+    payload = co_reporting_service.query_timeseries_window(
+        series="PoC Stack VI",
+        experiment_id=None,
+        uuid="source-uuid-001",
+        group=None,
+        channels=["Stack Voltage"],
+        visible_start_s=0,
+        visible_end_s=7200,
+        prefetch_margin_s=900,
+        resolution="auto",
+    )
+
+    query = captured["query"]
+    assert "experiment_id IN" in query
+    assert "SELECT DISTINCT experiment_id" in query
+    assert "FROM ps_xplatform_dev.co2elyd_dev.gold_experiment_index" in query
+    assert "uuid = 'source-uuid-001'" in query
+    assert "`group` =" not in query
+    assert payload["meta"]["uuid"] == "source-uuid-001"
+    assert payload["meta"]["group"] is None
+
+
 def test_co_reporting_query_rejects_missing_identity():
-    with pytest.raises(ValueError, match="experiment_id or both uuid and group"):
+    with pytest.raises(ValueError, match="experiment_id or uuid"):
         co_reporting_service.query_timeseries_window(
             series="PoC Stack VI",
             experiment_id=None,
@@ -179,3 +212,24 @@ def test_cache_get_or_query_falls_back_when_redis_unavailable(monkeypatch):
     )
 
     assert result == [{"elapsed_time_s": 0, "std_channel": "Stack Voltage"}]
+
+
+def test_list_series_groups_ranks_duplicate_experiment_index_rows(monkeypatch):
+    captured = {}
+
+    def fake_cache_get_or_query(key_prefix, query, source_name, **key_parts):
+        captured["key_prefix"] = key_prefix
+        captured["query"] = query
+        captured["source_name"] = source_name
+        return []
+
+    monkeypatch.setattr(co_reporting_service, "_cache_get_or_query", fake_cache_get_or_query)
+
+    co_reporting_service.list_series_groups()
+
+    query = captured["query"]
+    assert captured["key_prefix"] == "co_reporting_series"
+    assert "PARTITION BY experiment_id, uuid, `group`" in query
+    assert "ORDER BY ingested_at DESC NULLS LAST" in query
+    assert "FROM ranked" in query
+    assert "WHERE row_num = 1" in query
